@@ -44,3 +44,5 @@ env/
 .genreleases/
 *.zip
 sdd-*/
+/.claude
+/.spec-kit
