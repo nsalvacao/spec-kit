@@ -1,5 +1,8 @@
 # Specification-Driven Development (SDD)
 
+> **Fork Extension:** This fork adds **Phase 0 (AI System Ideation)** before the SDD workflow.  
+> See `docs/methodology.md` for the full fork methodology and `docs/walkthrough.md` for the end‑to‑end workflow.
+
 ## The Power Inversion
 
 For decades, code has been king. Specifications served code—they were the scaffolding we built and then discarded once the "real work" of coding began. We wrote PRDs to guide development, created design docs to inform implementation, drew diagrams to visualize architecture. But these were always subordinate to the code itself. Code was truth. Everything else was, at best, good intentions. Code was the source of truth, and as it moved forward, specs rarely kept pace. As the asset (code) and the implementation are one, it's not easy to have a parallel implementation without trying to build from the code.
@@ -71,6 +74,12 @@ Today, practicing SDD requires assembling existing tools and maintaining discipl
 The key is treating specifications as the source of truth, with code as the generated output that serves the specification rather than the other way around.
 
 ## Streamlining SDD with Commands
+
+In this fork, Phase 0 commands run **before** `/speckit.constitution`:
+
+- `/speckit.ideate` → `/speckit.select` → `/speckit.structure` → `/speckit.validate`
+
+After Phase 0, the standard SDD commands apply.
 
 The SDD methodology is significantly enhanced through three powerful commands that automate the specification → planning → tasking workflow:
 

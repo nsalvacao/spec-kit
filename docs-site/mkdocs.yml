@@ -1,0 +1,27 @@
+site_name: Spec Kit (Fork)
+site_url: https://nsalvacao.github.io/spec-kit/
+repo_url: https://github.com/nsalvacao/spec-kit
+repo_name: nsalvacao/spec-kit
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Methodology: methodology.md
+  - Walkthrough: walkthrough.md
+  - Install: install.md
+  - Phase 0: phase0.md
+  - CLI Reference: cli.md
+  - Supported Agents: agents.md
+  - Distribution: distribution.md
+  - Compatibility: compatibility.md
+  - Upgrade: upgrade.md
+  - Local Development: local-development.md
+  - Upstream Sync: upstream-sync.md
+  - Release: release.md
+  - Trademarks: trademarks.md

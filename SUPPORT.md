@@ -2,18 +2,16 @@
 
 ## How to file issues and get help
 
-This project uses GitHub issues to track bugs and feature requests. Please search the existing issues before filing new issues to avoid duplicates. For new issues, file your bug or feature request as a new issue.
+This fork uses GitHub issues to track bugs and feature requests. Please search existing issues before filing a new one.
 
-For help or questions about using this project, please:
-
-- Open a [GitHub issue](https://github.com/github/spec-kit/issues/new) for bug reports, feature requests, or questions about the Spec-Driven Development methodology
-- Check the [comprehensive guide](./spec-driven.md) for detailed documentation on the Spec-Driven Development process
+- Open a new issue in `https://github.com/nsalvacao/spec-kit/issues/new`
+- Check the [comprehensive guide](./spec-driven.md) for Spec-Driven Development details
 - Review the [README](./README.md) for getting started instructions and troubleshooting tips
 
 ## Project Status
 
-**Spec Kit** is under active development and maintained by GitHub staff **AND THE COMMUNITY**. We will do our best to respond to support, feature requests, and community questions in a timely manner.
+This fork is independently maintained. Support is provided on a best-effort basis.
 
-## GitHub Support Policy
+## Scope
 
-Support for this project is limited to the resources listed above.
+Issues and questions should relate to this fork’s enhancements and documented behavior. For upstream-only questions, refer to `github/spec-kit`.

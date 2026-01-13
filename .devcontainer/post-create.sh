@@ -83,14 +83,20 @@ echo -e "\n🤖 Installing CodeBuddy CLI..."
 run_command "npm install -g @tencent-ai/codebuddy-code@latest"
 echo "✅ Done"
 
+# Installing CLI utilities
+echo -e "\n🧰 Installing CLI utilities (yq, ripgrep)..."
+run_command "sudo apt-get update"
+run_command "sudo apt-get install -y yq ripgrep"
+echo "✅ Done"
+
 # Installing UV (Python package manager)
 echo -e "\n🐍 Installing UV - Python Package Manager..."
 run_command "pipx install uv"
 echo "✅ Done"
 
-# Installing DocFx (for documentation site)
-echo -e "\n📚 Installing DocFx..."
-run_command "dotnet tool update -g docfx"
+# Installing MkDocs (for documentation site)
+echo -e "\n📚 Installing MkDocs Material..."
+run_command "pip install mkdocs-material"
 echo "✅ Done"
 
 echo -e "\n🧹 Cleaning cache..."

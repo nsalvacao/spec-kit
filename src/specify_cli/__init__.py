@@ -25,6 +25,7 @@ Or install globally:
 """
 
 import os
+from urllib.parse import urlparse
 import subprocess
 import sys
 import zipfile
@@ -634,9 +635,31 @@ def merge_json_files(existing_path: Path, new_content: dict, verbose: bool = Fal
 
     return merged
 
-def download_template_from_github(ai_assistant: str, download_dir: Path, *, script_type: str = "sh", verbose: bool = True, show_progress: bool = True, client: httpx.Client = None, debug: bool = False, github_token: str = None) -> Tuple[Path, dict]:
-    repo_owner = "github"
-    repo_name = "spec-kit"
+def parse_template_repo(template_repo: str | None) -> tuple[str, str]:
+    """Parse a template repo string (owner/name or GitHub URL) into owner/name."""
+    if not template_repo:
+        return "github", "spec-kit"
+    raw = template_repo.strip()
+    if not raw:
+        return "github", "spec-kit"
+
+    if raw.startswith("http://") or raw.startswith("https://"):
+        parsed = urlparse(raw)
+        if "github.com" not in parsed.netloc:
+            raise ValueError("Template repo URL must point to github.com")
+        path = parsed.path.strip("/")
+        if path.endswith(".git"):
+            path = path[:-4]
+        parts = path.split("/")
+    else:
+        parts = raw.split("/")
+
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ValueError("Template repo must be in the format 'owner/name'")
+
+    return parts[0], parts[1]
+
+def download_template_from_github(ai_assistant: str, download_dir: Path, *, script_type: str = "sh", verbose: bool = True, show_progress: bool = True, client: httpx.Client = None, debug: bool = False, github_token: str = None, repo_owner: str = "github", repo_name: str = "spec-kit") -> Tuple[Path, dict]:
     if client is None:
         client = httpx.Client(verify=ssl_context)
 
@@ -748,7 +771,7 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, scri
     }
     return zip_path, metadata
 
-def download_and_extract_template(project_path: Path, ai_assistant: str, script_type: str, is_current_dir: bool = False, *, verbose: bool = True, tracker: StepTracker | None = None, client: httpx.Client = None, debug: bool = False, github_token: str = None) -> Path:
+def download_and_extract_template(project_path: Path, ai_assistant: str, script_type: str, is_current_dir: bool = False, *, verbose: bool = True, tracker: StepTracker | None = None, client: httpx.Client = None, debug: bool = False, github_token: str = None, repo_owner: str = "github", repo_name: str = "spec-kit") -> Path:
     """Download the latest release and extract it to create a new project.
     Returns project_path. Uses tracker if provided (with keys: fetch, download, extract, cleanup)
     """
@@ -765,7 +788,9 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, script_
             show_progress=(tracker is None),
             client=client,
             debug=debug,
-            github_token=github_token
+            github_token=github_token,
+            repo_owner=repo_owner,
+            repo_name=repo_name,
         )
         if tracker:
             tracker.complete("fetch", f"release {meta['release']} ({meta['size']:,} bytes)")
@@ -947,6 +972,7 @@ def init(
     project_name: str = typer.Argument(None, help="Name for your new project directory (optional if using --here, or use '.' for current directory)"),
     ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, codebuddy, amp, shai, q, bob, or qoder "),
     script_type: str = typer.Option(None, "--script", help="Script type to use: sh or ps"),
+    template_repo: str = typer.Option(None, "--template-repo", help="Override template repo (owner/name). Defaults to SPECIFY_TEMPLATE_REPO or nsalvacao/spec-kit"),
     ignore_agent_tools: bool = typer.Option(False, "--ignore-agent-tools", help="Skip checks for AI agent tools like Claude Code"),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git repository initialization"),
     here: bool = typer.Option(False, "--here", help="Initialize project in the current directory instead of creating a new one"),
@@ -978,6 +1004,7 @@ def init(
         specify init --here --ai codebuddy
         specify init --here
         specify init --here --force  # Skip confirmation when current directory not empty
+        specify init . --template-repo my-org/spec-kit
     """
 
     show_banner()
@@ -1025,6 +1052,14 @@ def init(
 
     current_dir = Path.cwd()
 
+    template_repo_value = template_repo or os.getenv("SPECIFY_TEMPLATE_REPO") or "nsalvacao/spec-kit"
+    try:
+        repo_owner, repo_name = parse_template_repo(template_repo_value)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] Invalid template repo: {e}")
+        console.print("Expected format: owner/name or https://github.com/owner/name")
+        raise typer.Exit(1)
+
     setup_lines = [
         "[cyan]Specify Project Setup[/cyan]",
         "",
@@ -1034,6 +1069,9 @@ def init(
 
     if not here:
         setup_lines.append(f"{'Target Path':<15} [dim]{project_path}[/dim]")
+
+    if template_repo_value != "github/spec-kit":
+        setup_lines.append(f"{'Template Repo':<15} [dim]{template_repo_value}[/dim]")
 
     console.print(Panel("\n".join(setup_lines), border_style="cyan", padding=(1, 2)))
 
@@ -1124,7 +1162,19 @@ def init(
             local_ssl_context = ssl_context if verify else False
             local_client = httpx.Client(verify=local_ssl_context)
 
-            download_and_extract_template(project_path, selected_ai, selected_script, here, verbose=False, tracker=tracker, client=local_client, debug=debug, github_token=github_token)
+            download_and_extract_template(
+                project_path,
+                selected_ai,
+                selected_script,
+                here,
+                verbose=False,
+                tracker=tracker,
+                client=local_client,
+                debug=debug,
+                github_token=github_token,
+                repo_owner=repo_owner,
+                repo_name=repo_name,
+            )
 
             ensure_executable_scripts(project_path, tracker=tracker)
 
@@ -1251,6 +1301,24 @@ def check():
     tracker.add("git", "Git version control")
     git_ok = check_tool("git", tracker=tracker)
 
+    tracker.add("python", "Python 3")
+    python_ok = check_tool("python3")
+    if not python_ok:
+        python_ok = check_tool("python")
+    if python_ok:
+        tracker.complete("python", "available")
+    else:
+        tracker.error("python", "not found")
+
+    tracker.add("uv", "uv package manager")
+    uv_ok = check_tool("uv", tracker=tracker)
+
+    tracker.add("yq", "yq (YAML processor)")
+    yq_ok = check_tool("yq", tracker=tracker)
+
+    tracker.add("rg", "ripgrep (rg)")
+    rg_ok = check_tool("rg", tracker=tracker)
+
     agent_results = {}
     for agent_key, agent_config in AGENT_CONFIG.items():
         agent_name = agent_config["name"]
@@ -1278,6 +1346,18 @@ def check():
 
     if not git_ok:
         console.print("[dim]Tip: Install git for repository management[/dim]")
+
+    if not python_ok:
+        console.print("[dim]Tip: Install Python 3 for Specify CLI usage[/dim]")
+
+    if not uv_ok:
+        console.print("[dim]Tip: Install uv for dependency management[/dim]")
+
+    if not yq_ok:
+        console.print("[dim]Tip: Install yq for state management and validation scripts[/dim]")
+
+    if not rg_ok:
+        console.print("[dim]Tip: Install ripgrep (rg) for validation scripts[/dim]")
 
     if not any(agent_results.values()):
         console.print("[dim]Tip: Install an AI assistant for the best experience[/dim]")
@@ -1366,4 +1446,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

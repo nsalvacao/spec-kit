@@ -74,6 +74,114 @@ EOF
     esac
 done
 
+# Dependency checks (core tools used by Spec-Kit workflows)
+deps_missing=false
+missing_tools=()
+
+log_dep() {
+    if $JSON_MODE; then
+        echo "$@" >&2
+    else
+        echo "$@"
+    fi
+}
+
+OS_NAME="$(uname -s)"
+LINUX_ID=""
+if [[ "$OS_NAME" == "Linux" && -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    LINUX_ID="${ID:-}"
+fi
+
+install_hint() {
+    local tool="$1"
+    case "$tool" in
+        git)
+            if [[ "$OS_NAME" == "Darwin" ]]; then
+                log_dep "  macOS: brew install git"
+            elif [[ "$OS_NAME" == "Linux" ]]; then
+                log_dep "  Linux: sudo apt install git"
+            else
+                log_dep "  Windows: winget install --id Git.Git"
+            fi
+            ;;
+        python)
+            if [[ "$OS_NAME" == "Darwin" ]]; then
+                log_dep "  macOS: brew install python"
+            elif [[ "$OS_NAME" == "Linux" ]]; then
+                log_dep "  Linux: sudo apt install python3"
+            else
+                log_dep "  Windows: winget install --id Python.Python.3"
+            fi
+            ;;
+        uv)
+            if [[ "$OS_NAME" == "Darwin" ]]; then
+                log_dep "  macOS: brew install uv"
+            else
+                log_dep "  pipx: pipx install uv"
+                log_dep "  pip: pip install uv"
+            fi
+            ;;
+        yq)
+            if [[ "$OS_NAME" == "Darwin" ]]; then
+                log_dep "  macOS: brew install yq"
+            elif [[ "$OS_NAME" == "Linux" ]]; then
+                log_dep "  Linux: sudo apt install yq"
+            else
+                log_dep "  Windows: winget install --id MikeFarah.yq"
+            fi
+            ;;
+        rg)
+            if [[ "$OS_NAME" == "Darwin" ]]; then
+                log_dep "  macOS: brew install ripgrep"
+            elif [[ "$OS_NAME" == "Linux" ]]; then
+                log_dep "  Linux: sudo apt install ripgrep"
+            else
+                log_dep "  Windows: winget install --id BurntSushi.ripgrep.MSVC"
+            fi
+            ;;
+    esac
+}
+
+check_cmd() {
+    local cmd="$1"
+    local label="$2"
+    if command -v "$cmd" >/dev/null 2>&1; then
+        return 0
+    fi
+    missing_tools+=("$label")
+    deps_missing=true
+    log_dep "✗ Missing required tool: $label"
+    install_hint "$cmd"
+    log_dep ""
+    return 1
+}
+
+log_dep "Checking system dependencies..."
+check_cmd "git" "git"
+
+if command -v python3 >/dev/null 2>&1; then
+    :
+elif command -v python >/dev/null 2>&1; then
+    :
+else
+    missing_tools+=("python3")
+    deps_missing=true
+    log_dep "✗ Missing required tool: python3 (or python)"
+    install_hint "python"
+    log_dep ""
+fi
+
+check_cmd "uv" "uv"
+check_cmd "yq" "yq"
+check_cmd "rg" "rg (ripgrep)"
+
+if $deps_missing; then
+    log_dep "Missing required tools: ${missing_tools[*]}"
+    log_dep ""
+fi
+
 # Source common functions
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
@@ -95,6 +203,9 @@ if $PATHS_ONLY; then
         echo "FEATURE_SPEC: $FEATURE_SPEC"
         echo "IMPL_PLAN: $IMPL_PLAN"
         echo "TASKS: $TASKS"
+    fi
+    if $deps_missing; then
+        exit 1
     fi
     exit 0
 fi
@@ -163,4 +274,8 @@ else
     if $INCLUDE_TASKS; then
         check_file "$TASKS" "tasks.md"
     fi
+fi
+
+if $deps_missing; then
+    exit 1
 fi
