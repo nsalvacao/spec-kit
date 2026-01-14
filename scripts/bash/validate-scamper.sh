@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FILE_PATH="${1:-.spec-kit/ideas_backlog.md}"
-STATE_LOG=".specify/scripts/bash/state-log-violation.sh"
+STATE_LOG="scripts/bash/state-log-violation.sh"
 
 if [ ! -f "$FILE_PATH" ]; then
   echo "Error: ideas_backlog not found at $FILE_PATH"
