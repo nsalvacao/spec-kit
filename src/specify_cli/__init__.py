@@ -644,10 +644,10 @@ def merge_json_files(existing_path: Path, new_content: dict, verbose: bool = Fal
 def parse_template_repo(template_repo: str | None) -> tuple[str, str]:
     """Parse a template repo string (owner/name or GitHub URL) into owner/name."""
     if not template_repo:
-        return "github", "spec-kit"
+        return "nsalvacao", "spec-kit"
     raw = template_repo.strip()
     if not raw:
-        return "github", "spec-kit"
+        return "nsalvacao", "spec-kit"
 
     if raw.startswith("http://") or raw.startswith("https://"):
         parsed = urlparse(raw)
