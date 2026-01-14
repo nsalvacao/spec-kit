@@ -233,16 +233,21 @@ SCRIPT_TYPE_CHOICES = {"sh": "POSIX Shell (bash/zsh)", "ps": "PowerShell"}
 
 CLAUDE_LOCAL_PATH = Path.home() / ".claude" / "local" / "claude"
 
+FORK_NAME = "Nexo Spec Kit"
+DEFAULT_TEMPLATE_REPO = "nsalvacao/spec-kit"
+UPSTREAM_TEMPLATE_REPO = "github/spec-kit"
+
 BANNER = """
-███████╗██████╗ ███████╗ ██████╗██╗███████╗██╗   ██╗
-██╔════╝██╔══██╗██╔════╝██╔════╝██║██╔════╝╚██╗ ██╔╝
-███████╗██████╔╝█████╗  ██║     ██║█████╗   ╚████╔╝ 
-╚════██║██╔═══╝ ██╔══╝  ██║     ██║██╔══╝    ╚██╔╝  
-███████║██║     ███████╗╚██████╗██║██║        ██║   
-╚══════╝╚═╝     ╚══════╝ ╚═════╝╚═╝╚═╝        ╚═╝   
+███╗   ██╗███████╗██╗  ██╗ ██████╗
+████╗  ██║██╔════╝╚██╗██╔╝██╔═══██╗
+██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║
+██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║
+██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝
+╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ 
 """
 
-TAGLINE = "GitHub Spec Kit - Spec-Driven Development Toolkit"
+TAGLINE = "Nexo Spec Kit — Phase 0 Ideation + Spec-Driven Development"
+TAGLINE_SUB = "Fork of GitHub Spec Kit (not affiliated)"
 class StepTracker:
     """Track and render hierarchical steps without emojis, similar to Claude Code tree output.
     Supports live auto-refresh via an attached refresh callback.
@@ -436,7 +441,7 @@ class BannerGroup(TyperGroup):
 
 app = typer.Typer(
     name="specify",
-    help="Setup tool for Specify spec-driven development projects",
+    help="Nexo Spec Kit CLI — Phase 0 + Spec-Driven Development",
     add_completion=False,
     invoke_without_command=True,
     cls=BannerGroup,
@@ -454,6 +459,7 @@ def show_banner():
 
     console.print(Align.center(styled_banner))
     console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
+    console.print(Align.center(Text(TAGLINE_SUB, style="dim")))
     console.print()
 
 @app.callback()
@@ -1052,7 +1058,7 @@ def init(
 
     current_dir = Path.cwd()
 
-    template_repo_value = template_repo or os.getenv("SPECIFY_TEMPLATE_REPO") or "nsalvacao/spec-kit"
+    template_repo_value = template_repo or os.getenv("SPECIFY_TEMPLATE_REPO") or DEFAULT_TEMPLATE_REPO
     try:
         repo_owner, repo_name = parse_template_repo(template_repo_value)
     except ValueError as e:
@@ -1070,7 +1076,7 @@ def init(
     if not here:
         setup_lines.append(f"{'Target Path':<15} [dim]{project_path}[/dim]")
 
-    if template_repo_value != "github/spec-kit":
+    if template_repo_value != UPSTREAM_TEMPLATE_REPO:
         setup_lines.append(f"{'Template Repo':<15} [dim]{template_repo_value}[/dim]")
 
     console.print(Panel("\n".join(setup_lines), border_style="cyan", padding=(1, 2)))
@@ -1387,8 +1393,7 @@ def version():
             pass
     
     # Fetch latest template release version
-    repo_owner = "github"
-    repo_name = "spec-kit"
+    repo_owner, repo_name = parse_template_repo(DEFAULT_TEMPLATE_REPO)
     api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
     
     template_version = "unknown"
@@ -1423,6 +1428,7 @@ def version():
     info_table.add_column("Value", style="white")
 
     info_table.add_row("CLI Version", cli_version)
+    info_table.add_row("Template Repo", DEFAULT_TEMPLATE_REPO)
     info_table.add_row("Template Version", template_version)
     info_table.add_row("Released", release_date)
     info_table.add_row("", "")
@@ -1433,7 +1439,7 @@ def version():
 
     panel = Panel(
         info_table,
-        title="[bold cyan]Specify CLI Information[/bold cyan]",
+        title="[bold cyan]Nexo Spec Kit CLI Information[/bold cyan]",
         border_style="cyan",
         padding=(1, 2)
     )
