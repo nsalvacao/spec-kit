@@ -42,6 +42,8 @@ foreach ($section in $requiredSections) {
     }
 }
 
+$content = Get-Content -Path $FilePath
+
 $sectionRefs = @{}
 foreach ($section in $requiredSections) { $sectionRefs[$section] = $false }
 $currentSection = ''
@@ -75,7 +77,6 @@ if (-not (Select-String -Path $FilePath -Pattern 'When .*I want .*so I can' -Cas
     Fail-Check 'Job statement missing When/I want/So I can format'
 }
 
-$content = Get-Content -Path $FilePath
 $section = ''
 $subsection = ''
 $assumptionCount = 0
