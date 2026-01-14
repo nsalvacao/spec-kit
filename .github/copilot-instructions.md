@@ -73,8 +73,8 @@ scripts/                # Development and automation scripts
     ├── setup-plan.ps1
     └── update-agent-context.ps1
 
-src/specify_cli/        # Python source code for Specify CLI
-├── __init__.py        # Main CLI implementation (AGENT_CONFIG lives here)
+src/specify_cli/            # Python source code for Specify CLI
+    └── __init__.py         # Main CLI implementation (AGENT_CONFIG lives here)
 
 templates/              # Templates for SDD workflow
 ├── agent-file-template.md     # Template for agent context files
@@ -198,8 +198,8 @@ Keep PRs focused:
 ## Common Commands Reference
 
 ```bash
-# Install Specify CLI
-uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+# Install Specify CLI (from fork with Phase 0 integration)
+uv tool install specify-cli --from git+https://github.com/nsalvacao/spec-kit.git
 
 # Initialize new project
 specify init <project-name> --ai <agent-name>
@@ -218,7 +218,23 @@ uv run specify --help      # Test CLI
 
 ## Supported AI Agents
 
-Copilot, Claude Code, Gemini CLI, Cursor, Qwen Code, opencode, Codex CLI, Windsurf, Kilo Code, Auggie CLI, Roo Code, CodeBuddy CLI, Qoder CLI, Amazon Q Developer CLI, Amp, SHAI, IBM Bob
+- Copilot
+- Claude Code
+- Gemini CLI
+- Cursor
+- Qwen Code
+- opencode
+- Codex CLI
+- Windsurf
+- Kilo Code
+- Auggie CLI
+- Roo Code
+- CodeBuddy CLI
+- Qoder CLI
+- Amazon Q Developer CLI
+- Amp
+- SHAI
+- IBM Bob
 
 See `README.md` for the full list with links and support status.
 
