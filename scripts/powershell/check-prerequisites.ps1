@@ -53,6 +53,97 @@ EXAMPLES:
     exit 0
 }
 
+# Dependency checks (core tools used by Spec-Kit workflows)
+$depsMissing = $false
+$missingTools = @()
+
+function Write-Dep {
+    param([string]$Message)
+    if ($Json) {
+        Write-Warning $Message
+    } else {
+        Write-Output $Message
+    }
+}
+
+function Get-InstallHints {
+    param([string]$Tool)
+
+    if ($IsMacOS) {
+        switch ($Tool) {
+            'git' { return @('brew install git') }
+            'python' { return @('brew install python') }
+            'uv' { return @('brew install uv', 'pipx install uv', 'pip install uv') }
+            'yq' { return @('brew install yq') }
+            'rg' { return @('brew install ripgrep') }
+        }
+    } elseif ($IsLinux) {
+        switch ($Tool) {
+            'git' { return @('sudo apt install git') }
+            'python' { return @('sudo apt install python3') }
+            'uv' { return @('pipx install uv', 'pip install uv') }
+            'yq' { return @('sudo apt install yq') }
+            'rg' { return @('sudo apt install ripgrep') }
+        }
+    } else {
+        switch ($Tool) {
+            'git' { return @('winget install --id Git.Git') }
+            'python' { return @('winget install --id Python.Python.3') }
+            'uv' { return @('pipx install uv', 'pip install uv') }
+            'yq' { return @('winget install --id MikeFarah.yq') }
+            'rg' { return @('winget install --id BurntSushi.ripgrep.MSVC') }
+        }
+    }
+    return @()
+}
+
+function Add-MissingTool {
+    param(
+        [string]$Name,
+        [string[]]$Hints
+    )
+    $script:depsMissing = $true
+    $script:missingTools += [PSCustomObject]@{
+        Name = $Name
+        Hints = $Hints
+    }
+}
+
+Write-Dep "Checking system dependencies..."
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Add-MissingTool -Name 'git' -Hints (Get-InstallHints 'git')
+}
+
+$pythonCmd = Get-Command python3 -ErrorAction SilentlyContinue
+if (-not $pythonCmd) { $pythonCmd = Get-Command python -ErrorAction SilentlyContinue }
+if (-not $pythonCmd) {
+    Add-MissingTool -Name 'python3 (or python)' -Hints (Get-InstallHints 'python')
+}
+
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Add-MissingTool -Name 'uv' -Hints (Get-InstallHints 'uv')
+}
+
+if (-not (Get-Command yq -ErrorAction SilentlyContinue)) {
+    Add-MissingTool -Name 'yq' -Hints (Get-InstallHints 'yq')
+}
+
+if (-not (Get-Command rg -ErrorAction SilentlyContinue)) {
+    Add-MissingTool -Name 'rg (ripgrep)' -Hints (Get-InstallHints 'rg')
+}
+
+if ($missingTools.Count -gt 0) {
+    Write-Dep ("Missing required tools: {0}" -f (($missingTools | ForEach-Object { $_.Name }) -join ', '))
+    foreach ($tool in $missingTools) {
+        Write-Dep ("Install {0}:" -f $tool.Name)
+        foreach ($hint in $tool.Hints) {
+            if ($hint) { Write-Dep ("  {0}" -f $hint) }
+        }
+    }
+    Write-Dep ""
+}
+
 # Source common functions
 . "$PSScriptRoot/common.ps1"
 
@@ -82,6 +173,7 @@ if ($PathsOnly) {
         Write-Output "IMPL_PLAN: $($paths.IMPL_PLAN)"
         Write-Output "TASKS: $($paths.TASKS)"
     }
+    if ($depsMissing) { exit 1 }
     exit 0
 }
 
@@ -146,3 +238,5 @@ if ($Json) {
         Test-FileExists -Path $paths.TASKS -Description 'tasks.md' | Out-Null
     }
 }
+
+if ($depsMissing) { exit 1 }

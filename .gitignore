@@ -46,3 +46,10 @@ env/
 sdd-*/
 /.claude
 /.spec-kit
+/specs
+/.specify
+CLAUDE.md
+/.github/agents
+/.codex
+/.github/prompts
+/.spec-kit-dev-notes

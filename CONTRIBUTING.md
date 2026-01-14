@@ -1,6 +1,6 @@
-# Contributing to Spec Kit
+# Contributing to Spec Kit (Fork)
 
-Hi there! We're thrilled that you'd like to contribute to Spec Kit. Contributions to this project are [released](https://help.github.com/articles/github-terms-of-service/#6-contributions-under-repository-license) to the public under the [project's open source license](LICENSE).
+Hi there! Thanks for contributing. This repository is an independent fork of `github/spec-kit` and is not affiliated with GitHub. Contributions to this project are released to the public under the [project's open source license](LICENSE).
 
 Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
 
@@ -33,7 +33,7 @@ On [GitHub Codespaces](https://github.com/features/codespaces) it's even simpler
 ## Submitting a pull request
 
 > [!NOTE]
-> If your pull request introduces a large change that materially impacts the work of the CLI or the rest of the repository (e.g., you're introducing new templates, arguments, or otherwise major changes), make sure that it was **discussed and agreed upon** by the project maintainers. Pull requests with large changes that did not have a prior conversation and agreement will be closed.
+> If your pull request introduces a large change that materially impacts the CLI or repository (e.g., new templates, arguments, or other major changes), discuss it with the maintainer first. Large changes without prior agreement may be closed.
 
 1. Fork and clone the repository
 1. Configure and install the dependencies: `uv sync`
@@ -52,6 +52,15 @@ Here are a few things you can do that will increase the likelihood of your pull 
 - Keep your change as focused as possible. If there are multiple changes you would like to make that are not dependent upon each other, consider submitting them as separate pull requests.
 - Write a [good commit message](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 - Test your changes with the Spec-Driven Development workflow to ensure compatibility.
+
+### Upstream PR Policy
+
+If a change is broadly useful to upstream `github/spec-kit`, the maintainer may:
+
+- Ask you to open a corresponding upstream PR, or
+- Open one on your behalf with attribution
+
+Fork-specific changes (Phase 0 or distribution overrides) should target this fork only.
 
 ## Development workflow
 
