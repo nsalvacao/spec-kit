@@ -198,8 +198,10 @@ Keep PRs focused:
 ## Common Commands Reference
 
 ```bash
-# Install Specify CLI (from fork with Phase 0 integration)
+# Install Specify CLI from this fork (with Phase 0 integration)
 uv tool install specify-cli --from git+https://github.com/nsalvacao/spec-kit.git
+
+# Note: The upstream repository is github/spec-kit. This fork includes Phase 0: AI System Ideation.
 
 # Initialize new project
 specify init <project-name> --ai <agent-name>
