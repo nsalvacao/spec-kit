@@ -1,0 +1,84 @@
+name: ðŸ”¥ Bug Report
+description: Create a report to help us improve the Spec Kit
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category (Architecture)
+      description: Which part of the system is affected?
+      options:
+        - "cat:state-management (State & Scripts)"
+        - "cat:phase0-integration (Phase 0 to SDD)"
+        - "cat:automation-scripts (Phase 0 Automation)"
+        - "cat:validators (Coverage & Quality)"
+        - "cat:cli-ux (Features & UX)"
+        - "cat:framework-design (Methodology)"
+        - "cat:qa-docs (QA & Documentation)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How critical is this issue?
+      options:
+        - "severity:critical (Blocker)"
+        - "severity:high (Major)"
+        - "severity:medium (Standard)"
+        - "severity:low (Minor)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+      placeholder: "The state-update.sh script fails when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: To Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Run 'specify init'
+        2. Run 'state-update.sh'
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: Paste any relevant logs or screenshots here.
+      render: shell
+
+  - type: dropdown
+    id: assignee_pref
+    attributes:
+      label: Preferred Implementation Agent
+      description: Who should fix this? (Used for automated routing)
+      options:
+        - "Human (Nuno)"
+        - "AI Agent (Gemini/Claude)"
+      default: 0

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ðŸ¤” Questions & Discussions
+    url: https://github.com/nsalvacao/spec-kit/discussions
+    about: Please ask questions in Discussions before opening an issue.

@@ -1,0 +1,62 @@
+name: ðŸ”§ Technical Debt / Refactor
+description: Improvements to code quality, tests, or infrastructure
+title: "[TECH] "
+labels: ["tech-debt"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for code cleanup, refactoring, or infrastructure work that doesn't add user-facing features.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Area
+      options:
+        - "cat:state-management"
+        - "cat:phase0-integration"
+        - "cat:automation-scripts"
+        - "cat:validators"
+        - "cat:cli-ux"
+        - "cat:framework-design"
+        - "cat:qa-docs"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Current Implementation
+      description: What is the current state? Why is it problematic?
+      placeholder: "Currently, we use yq v3 syntax which breaks..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Improvement
+      description: How should we refactor this?
+      placeholder: "Rewrite in Python using ruamel.yaml..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk Level
+      description: How risky is this change?
+      options:
+        - "Low (Isolated)"
+        - "Medium (Component)"
+        - "High (System-wide)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: assignee_pref
+    attributes:
+      label: Preferred Implementation Agent
+      options:
+        - "Human (Nuno)"
+        - "AI Agent (Gemini/Claude)"

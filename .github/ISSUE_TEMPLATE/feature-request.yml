@@ -1,0 +1,60 @@
+name: ðŸš€ Feature Request
+description: Suggest an idea or enhancement for the project
+title: "[FEAT] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please focus on the value provided.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Target Category
+      options:
+        - "cat:state-management"
+        - "cat:phase0-integration"
+        - "cat:automation-scripts"
+        - "cat:validators"
+        - "cat:cli-ux"
+        - "cat:framework-design"
+        - "cat:qa-docs"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what the problem is.
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the solution you'd like
+      description: A clear and concise description of what you want to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: value
+    attributes:
+      label: Business Value / Impact
+      description: Why is this important? Who benefits?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - "severity:high (Must Have)"
+        - "severity:medium (Nice to Have)"
+        - "severity:low (Future)"
+    validations:
+      required: true
