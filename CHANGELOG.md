@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Shows available templates when no match is found for easier debugging
   - `[DEV MODE]` label in output makes local mode clearly visible
   - Local template ZIP files are preserved after extraction (no cleanup)
+- **Upstream #1480: `--keep-memory` option for `specify init`** - Preserve existing `.specify/memory/constitution.md` when switching AI agents
+  - New `--keep-memory` flag prevents overwriting existing constitution during template merge
+  - Example: `specify init . --ai gemini --keep-memory`
 
 ### Changed
 
