@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# This script is deprecated. Use the Python implementation directly.
-# This wrapper is kept for backwards compatibility but now calls Python.
+# This script is deprecated and only shows usage information.
+# Direct usage of the Python implementation is required.
 
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_SCRIPT="$SCRIPT_DIR/../python/state-update.py"

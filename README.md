@@ -107,7 +107,8 @@ For detailed guidance, see `docs/quickstart.md` and `docs/walkthrough.md`.
 ## 🔧 Prerequisites
 
 - **Linux/macOS/Windows**
-- **Python 3.11+** (includes PyYAML for state management)
+- **Python 3.11+**
+- **PyYAML** (required for state management; install via `pip install pyyaml`)
 - **uv** for package management
 - **Git**
 - **ripgrep (rg)** (validation scripts)

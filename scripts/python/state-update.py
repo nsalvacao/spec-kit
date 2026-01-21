@@ -45,7 +45,7 @@ import argparse
 import yaml
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 import json
 
 
@@ -72,8 +72,8 @@ def save_yaml(file_path: Path, data: Dict[str, Any]) -> None:
         with open(temp_file, 'w', encoding='utf-8') as f:
             yaml.safe_dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         
-        # Atomic move (rename)
-        temp_file.rename(file_path)
+        # Atomic move (replace for cross-platform compatibility)
+        temp_file.replace(file_path)
     except Exception as e:
         # Clean up temp file on error
         if temp_file.exists():

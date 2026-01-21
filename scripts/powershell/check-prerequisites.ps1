@@ -119,6 +119,12 @@ $pythonCmd = Get-Command python3 -ErrorAction SilentlyContinue
 if (-not $pythonCmd) { $pythonCmd = Get-Command python -ErrorAction SilentlyContinue }
 if (-not $pythonCmd) {
     Add-MissingTool -Name 'python3 (or python)' -Hints (Get-InstallHints 'python')
+} else {
+    # Check if PyYAML is installed
+    $pyYamlCheck = & $pythonCmd -c "import yaml" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Add-MissingTool -Name 'PyYAML' -Hints @('pip install pyyaml')
+    }
 }
 
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {

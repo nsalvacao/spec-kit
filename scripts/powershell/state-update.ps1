@@ -1,9 +1,5 @@
-param(
-    [Parameter(Mandatory=$false)][string]$Expression
-)
-
-# This script is deprecated. Use the Python implementation directly.
-# This wrapper is kept for backwards compatibility but now calls Python.
+# This script is deprecated and only shows usage information.
+# Direct usage of the Python implementation is required.
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonScript = Join-Path (Split-Path -Parent $scriptDir) 'python/state-update.py'
