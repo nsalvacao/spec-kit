@@ -541,16 +541,18 @@ def ensure_gitignore_security(project_path: Path, tracker: StepTracker | None = 
     
     try:
         existing_content = ""
+        existing_lines = []
         if gitignore_path.exists():
             with open(gitignore_path, 'r', encoding='utf-8') as f:
                 existing_content = f.read()
+                existing_lines = [line.strip() for line in existing_content.splitlines()]
         
-        # Check if patterns already exist
+        # Check if patterns already exist (line-by-line to avoid false positives)
         needs_update = False
         for pattern in security_patterns:
             if pattern.startswith("#"):
                 continue  # Skip comment line
-            if pattern not in existing_content:
+            if pattern.strip() not in existing_lines:
                 needs_update = True
                 break
         
@@ -1338,19 +1340,19 @@ def init(
     steps_lines.append(f"{step_num}. Start using slash commands with your AI agent:")
     steps_lines.append("")
     steps_lines.append("   [bold cyan]Phase 0: AI System Ideation[/bold cyan]")
-    steps_lines.append("   2.1 [cyan]/speckit.ideate[/] - Generate ideas using SCAMPER + HMW")
-    steps_lines.append("   2.2 [cyan]/speckit.select[/] - Score and select best idea using AI-RICE")
-    steps_lines.append("   2.3 [cyan]/speckit.structure[/] - Complete Integrated Canvas and vision brief")
+    steps_lines.append("   • [cyan]/speckit.ideate[/] - Generate ideas using SCAMPER + HMW")
+    steps_lines.append("   • [cyan]/speckit.select[/] - Score and select best idea using AI-RICE")
+    steps_lines.append("   • [cyan]/speckit.structure[/] - Complete Integrated Canvas and vision brief")
     steps_lines.append("")
     steps_lines.append("   [bold cyan]Core SDD Workflow[/bold cyan]")
-    steps_lines.append("   2.4 [cyan]/speckit.constitution[/] - Establish project principles")
-    steps_lines.append("   2.5 [cyan]/speckit.clarify[/] - Ask structured questions to de-risk ambiguities")
-    steps_lines.append("   2.6 [cyan]/speckit.specify[/] - Create baseline specification")
-    steps_lines.append("   2.7 [cyan]/speckit.plan[/] - Create implementation plan")
-    steps_lines.append("   2.8 [cyan]/speckit.checklist[/] - Validate requirements completeness & consistency")
-    steps_lines.append("   2.9 [cyan]/speckit.tasks[/] - Generate actionable tasks")
-    steps_lines.append("   2.10 [cyan]/speckit.analyze[/] - Check cross-artifact alignment")
-    steps_lines.append("   2.11 [cyan]/speckit.implement[/] - Execute implementation")
+    steps_lines.append("   • [cyan]/speckit.constitution[/] - Establish project principles")
+    steps_lines.append("   • [cyan]/speckit.clarify[/] - Ask structured questions to de-risk ambiguities")
+    steps_lines.append("   • [cyan]/speckit.specify[/] - Create baseline specification")
+    steps_lines.append("   • [cyan]/speckit.plan[/] - Create implementation plan")
+    steps_lines.append("   • [cyan]/speckit.checklist[/] - Validate requirements completeness & consistency")
+    steps_lines.append("   • [cyan]/speckit.tasks[/] - Generate actionable tasks")
+    steps_lines.append("   • [cyan]/speckit.analyze[/] - Check cross-artifact alignment")
+    steps_lines.append("   • [cyan]/speckit.implement[/] - Execute implementation")
 
     steps_panel = Panel("\n".join(steps_lines), title="Next Steps", border_style="cyan", padding=(1,2))
     console.print()
