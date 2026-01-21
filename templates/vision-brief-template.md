@@ -13,6 +13,7 @@ gate_g0_status: pending
 
 <!--
 Guidance:
+
 - Use the 7-section handoff format to align with Gate G0 automated checks.
 - Job statement must use: "When [situation], I want [motivation], so I can [outcome]."
 -->
@@ -58,7 +59,7 @@ Guidance:
 [From canvas component 8, with validation methods from component 9]
 
 | Assumption | Validation Method | Risk If Wrong | Tracking |
-|------------|-------------------|---------------|----------|
+| ------------ | ------------------- | --------------- | ---------- |
 | [Assumption 1] | [From component 9] | [Impact] | [How monitored] |
 | [Assumption 2] | [From component 9] | [Impact] | [How monitored] |
 | [Assumption 3] | [From component 9] | [Impact] | [How monitored] |
@@ -68,6 +69,7 @@ Guidance:
 ## Data & Model Strategy
 
 **Data Requirements**: [From canvas component 13 - Sources, Quality, Labeling, Bias, Privacy]
+
 - [Source 1 + availability %]
 - [Source 2 + availability %]
 - [Source 3 + availability %]
@@ -92,4 +94,4 @@ Guidance:
 
 ---
 
-**Approval**: _[Awaiting Gate G0 validation]_
+**Approval**: *[Awaiting Gate G0 validation]*

@@ -18,6 +18,7 @@ decision: PROCEED | BLOCK
 
 <!--
 Guidance:
+
 - Automated checks are non-waivable. Manual checks may be waived with justification + risk + mitigation + tracking.
 - Metrics should be SMART (Specific, Measurable, Achievable, Relevant, Time-bound).
 - Validation should enable validated learning and risk-aware decisions before handoff.
@@ -28,7 +29,7 @@ Guidance:
 ## Automated Checks (8 criteria)
 
 | ID | Criterion | Status | Evidence |
-|----|-----------|--------|----------|
+| ---- | ----------- | -------- | ---------- |
 | A1 | vision_brief.md exists | PASS/FAIL | [File found at path] |
 | A2 | All 7 sections present | PASS/FAIL | [Sections: One-Liner, Problem Statement, Solution Approach, Success Criteria, Key Assumptions, Data & Model Strategy, Constraints & Risks] |
 | A3 | No [PLACEHOLDER] tokens | PASS/FAIL | [0 placeholders found] |
@@ -43,7 +44,7 @@ Guidance:
 ## Manual Checks - Quality (5 criteria)
 
 | ID | Criterion | Status | Notes |
-|----|-----------|--------|-------|
+| ---- | ----------- | -------- | ------- |
 | Q1 | Assumptions have validation methods | PASS/FAIL/WAIVED | [Each assumption has method + effort] |
 | Q2 | Metrics are SMART | PASS/FAIL/WAIVED | [Targets, measures, timeframes defined] |
 | Q3 | Data sources concrete (named + availability %) | PASS/FAIL/WAIVED | [Sources with % readiness] |
@@ -55,7 +56,7 @@ Guidance:
 ## Manual Checks - AI-Specific (4 criteria)
 
 | ID | Criterion | Status | Notes |
-|----|-----------|--------|-------|
+| ---- | ----------- | -------- | ------- |
 | AI1 | Data readiness ≥60% | PASS/FAIL/WAIVED | [Calculated average readiness] |
 | AI2 | Evaluation strategy defined | PASS/FAIL/WAIVED | [Metrics, benchmarks, human review] |
 | AI3 | Safety assessment complete | PASS/FAIL/WAIVED | [Risks + mitigations] |
@@ -66,7 +67,7 @@ Guidance:
 ## Manual Checks - Consistency (3 criteria)
 
 | ID | Criterion | Status | Notes |
-|----|-----------|--------|-------|
+| ---- | ----------- | -------- | ------- |
 | C1 | JTBD outcomes ↔ Metrics alignment | PASS/FAIL/WAIVED | [Outcome-to-metric mapping] |
 | C2 | Lean solution ↔ AI task alignment | PASS/FAIL/WAIVED | [Solution maps to AI task] |
 | C3 | Constraints ↔ Model choice alignment | PASS/FAIL/WAIVED | [Latency/cost vs model] |
@@ -89,6 +90,7 @@ Guidance:
 ## Overall Assessment
 
 **Score Breakdown**:
+
 - Automated Checks: [X/8] passed
 - Manual Checks - Quality: [X/5] passed
 - Manual Checks - AI-Specific: [X/4] passed
@@ -98,17 +100,19 @@ Guidance:
 **Threshold**: ≥18/20 (90%) required for PROCEED
 
 **Status Determination**:
+
 - **PASS**: All 8 automated checks passed + ≥18/20 total score + no waivers
 - **PASS WITH WAIVER**: All 8 automated checks passed + ≥18/20 total score + waivers documented
 - **FAIL**: <18/20 total score OR automated checks failed
 
 **Decision**:
+
 - **PROCEED**: Ready for `/speckit.constitution` handoff
 - **BLOCK**: Fix issues and re-validate OR document additional waivers
 
 ---
 
-**User Approval**
+## User Approval
 
 **Name**: [User name]
 **Decision**: [PROCEED / BLOCK / REQUEST REVISION]

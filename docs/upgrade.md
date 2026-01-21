@@ -7,8 +7,8 @@
 ## Quick Reference
 
 | What to Upgrade | Command | When to Use |
-|----------------|---------|-------------|
-| **CLI Tool Only** | `uv tool install specify-cli --force --from git+https://github.com/nsalvacao/spec-kit.git` | Get latest CLI features without touching project files |
+| ---------------- | --------- | ------------- |
+| **CLI Tool Only** | `uv tool install specify-cli --force --from git+<https://github.com/nsalvacao/spec-kit.git`> | Get latest CLI features without touching project files |
 | **Project Files** | `specify init --here --force --ai <your-agent>` | Update slash commands, templates, and scripts in your project |
 | **Both** | Run CLI upgrade, then project update | Recommended for major version updates |
 
@@ -21,22 +21,22 @@ The CLI tool (`specify`) is separate from your project files. Upgrade it to get 
 ### If you installed with `uv tool install`
 
 ```bash
-uv tool install specify-cli --force --from git+https://github.com/nsalvacao/spec-kit.git
-```
+uv tool install specify-cli --force --from git+<https://github.com/nsalvacao/spec-kit.git>
+```bash
 
 ### If you use one-shot `uvx` commands
 
 No upgrade needed—`uvx` always fetches the latest version. Just run your commands as normal:
 
 ```bash
-uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init --here --ai copilot
-```
+uvx --from git+<https://github.com/nsalvacao/spec-kit.git> specify init --here --ai copilot
+```bash
 
 ### Verify the upgrade
 
 ```bash
 specify check
-```
+```bash
 
 This shows installed tools and confirms the CLI is working.
 
@@ -72,7 +72,7 @@ Run this inside your project directory:
 
 ```bash
 specify init --here --force --ai <your-agent>
-```
+```bash
 
 Replace `<your-agent>` with your AI assistant. Refer to [Supported AI Agents](./agents.md).
 
@@ -80,7 +80,7 @@ Replace `<your-agent>` with your AI assistant. Refer to [Supported AI Agents](./
 
 ```bash
 specify init --here --force --ai copilot
-```
+```bash
 
 ### Understanding the `--force` flag
 
@@ -90,7 +90,7 @@ Without `--force`, the CLI warns you and asks for confirmation:
 Warning: Current directory is not empty (25 items)
 Template files will be merged with existing content and may overwrite existing files
 Proceed? [y/N]
-```
+```bash
 
 With `--force`, it skips the confirmation and proceeds immediately.
 
@@ -107,33 +107,42 @@ With `--force`, it skips the confirmation and proceeds immediately.
 **Workaround:**
 
 ```bash
+
 # 1. Back up your constitution before upgrading
+
 cp .specify/memory/constitution.md .specify/memory/constitution-backup.md
 
 # 2. Run the upgrade
+
 specify init --here --force --ai copilot
 
 # 3. Restore your customized constitution
+
 mv .specify/memory/constitution-backup.md .specify/memory/constitution.md
-```
+```bash
 
 Or use git to restore it:
 
 ```bash
+
 # After upgrade, restore from git history
+
 git restore .specify/memory/constitution.md
-```
+```bash
 
 ### 2. Custom template modifications
 
 If you customized any templates in `.specify/templates/`, the upgrade will overwrite them. Back them up first:
 
 ```bash
+
 # Back up custom templates
+
 cp -r .specify/templates .specify/templates-backup
 
 # After upgrade, merge your changes back manually
-```
+
+```bash
 
 ### 3. Duplicate slash commands (IDE-based agents)
 
@@ -144,16 +153,20 @@ Some IDE-based agents (like Kilo Code, Windsurf) may show **duplicate slash comm
 **Example for Kilo Code:**
 
 ```bash
+
 # Navigate to the agent's commands folder
+
 cd .kilocode/rules/
 
 # List files and identify duplicates
+
 ls -la
 
 # Delete old versions (example filenames - yours may differ)
+
 rm speckit.specify-old.md
 rm speckit.plan-v1.md
-```
+```bash
 
 Restart your IDE to refresh the command list.
 
@@ -164,65 +177,85 @@ Restart your IDE to refresh the command list.
 ### Scenario 1: "I just want new slash commands"
 
 ```bash
+
 # Upgrade CLI (if using persistent install)
-uv tool install specify-cli --force --from git+https://github.com/nsalvacao/spec-kit.git
+
+uv tool install specify-cli --force --from git+<https://github.com/nsalvacao/spec-kit.git>
 
 # Update project files to get new commands
+
 specify init --here --force --ai copilot
 
 # Restore your constitution if customized
+
 git restore .specify/memory/constitution.md
-```
+```bash
 
 ### Scenario 2: "I customized templates and constitution"
 
 ```bash
+
 # 1. Back up customizations
+
 cp .specify/memory/constitution.md /tmp/constitution-backup.md
 cp -r .specify/templates /tmp/templates-backup
 
 # 2. Upgrade CLI
-uv tool install specify-cli --force --from git+https://github.com/nsalvacao/spec-kit.git
+
+uv tool install specify-cli --force --from git+<https://github.com/nsalvacao/spec-kit.git>
 
 # 3. Update project
+
 specify init --here --force --ai copilot
 
 # 4. Restore customizations
+
 mv /tmp/constitution-backup.md .specify/memory/constitution.md
+
 # Manually merge template changes if needed
-```
+
+```bash
 
 ### Scenario 3: "I see duplicate slash commands in my IDE"
 
 This happens with IDE-based agents (Kilo Code, Windsurf, Roo Code, etc.).
 
 ```bash
+
 # Find the agent folder (example: .kilocode/rules/)
+
 cd .kilocode/rules/
 
 # List all files
+
 ls -la
 
 # Delete old command files
+
 rm speckit.old-command-name.md
 
 # Restart your IDE
-```
+
+```bash
 
 ### Scenario 4: "I'm working on a project without Git"
 
 If you initialized your project with `--no-git`, you can still upgrade:
 
 ```bash
+
 # Manually back up files you customized
+
 cp .specify/memory/constitution.md /tmp/constitution-backup.md
 
 # Run upgrade
+
 specify init --here --force --ai copilot --no-git
 
 # Restore customizations
+
 mv /tmp/constitution-backup.md .specify/memory/constitution.md
-```
+```bash
 
 The `--no-git` flag skips git initialization but doesn't affect file updates.
 
@@ -240,13 +273,13 @@ The `--no-git` flag tells Spec Kit to **skip git repository initialization**. Th
 
 ```bash
 specify init my-project --ai copilot --no-git
-```
+```bash
 
 **During upgrade:**
 
 ```bash
 specify init --here --force --ai copilot --no-git
-```
+```bash
 
 ### What `--no-git` does NOT do
 
@@ -263,12 +296,15 @@ If you use `--no-git`, you'll need to manage feature directories manually:
 **Set the `SPECIFY_FEATURE` environment variable** before using planning commands:
 
 ```bash
+
 # Bash/Zsh
+
 export SPECIFY_FEATURE="001-my-feature"
 
 # PowerShell
+
 $env:SPECIFY_FEATURE = "001-my-feature"
-```
+```bash
 
 This tells Spec Kit which feature directory to use when creating specs, plans, and tasks.
 
@@ -293,7 +329,7 @@ This tells Spec Kit which feature directory to use when creating specs, plans, a
    ls -la .cursor/commands/       # Cursor
    ```
 
-3. **Check agent-specific setup:**
+1. **Check agent-specific setup:**
    - Codex requires `CODEX_HOME` environment variable
    - Some agents need workspace restart or cache clearing
 
@@ -302,12 +338,15 @@ This tells Spec Kit which feature directory to use when creating specs, plans, a
 **Fix:** Restore from git or backup:
 
 ```bash
+
 # If you committed before upgrading
+
 git restore .specify/memory/constitution.md
 
 # If you backed up manually
+
 cp /tmp/constitution-backup.md .specify/memory/constitution.md
-```
+```bash
 
 **Prevention:** Always commit or back up `constitution.md` before upgrading.
 
@@ -319,7 +358,7 @@ cp /tmp/constitution-backup.md .specify/memory/constitution.md
 Warning: Current directory is not empty (25 items)
 Template files will be merged with existing content and may overwrite existing files
 Do you want to continue? [y/N]
-```
+```bash
 
 **What this means:**
 
@@ -368,23 +407,27 @@ Only Spec Kit infrastructure files:
 Verify the installation:
 
 ```bash
+
 # Check installed tools
+
 uv tool list
 
 # Should show specify-cli
 
 # Verify path
+
 which specify
 
 # Should point to the uv tool installation directory
-```
+
+```bash
 
 If not found, reinstall:
 
 ```bash
 uv tool uninstall specify-cli
-uv tool install specify-cli --from git+https://github.com/nsalvacao/spec-kit.git
-```
+uv tool install specify-cli --from git+<https://github.com/nsalvacao/spec-kit.git>
+```bash
 
 ### "Do I need to run specify every time I open my project?"
 
@@ -412,11 +455,11 @@ Once you've run `specify init`, the slash commands (like `/speckit.specify`, `/s
    ls -la .claude/commands/
    ```
 
-2. **Restart your IDE/editor completely** (not just reload window)
+1. **Restart your IDE/editor completely** (not just reload window)
 
-3. **Check you're in the correct directory** where you ran `specify init`
+1. **Check you're in the correct directory** where you ran `specify init`
 
-4. **For some agents**, you may need to reload the workspace or clear cache
+1. **For some agents**, you may need to reload the workspace or clear cache
 
 **Related issue:** If Copilot can't open local files or uses PowerShell commands unexpectedly, this is typically an IDE context issue, not related to `specify`. Try:
 
@@ -439,6 +482,6 @@ Spec Kit follows semantic versioning for major releases. The CLI and project fil
 After upgrading:
 
 - **Test new slash commands:** Run `/speckit.constitution` or another command to verify everything works
-- **Review release notes:** Check [GitHub Releases](https://github.com/nsalvacao/spec-kit/releases) for new features and breaking changes
+- **Review release notes:** Check [GitHub Releases](<https://github.com/nsalvacao/spec-kit/releases>) for new features and breaking changes
 - **Update workflows:** If new commands were added, update your team's development workflows
-- **Check documentation:** Visit [github.io/spec-kit](https://github.github.io/spec-kit/) for updated guides
+- **Check documentation:** Visit [github.io/spec-kit](<https://github.github.io/spec-kit/>) for updated guides

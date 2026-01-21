@@ -124,7 +124,8 @@ Here's how these commands transform the traditional development workflow:
 4. Write technical specifications (3-4 hours)
 5. Create test plans (2 hours)
 Total: ~12 hours of documentation work
-```
+
+```text
 
 **SDD with Commands Approach:**
 
@@ -180,9 +181,11 @@ The true power of these commands lies not just in automation, but in how the tem
 The feature specification template explicitly instructs:
 
 ```text
+
 - ✅ Focus on WHAT users need and WHY
 - ❌ Avoid HOW to implement (no tech stack, APIs, code structure)
-```
+
+```text
 
 This constraint forces the LLM to maintain proper abstraction levels. When an LLM might naturally jump to "implement using React with Redux," the template keeps it focused on "users need real-time updates of their data." This separation ensures specifications remain stable even as implementation technologies change.
 
@@ -203,12 +206,14 @@ This prevents the common LLM behavior of making plausible but potentially incorr
 The templates include comprehensive checklists that act as "unit tests" for the specification:
 
 ```markdown
+
 ### Requirement Completeness
 
 - [ ] No [NEEDS CLARIFICATION] markers remain
 - [ ] Requirements are testable and unambiguous
 - [ ] Success criteria are measurable
-```
+
+```text
 
 These checklists force the LLM to self-review its output systematically, catching gaps that might otherwise slip through. It's like giving the LLM a quality assurance framework.
 
@@ -240,7 +245,8 @@ The templates enforce proper information architecture:
 **IMPORTANT**: This implementation plan should remain high-level and readable.
 Any code samples, detailed algorithms, or extensive technical specifications
 must be placed in the appropriate `implementation-details/` file
-```
+
+```text
 
 This prevents the common problem of specifications becoming unreadable code dumps. The LLM learns to maintain appropriate detail levels, extracting complexity to separate files while keeping the main document navigable.
 
@@ -262,9 +268,11 @@ This ordering constraint ensures the LLM thinks about testability and contracts 
 Templates explicitly discourage speculation:
 
 ```text
+
 - [ ] No speculative or "might need" features
 - [ ] All phases have clear prerequisites and deliverables
-```
+
+```text
 
 This stops the LLM from adding "nice to have" features that complicate implementation. Every feature must trace back to a concrete user story with clear acceptance criteria.
 
@@ -306,10 +314,12 @@ Every library must expose its functionality through a command-line interface:
 
 ```text
 All CLI interfaces MUST:
+
 - Accept text as input (via stdin, arguments, or files)
 - Produce text as output (via stdout)
 - Support JSON format for structured data exchange
-```
+
+```text
 
 This enforces observability and testability. The LLM cannot hide functionality inside opaque classes—everything must be accessible and verifiable through text-based interfaces.
 
@@ -333,12 +343,15 @@ These paired articles combat over-engineering:
 
 ```text
 Section 7.3: Minimal Project Structure
+
 - Maximum 3 projects for initial implementation
 - Additional projects require documented justification
 
 Section 8.1: Framework Trust
+
 - Use framework features directly rather than wrapping them
-```
+
+```text
 
 When an LLM might naturally create elaborate abstractions, these articles force it to justify every layer of complexity. The implementation plan template's "Phase -1 Gates" directly enforce these principles.
 
@@ -360,6 +373,7 @@ This ensures generated code works in practice, not just in theory.
 The implementation plan template operationalizes these articles through concrete checkpoints:
 
 ```markdown
+
 ### Phase -1: Pre-Implementation Gates
 
 #### Simplicity Gate (Article VII)
@@ -376,7 +390,8 @@ The implementation plan template operationalizes these articles through concrete
 
 - [ ] Contracts defined?
 - [ ] Contract tests written?
-```
+
+```text
 
 These gates act as compile-time checks for architectural principles. The LLM cannot proceed without either passing the gates or documenting justified exceptions in the "Complexity Tracking" section.
 

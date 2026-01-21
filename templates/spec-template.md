@@ -14,6 +14,7 @@
   
   Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
   Think of each story as a standalone slice of functionality that can be:
+
   - Developed independently
   - Tested independently
   - Deployed independently

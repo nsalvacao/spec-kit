@@ -9,9 +9,9 @@ Please note that this project is released with a [Contributor Code of Conduct](C
 These are one time installations required to be able to test your changes locally as part of the pull request (PR) submission process.
 
 1. Install [Python 3.11+](https://www.python.org/downloads/)
-1. Install [uv](https://docs.astral.sh/uv/) for package management
-1. Install [Git](https://git-scm.com/downloads)
-1. Have an [AI coding agent available](README.md#-supported-ai-agents)
+2. Install [uv](https://docs.astral.sh/uv/) for package management
+3. Install [Git](https://git-scm.com/downloads)
+4. Have an [AI coding agent available](README.md#-supported-ai-agents)
 
 <details>
 <summary><b>💡 Hint if you are using <code>VSCode</code> or <code>GitHub Codespaces</code> as your IDE</b></summary>
@@ -36,13 +36,13 @@ On [GitHub Codespaces](https://github.com/features/codespaces) it's even simpler
 > If your pull request introduces a large change that materially impacts the CLI or repository (e.g., new templates, arguments, or other major changes), discuss it with the maintainer first. Large changes without prior agreement may be closed.
 
 1. Fork and clone the repository
-1. Configure and install the dependencies: `uv sync`
-1. Make sure the CLI works on your machine: `uv run specify --help`
-1. Create a new branch: `git checkout -b my-branch-name`
-1. Make your change, add tests, and make sure everything still works
-1. Test the CLI functionality with a sample project if relevant
-1. Push to your fork and submit a pull request
-1. Wait for your pull request to be reviewed and merged.
+2. Configure and install the dependencies: `uv sync`
+3. Make sure the CLI works on your machine: `uv run specify --help`
+4. Create a new branch: `git checkout -b my-branch-name`
+5. Make your change, add tests, and make sure everything still works
+6. Test the CLI functionality with a sample project if relevant
+7. Push to your fork and submit a pull request
+8. Wait for your pull request to be reviewed and merged.
 
 Here are a few things you can do that will increase the likelihood of your pull request being accepted:
 
@@ -84,13 +84,13 @@ To test your templates, commands, and other changes locally, follow these steps:
    ./.github/workflows/scripts/create-release-packages.sh v1.0.0
    ```
 
-2. **Copy the relevant package to your test project**
+1. **Copy the relevant package to your test project**
 
    ```bash
    cp -r .genreleases/sdd-copilot-package-sh/. <path-to-test-project>/
    ```
 
-3. **Open and test the agent**
+1. **Open and test the agent**
 
    Navigate to your test project folder and open the agent to verify your implementation.
 

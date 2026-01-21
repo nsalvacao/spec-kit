@@ -14,6 +14,7 @@ total_count: [TOTAL_COUNT]
 
 <!--
 Guidance:
+
 - SCAMPER uses seven lenses: Substitute, Combine, Adapt, Modify, Put to another use, Eliminate, Reverse.
 - Each seed idea MUST produce one variation per lens (7 total).
 - HMW (How Might We) questions should open the problem space; create 5+ across Data/Model/Safety/Cost/UX.
@@ -25,6 +26,7 @@ Guidance:
 <!-- Add 2-5 seed ideas. Use Tag: SEED only. -->
 
 ### Idea S1
+
 **Text**: [1-3 sentence description]
 **Tag**: SEED
 **Generated**: [ISO_8601_TIMESTAMP]
@@ -32,6 +34,7 @@ Guidance:
 ---
 
 ### Idea S2
+
 **Text**: [1-3 sentence description]
 **Tag**: SEED
 **Generated**: [ISO_8601_TIMESTAMP]
@@ -43,6 +46,7 @@ Guidance:
 <!--
 Tag format: SCAMPER-<Lens>
 Lens values (exact):
+
 - Substitute
 - Combine
 - Adapt
@@ -54,6 +58,7 @@ Each variation MUST include Provenance linking to the originating seed idea.
 -->
 
 ### Idea SC1-Substitute
+
 **Text**: [variation description]
 **Tag**: SCAMPER-Substitute
 **Provenance**: Derived from Seed Idea S1
@@ -62,6 +67,7 @@ Each variation MUST include Provenance linking to the originating seed idea.
 ---
 
 ### Idea SC1-Combine
+
 **Text**: [variation description]
 **Tag**: SCAMPER-Combine
 **Provenance**: Derived from Seed Idea S1
@@ -70,6 +76,7 @@ Each variation MUST include Provenance linking to the originating seed idea.
 ---
 
 ### Idea SC1-Adapt
+
 **Text**: [variation description]
 **Tag**: SCAMPER-Adapt
 **Provenance**: Derived from Seed Idea S1
@@ -78,6 +85,7 @@ Each variation MUST include Provenance linking to the originating seed idea.
 ---
 
 ### Idea SC1-Modify
+
 **Text**: [variation description]
 **Tag**: SCAMPER-Modify
 **Provenance**: Derived from Seed Idea S1
@@ -86,6 +94,7 @@ Each variation MUST include Provenance linking to the originating seed idea.
 ---
 
 ### Idea SC1-Put-to-another-use
+
 **Text**: [variation description]
 **Tag**: SCAMPER-Put-to-another-use
 **Provenance**: Derived from Seed Idea S1
@@ -94,6 +103,7 @@ Each variation MUST include Provenance linking to the originating seed idea.
 ---
 
 ### Idea SC1-Eliminate
+
 **Text**: [variation description]
 **Tag**: SCAMPER-Eliminate
 **Provenance**: Derived from Seed Idea S1
@@ -102,6 +112,7 @@ Each variation MUST include Provenance linking to the originating seed idea.
 ---
 
 ### Idea SC1-Reverse
+
 **Text**: [variation description]
 **Tag**: SCAMPER-Reverse
 **Provenance**: Derived from Seed Idea S1
@@ -120,6 +131,7 @@ Dimension values (suggested): Data, Model, Safety, Cost, UX
 -->
 
 ### Idea HMW1
+
 **Text**: [expansion description]
 **Tag**: HMW-Data
 **Provenance**: Generated from question "How might we ensure data quality at scale?"
@@ -128,6 +140,7 @@ Dimension values (suggested): Data, Model, Safety, Cost, UX
 ---
 
 ### Idea HMW2
+
 **Text**: [expansion description]
 **Tag**: HMW-Model
 **Provenance**: Generated from question "How might we reduce hallucinations?"
@@ -136,6 +149,7 @@ Dimension values (suggested): Data, Model, Safety, Cost, UX
 ---
 
 ### Idea HMW3
+
 **Text**: [expansion description]
 **Tag**: HMW-Safety
 **Provenance**: Generated from question "How might we prevent jailbreaks?"
@@ -144,6 +158,7 @@ Dimension values (suggested): Data, Model, Safety, Cost, UX
 ---
 
 ### Idea HMW4
+
 **Text**: [expansion description]
 **Tag**: HMW-Cost
 **Provenance**: Generated from question "How might we control inference cost?"
@@ -152,6 +167,7 @@ Dimension values (suggested): Data, Model, Safety, Cost, UX
 ---
 
 ### Idea HMW5
+
 **Text**: [expansion description]
 **Tag**: HMW-UX
 **Provenance**: Generated from question "How might we keep context across turns?"

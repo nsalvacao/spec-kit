@@ -29,25 +29,25 @@ Specify supports multiple AI agents by generating agent-specific command files a
 
 ### Current Supported Agents
 
-| Agent                      | Directory              | Format   | CLI Tool        | Description                 |
+| Agent | Directory | Format | CLI Tool | Description |
 | -------------------------- | ---------------------- | -------- | --------------- | --------------------------- |
-| **Claude Code**            | `.claude/commands/`    | Markdown | `claude`        | Anthropic's Claude Code CLI |
-| **Gemini CLI**             | `.gemini/commands/`    | TOML     | `gemini`        | Google's Gemini CLI         |
-| **GitHub Copilot**         | `.github/agents/`      | Markdown | N/A (IDE-based) | GitHub Copilot in VS Code   |
-| **Cursor**                 | `.cursor/commands/`    | Markdown | `cursor-agent`  | Cursor CLI                  |
-| **Qwen Code**              | `.qwen/commands/`      | TOML     | `qwen`          | Alibaba's Qwen Code CLI     |
-| **opencode**               | `.opencode/command/`   | Markdown | `opencode`      | opencode CLI                |
-| **Codex CLI**              | `.codex/commands/`     | Markdown | `codex`         | Codex CLI                   |
-| **Windsurf**               | `.windsurf/workflows/` | Markdown | N/A (IDE-based) | Windsurf IDE workflows      |
-| **Kilo Code**              | `.kilocode/rules/`     | Markdown | N/A (IDE-based) | Kilo Code IDE               |
-| **Auggie CLI**             | `.augment/rules/`      | Markdown | `auggie`        | Auggie CLI                  |
-| **Roo Code**               | `.roo/rules/`          | Markdown | N/A (IDE-based) | Roo Code IDE                |
-| **CodeBuddy CLI**          | `.codebuddy/commands/` | Markdown | `codebuddy`     | CodeBuddy CLI               |
-| **Qoder CLI**              | `.qoder/commands/`     | Markdown | `qoder`         | Qoder CLI                   |
-| **Amazon Q Developer CLI** | `.amazonq/prompts/`    | Markdown | `q`             | Amazon Q Developer CLI      |
-| **Amp**                    | `.agents/commands/`    | Markdown | `amp`           | Amp CLI                     |
-| **SHAI**                   | `.shai/commands/`      | Markdown | `shai`          | SHAI CLI                    |
-| **IBM Bob**                | `.bob/commands/`       | Markdown | N/A (IDE-based) | IBM Bob IDE                 |
+| **Claude Code** | `.claude/commands/` | Markdown | `claude` | Anthropic's Claude Code CLI |
+| **Gemini CLI** | `.gemini/commands/` | TOML | `gemini` | Google's Gemini CLI |
+| **GitHub Copilot** | `.github/agents/` | Markdown | N/A (IDE-based) | GitHub Copilot in VS Code |
+| **Cursor** | `.cursor/commands/` | Markdown | `cursor-agent` | Cursor CLI |
+| **Qwen Code** | `.qwen/commands/` | TOML | `qwen` | Alibaba's Qwen Code CLI |
+| **opencode** | `.opencode/command/` | Markdown | `opencode` | opencode CLI |
+| **Codex CLI** | `.codex/commands/` | Markdown | `codex` | Codex CLI |
+| **Windsurf** | `.windsurf/workflows/` | Markdown | N/A (IDE-based) | Windsurf IDE workflows |
+| **Kilo Code** | `.kilocode/rules/` | Markdown | N/A (IDE-based) | Kilo Code IDE |
+| **Auggie CLI** | `.augment/rules/` | Markdown | `auggie` | Auggie CLI |
+| **Roo Code** | `.roo/rules/` | Markdown | N/A (IDE-based) | Roo Code IDE |
+| **CodeBuddy CLI** | `.codebuddy/commands/` | Markdown | `codebuddy` | CodeBuddy CLI |
+| **Qoder CLI** | `.qoder/commands/` | Markdown | `qoder` | Qoder CLI |
+| **Amazon Q Developer CLI** | `.amazonq/prompts/` | Markdown | `q` | Amazon Q Developer CLI |
+| **Amp** | `.agents/commands/` | Markdown | `amp` | Amp CLI |
+| **SHAI** | `.shai/commands/` | Markdown | `shai` | SHAI CLI |
+| **IBM Bob** | `.bob/commands/` | Markdown | N/A (IDE-based) | IBM Bob IDE |
 
 ### Step-by-Step Integration Guide
 
@@ -69,6 +69,7 @@ AGENT_CONFIG = {
         "requires_cli": True,  # True if CLI tool required, False for IDE-based agents
     },
 }
+
 ```
 
 **Key Design Principle**: The dictionary key should match the actual executable name that users install. For example:
@@ -112,6 +113,7 @@ Modify `.github/workflows/scripts/create-release-packages.sh`:
 
 ```bash
 ALL_AGENTS=(claude gemini copilot cursor-agent qwen opencode windsurf q)
+
 ```
 
 ##### Add case statement for directory structure
@@ -135,6 +137,7 @@ gh release create "$VERSION" \
   .genreleases/spec-kit-template-windsurf-sh-"$VERSION".zip \
   .genreleases/spec-kit-template-windsurf-ps-"$VERSION".zip \
   # Add new agent packages here
+
 ```
 
 #### 5. Update Agent Context Scripts
@@ -159,6 +162,7 @@ case "$AGENT_TYPE" in
     # Update default creation condition
     ;;
 esac
+
 ```
 
 ##### PowerShell script (`scripts/powershell/update-agent-context.ps1`)
@@ -185,6 +189,7 @@ switch ($AgentType) {
         # Update default creation condition
     }
 }
+
 ```
 
 #### 6. Update CLI Tool Checks (Optional)
@@ -230,9 +235,11 @@ AGENT_CONFIG = {
 }
 
 # Then you need special cases everywhere:
+
 cli_tool = agent_key
 if agent_key == "cursor":
     cli_tool = "cursor-agent"  # Map to the real tool name
+
 ```
 
 ✅ **Correct approach** (no mapping needed):
@@ -275,6 +282,7 @@ For agents available as VS Code extensions, add them to `.devcontainer/devcontai
     }
   }
 }
+
 ```
 
 ##### CLI-based Agents
@@ -339,6 +347,7 @@ description: "Command description"
 ---
 
 Command content with {SCRIPT} and $ARGUMENTS placeholders.
+
 ```
 
 **GitHub Copilot Chat Mode format:**
@@ -362,6 +371,7 @@ description = "Command description"
 prompt = """
 Command content with {SCRIPT} and {{args}} placeholders.
 """
+
 ```
 
 ## Directory Conventions
