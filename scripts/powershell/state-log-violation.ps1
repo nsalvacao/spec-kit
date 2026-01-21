@@ -7,10 +7,11 @@ param(
 )
 
 $stateFile = '.spec-kit/state.yaml'
-$tempFile = '.spec-kit/.state.yaml.tmp'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$pythonScript = Join-Path (Split-Path -Parent $scriptDir) 'python/state-update.py'
 
-if (-not (Get-Command yq -ErrorAction SilentlyContinue)) {
-    Write-Error 'yq not found. Install: https://github.com/mikefarah/yq'
+if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+    Write-Error 'python3 not found. Please install Python 3'
     exit 1
 }
 
@@ -19,9 +20,11 @@ if (-not (Test-Path $stateFile)) {
     exit 1
 }
 
-$timestamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-
-$expr = ".violations += [{\"timestamp\":\"$timestamp\",\"phase\":\"$Phase\",\"principle\":\"$Principle\",\"message\":\"$Message\",\"severity\":\"$Severity\",\"source\":\"$Source\"}]"
-
-yq e $expr $stateFile | Set-Content -Path $tempFile -NoNewline
-Move-Item -Force $tempFile $stateFile
+& python3 $pythonScript `
+  --file $stateFile `
+  --operation log-violation `
+  --violation-phase $Phase `
+  --violation-principle $Principle `
+  --violation-message $Message `
+  --violation-severity $Severity `
+  --violation-source $Source

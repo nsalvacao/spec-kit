@@ -162,9 +162,23 @@ log_dep "Checking system dependencies..."
 check_cmd "git" "git"
 
 if command -v python3 >/dev/null 2>&1; then
-    :
+    # Check if PyYAML is installed
+    if ! python3 -c "import yaml" >/dev/null 2>&1; then
+        missing_tools+=("pyyaml")
+        deps_missing=true
+        log_dep "✗ Missing required Python module: PyYAML"
+        log_dep "  Install: pip install pyyaml"
+        log_dep ""
+    fi
 elif command -v python >/dev/null 2>&1; then
-    :
+    # Check if PyYAML is installed
+    if ! python -c "import yaml" >/dev/null 2>&1; then
+        missing_tools+=("pyyaml")
+        deps_missing=true
+        log_dep "✗ Missing required Python module: PyYAML"
+        log_dep "  Install: pip install pyyaml"
+        log_dep ""
+    fi
 else
     missing_tools+=("python3")
     deps_missing=true
@@ -174,7 +188,14 @@ else
 fi
 
 check_cmd "uv" "uv"
-check_cmd "yq" "yq"
+# yq is now optional - state management uses Python/PyYAML
+if ! command -v yq >/dev/null 2>&1; then
+    log_dep "⚠ Optional tool not found: yq (YAML processor)"
+    log_dep "  Note: State management now uses Python/PyYAML instead"
+    log_dep "  yq is still useful for manual YAML queries"
+    install_hint "yq"
+    log_dep ""
+fi
 check_cmd "rg" "rg (ripgrep)"
 
 if $deps_missing; then

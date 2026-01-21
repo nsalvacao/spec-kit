@@ -3,20 +3,38 @@ set -euo pipefail
 
 REQUIRED_PHASE="${1:-}"
 STATE_FILE=".spec-kit/state.yaml"
+SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_SCRIPT="$SCRIPT_DIR/../python/state-update.py"
 
 if [ -z "$REQUIRED_PHASE" ]; then
   echo "Usage: state-check.sh <required_phase>"
   exit 1
 fi
 
-command -v yq >/dev/null 2>&1 || { echo "Error: yq not found. Install: brew install yq || sudo apt install yq"; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "Error: python3 not found. Please install Python 3"; exit 1; }
 
 if [ ! -f "$STATE_FILE" ]; then
   echo "Error: state.yaml not found. Run state-init.sh first."
   exit 1
 fi
 
-if ! yq eval ".phases_completed | contains([\"$REQUIRED_PHASE\"])" "$STATE_FILE" | grep -q "true"; then
+# Use Python to check if the phase is in phases_completed array
+# Pass values as command-line arguments to avoid code injection
+if ! python3 -c "
+import yaml
+import sys
+
+state_file = sys.argv[1]
+required_phase = sys.argv[2]
+
+with open(state_file, 'r') as f:
+    data = yaml.safe_load(f)
+phases = data.get('phases_completed', [])
+if required_phase in phases:
+    sys.exit(0)
+else:
+    sys.exit(1)
+" "$STATE_FILE" "$REQUIRED_PHASE"; then
   echo "Error: Phase '$REQUIRED_PHASE' must be completed first."
   exit 1
 fi

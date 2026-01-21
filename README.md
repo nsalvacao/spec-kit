@@ -108,9 +108,9 @@ For detailed guidance, see `docs/quickstart.md` and `docs/walkthrough.md`.
 
 - **Linux/macOS/Windows**
 - **Python 3.11+**
+- **PyYAML** (required for state management; install via `pip install pyyaml`)
 - **uv** for package management
 - **Git**
-- **yq** (YAML edits)
 - **ripgrep (rg)** (validation scripts)
 - An AI coding agent (see `docs/agents.md`)
 

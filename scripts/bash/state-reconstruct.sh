@@ -3,8 +3,10 @@ set -euo pipefail
 
 STATE_DIR=".spec-kit"
 STATE_FILE="$STATE_DIR/state.yaml"
+SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_SCRIPT="$SCRIPT_DIR/../python/state-update.py"
 
-command -v yq >/dev/null 2>&1 || { echo "Error: yq not found. Install: brew install yq || sudo apt install yq"; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "Error: python3 not found. Please install Python 3"; exit 1; }
 
 mkdir -p "$STATE_DIR"
 
@@ -50,28 +52,31 @@ violations: []
 EOF
 
 if [ -f "$ideas_backlog" ]; then
-  yq eval ".artifacts.ideas_backlog = \"$ideas_backlog\"" "$STATE_FILE" > "$STATE_DIR/.state.yaml.tmp" && mv "$STATE_DIR/.state.yaml.tmp" "$STATE_FILE"
+  python3 "$PYTHON_SCRIPT" --file "$STATE_FILE" --operation set-value --key artifacts.ideas_backlog --value "$ideas_backlog"
 fi
 if [ -f "$idea_selection" ]; then
-  yq eval ".artifacts.idea_selection = \"$idea_selection\"" "$STATE_FILE" > "$STATE_DIR/.state.yaml.tmp" && mv "$STATE_DIR/.state.yaml.tmp" "$STATE_FILE"
+  python3 "$PYTHON_SCRIPT" --file "$STATE_FILE" --operation set-value --key artifacts.idea_selection --value "$idea_selection"
 fi
 if [ -f "$ai_vision_canvas" ]; then
-  yq eval ".artifacts.ai_vision_canvas = \"$ai_vision_canvas\"" "$STATE_FILE" > "$STATE_DIR/.state.yaml.tmp" && mv "$STATE_DIR/.state.yaml.tmp" "$STATE_FILE"
+  python3 "$PYTHON_SCRIPT" --file "$STATE_FILE" --operation set-value --key artifacts.ai_vision_canvas --value "$ai_vision_canvas"
 fi
 if [ -f "$vision_brief" ]; then
-  yq eval ".artifacts.vision_brief = \"$vision_brief\"" "$STATE_FILE" > "$STATE_DIR/.state.yaml.tmp" && mv "$STATE_DIR/.state.yaml.tmp" "$STATE_FILE"
+  python3 "$PYTHON_SCRIPT" --file "$STATE_FILE" --operation set-value --key artifacts.vision_brief --value "$vision_brief"
 fi
 if [ -f "$g0_report" ]; then
-  yq eval ".artifacts.g0_validation_report = \"$g0_report\"" "$STATE_FILE" > "$STATE_DIR/.state.yaml.tmp" && mv "$STATE_DIR/.state.yaml.tmp" "$STATE_FILE"
+  python3 "$PYTHON_SCRIPT" --file "$STATE_FILE" --operation set-value --key artifacts.g0_validation_report --value "$g0_report"
 fi
 
 if [ "${#phases_completed[@]}" -gt 0 ]; then
+  # Build JSON array for phases_completed
   phases_json="["
   for phase in "${phases_completed[@]}"; do
     phases_json="${phases_json}\"${phase}\","
   done
   phases_json="${phases_json%,}]"
-  yq eval ".phases_completed = $phases_json | .current_phase = \"$current_phase\"" "$STATE_FILE" > "$STATE_DIR/.state.yaml.tmp" && mv "$STATE_DIR/.state.yaml.tmp" "$STATE_FILE"
+  
+  # Set both phases_completed and current_phase using set-multiple
+  python3 "$PYTHON_SCRIPT" --file "$STATE_FILE" --operation set-multiple --json-data "{\"phases_completed\": $phases_json, \"current_phase\": \"$current_phase\"}"
 fi
 
 echo "state.yaml reconstructed"

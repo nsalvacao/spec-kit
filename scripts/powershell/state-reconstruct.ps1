@@ -1,8 +1,10 @@
 $stateDir = '.spec-kit'
 $stateFile = Join-Path $stateDir 'state.yaml'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$pythonScript = Join-Path (Split-Path -Parent $scriptDir) 'python/state-update.py'
 
-if (-not (Get-Command yq -ErrorAction SilentlyContinue)) {
-    Write-Error 'yq not found. Install: https://github.com/mikefarah/yq'
+if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+    Write-Error 'python3 not found. Please install Python 3'
     exit 1
 }
 
@@ -39,16 +41,26 @@ profile: ai-system
 violations: []
 '@ | Set-Content -Path $stateFile -NoNewline
 
-if (Test-Path $ideasBacklog) { yq e ".artifacts.ideas_backlog = \"$ideasBacklog\"" $stateFile | Set-Content -Path "$stateDir/.state.yaml.tmp" -NoNewline; Move-Item -Force "$stateDir/.state.yaml.tmp" $stateFile }
-if (Test-Path $ideaSelection) { yq e ".artifacts.idea_selection = \"$ideaSelection\"" $stateFile | Set-Content -Path "$stateDir/.state.yaml.tmp" -NoNewline; Move-Item -Force "$stateDir/.state.yaml.tmp" $stateFile }
-if (Test-Path $aiVisionCanvas) { yq e ".artifacts.ai_vision_canvas = \"$aiVisionCanvas\"" $stateFile | Set-Content -Path "$stateDir/.state.yaml.tmp" -NoNewline; Move-Item -Force "$stateDir/.state.yaml.tmp" $stateFile }
-if (Test-Path $visionBrief) { yq e ".artifacts.vision_brief = \"$visionBrief\"" $stateFile | Set-Content -Path "$stateDir/.state.yaml.tmp" -NoNewline; Move-Item -Force "$stateDir/.state.yaml.tmp" $stateFile }
-if (Test-Path $g0Report) { yq e ".artifacts.g0_validation_report = \"$g0Report\"" $stateFile | Set-Content -Path "$stateDir/.state.yaml.tmp" -NoNewline; Move-Item -Force "$stateDir/.state.yaml.tmp" $stateFile }
+if (Test-Path $ideasBacklog) { 
+    & python3 $pythonScript --file $stateFile --operation set-value --key artifacts.ideas_backlog --value $ideasBacklog
+}
+if (Test-Path $ideaSelection) { 
+    & python3 $pythonScript --file $stateFile --operation set-value --key artifacts.idea_selection --value $ideaSelection
+}
+if (Test-Path $aiVisionCanvas) { 
+    & python3 $pythonScript --file $stateFile --operation set-value --key artifacts.ai_vision_canvas --value $aiVisionCanvas
+}
+if (Test-Path $visionBrief) { 
+    & python3 $pythonScript --file $stateFile --operation set-value --key artifacts.vision_brief --value $visionBrief
+}
+if (Test-Path $g0Report) { 
+    & python3 $pythonScript --file $stateFile --operation set-value --key artifacts.g0_validation_report --value $g0Report
+}
 
 if ($phasesCompleted.Count -gt 0) {
     $phasesJson = '[' + ($phasesCompleted | ForEach-Object { '"' + $_ + '"' } -join ',') + ']'
-    yq e ".phases_completed = $phasesJson | .current_phase = \"$currentPhase\"" $stateFile | Set-Content -Path "$stateDir/.state.yaml.tmp" -NoNewline
-    Move-Item -Force "$stateDir/.state.yaml.tmp" $stateFile
+    $jsonData = "{`"phases_completed`": $phasesJson, `"current_phase`": `"$currentPhase`"}"
+    & python3 $pythonScript --file $stateFile --operation set-multiple --json-data $jsonData
 }
 
 Write-Output 'state.yaml reconstructed'

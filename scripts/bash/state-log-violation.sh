@@ -8,21 +8,26 @@ SEVERITY="${4:-high}"
 SOURCE="${5:-validator}"
 
 STATE_FILE=".spec-kit/state.yaml"
-TEMP_FILE=".spec-kit/.state.yaml.tmp"
+SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_SCRIPT="$SCRIPT_DIR/../python/state-update.py"
 
 if [ -z "$MESSAGE" ]; then
   echo "Usage: state-log-violation.sh <phase> <principle> <message> [severity] [source]"
   exit 1
 fi
 
-command -v yq >/dev/null 2>&1 || { echo "Error: yq not found. Install: brew install yq || sudo apt install yq"; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "Error: python3 not found. Please install Python 3"; exit 1; }
 
 if [ ! -f "$STATE_FILE" ]; then
   echo "Error: state.yaml not found. Run state-init.sh first."
   exit 1
 fi
 
-timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
-yq eval ".violations += [{\"timestamp\":\"$timestamp\",\"phase\":\"$PHASE\",\"principle\":\"$PRINCIPLE\",\"message\":\"$MESSAGE\",\"severity\":\"$SEVERITY\",\"source\":\"$SOURCE\"}]" "$STATE_FILE" > "$TEMP_FILE"
-mv "$TEMP_FILE" "$STATE_FILE"
+python3 "$PYTHON_SCRIPT" \
+  --file "$STATE_FILE" \
+  --operation log-violation \
+  --violation-phase "$PHASE" \
+  --violation-principle "$PRINCIPLE" \
+  --violation-message "$MESSAGE" \
+  --violation-severity "$SEVERITY" \
+  --violation-source "$SOURCE"

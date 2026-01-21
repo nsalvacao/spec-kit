@@ -1,22 +1,20 @@
-param(
-    [Parameter(Mandatory=$true)][string]$Expression
-)
+# This script is deprecated and only shows usage information.
+# Direct usage of the Python implementation is required.
 
-$stateFile = '.spec-kit/state.yaml'
-$tempFile = '.spec-kit/.state.yaml.tmp'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$pythonScript = Join-Path (Split-Path -Parent $scriptDir) 'python/state-update.py'
 
-if (-not (Get-Command yq -ErrorAction SilentlyContinue)) {
-    Write-Error 'yq not found. Install: https://github.com/mikefarah/yq'
-    exit 1
-}
+Write-Error @"
+Error: state-update.ps1 is deprecated. Use the Python implementation directly:
+  python3 $pythonScript --file .spec-kit/state.yaml --operation <operation> [options]
 
-if (-not (Test-Path $stateFile)) {
-    Write-Error 'state.yaml not found. Run state-init.ps1 first.'
-    exit 1
-}
+Available operations:
+  - set-value: Set a key to a value
+  - append-item: Append to an array
+  - ensure-array: Ensure key is an array
+  - log-violation: Log a violation
+  - set-multiple: Set multiple keys (JSON)
 
-# Ensure violations array exists
-$expr = ".violations //= [] | $Expression"
-
-$null = yq e $expr $stateFile | Set-Content -Path $tempFile -NoNewline
-Move-Item -Force $tempFile $stateFile
+Run 'python3 $pythonScript --help' for detailed usage.
+"@
+exit 1
