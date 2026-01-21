@@ -83,10 +83,15 @@ def save_yaml(file_path: Path, data: Dict[str, Any]) -> None:
 
 def get_nested_value(data: Dict[str, Any], key_path: str) -> Any:
     """Get value from nested dictionary using dot notation."""
+    if not key_path:
+        raise ValueError("Key path cannot be empty")
+    
     keys = key_path.split('.')
     value = data
     
     for key in keys:
+        if not key:  # Handle consecutive dots or leading/trailing dots
+            raise ValueError(f"Invalid key path: {key_path} (contains empty key)")
         if isinstance(value, dict):
             value = value.get(key)
             if value is None:
@@ -99,7 +104,16 @@ def get_nested_value(data: Dict[str, Any], key_path: str) -> Any:
 
 def set_nested_value(data: Dict[str, Any], key_path: str, value: Any) -> None:
     """Set value in nested dictionary using dot notation."""
+    if not key_path:
+        raise ValueError("Key path cannot be empty")
+    
     keys = key_path.split('.')
+    
+    # Validate no empty keys
+    for key in keys:
+        if not key:
+            raise ValueError(f"Invalid key path: {key_path} (contains empty key)")
+    
     current = data
     
     # Navigate to the parent of the target key
@@ -146,7 +160,7 @@ def parse_value(value_str: str) -> Any:
 
 def operation_set_value(data: Dict[str, Any], args: argparse.Namespace) -> None:
     """Set a single key to a value."""
-    if not args.key or not hasattr(args, 'value') or args.value is None:
+    if not args.key or args.value is None:
         raise ValueError("--key and --value required for set-value operation")
     
     value = parse_value(args.value)
@@ -155,7 +169,7 @@ def operation_set_value(data: Dict[str, Any], args: argparse.Namespace) -> None:
 
 def operation_append_item(data: Dict[str, Any], args: argparse.Namespace) -> None:
     """Append an item to an array."""
-    if not args.key or not hasattr(args, 'value') or args.value is None:
+    if not args.key or args.value is None:
         raise ValueError("--key and --value required for append-item operation")
     
     value = parse_value(args.value)
