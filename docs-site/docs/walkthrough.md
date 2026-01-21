@@ -53,7 +53,7 @@ Phase 0 generates the artifacts that justify the project before specs are writte
 
 ```text
 /speckit.constitution Create principles focused on code quality, testing standards, UX consistency, and performance.
-```bash
+```
 
 Output: `.specify/memory/constitution.md`
 
@@ -61,7 +61,7 @@ Output: `.specify/memory/constitution.md`
 
 ```text
 /speckit.specify Describe the feature requirements, user stories, and constraints.
-```bash
+```
 
 Output: `.specify/specs/<feature>/spec.md`
 
@@ -69,13 +69,13 @@ Output: `.specify/specs/<feature>/spec.md`
 
 ```text
 /speckit.clarify Review and clarify missing details before planning.
-```bash
+```
 
 ## 5) Create the Plan
 
 ```text
 /speckit.plan Provide the tech stack and architecture choices.
-```bash
+```
 
 Output: `.specify/specs/<feature>/plan.md`
 
@@ -83,7 +83,7 @@ Output: `.specify/specs/<feature>/plan.md`
 
 ```text
 /speckit.tasks
-```bash
+```
 
 Output: `.specify/specs/<feature>/tasks.md`
 
@@ -91,7 +91,7 @@ Output: `.specify/specs/<feature>/tasks.md`
 
 ```text
 /speckit.analyze
-```bash
+```
 
 Checks cross‑artifact consistency before execution.
 

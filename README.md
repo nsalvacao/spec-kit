@@ -64,7 +64,7 @@ Full walkthrough: `docs/walkthrough.md`
 ```bash
 uv tool install specify-cli --from git+https://github.com/nsalvacao/spec-kit.git
 
-```text
+```
 
 ### 2) Initialize a project
 
@@ -80,7 +80,7 @@ specify init my-project --ai codex
 /speckit.structure
 /speckit.validate
 
-```text
+```
 
 ### 4) Continue with SDD
 

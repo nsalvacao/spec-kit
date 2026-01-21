@@ -97,7 +97,7 @@ templates/              # Templates for SDD workflow
 docs/                   # Documentation
 media/                  # Images, logos, and media assets
 
-```text
+```
 
 ## Key Guidelines
 

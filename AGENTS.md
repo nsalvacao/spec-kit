@@ -70,7 +70,7 @@ AGENT_CONFIG = {
     },
 }
 
-```text
+```
 
 **Key Design Principle**: The dictionary key should match the actual executable name that users install. For example:
 
@@ -114,7 +114,7 @@ Modify `.github/workflows/scripts/create-release-packages.sh`:
 ```bash
 ALL_AGENTS=(claude gemini copilot cursor-agent qwen opencode windsurf q)
 
-```text
+```
 
 ##### Add case statement for directory structure
 
@@ -138,7 +138,7 @@ gh release create "$VERSION" \
   .genreleases/spec-kit-template-windsurf-ps-"$VERSION".zip \
   # Add new agent packages here
 
-```text
+```
 
 #### 5. Update Agent Context Scripts
 
@@ -163,7 +163,7 @@ case "$AGENT_TYPE" in
     ;;
 esac
 
-```text
+```
 
 ##### PowerShell script (`scripts/powershell/update-agent-context.ps1`)
 
@@ -190,7 +190,7 @@ switch ($AgentType) {
     }
 }
 
-```text
+```
 
 #### 6. Update CLI Tool Checks (Optional)
 
@@ -240,7 +240,7 @@ cli_tool = agent_key
 if agent_key == "cursor":
     cli_tool = "cursor-agent"  # Map to the real tool name
 
-```text
+```
 
 ✅ **Correct approach** (no mapping needed):
 
@@ -283,7 +283,7 @@ For agents available as VS Code extensions, add them to `.devcontainer/devcontai
   }
 }
 
-```text
+```
 
 ##### CLI-based Agents
 
@@ -348,7 +348,7 @@ description: "Command description"
 
 Command content with {SCRIPT} and $ARGUMENTS placeholders.
 
-```text
+```
 
 **GitHub Copilot Chat Mode format:**
 
@@ -372,7 +372,7 @@ prompt = """
 Command content with {SCRIPT} and {{args}} placeholders.
 """
 
-```text
+```
 
 ## Directory Conventions
 
