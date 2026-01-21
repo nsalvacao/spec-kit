@@ -7,6 +7,20 @@ All notable changes to the Specify CLI and templates are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **P001: State management yq compatibility** - Replaced yq-based state scripts with Python implementation using PyYAML
+  - Created `scripts/python/state-update.py` for atomic YAML updates
+  - Updated `state-log-violation.sh/ps1`, `state-reconstruct.sh/ps1`, and `state-check.sh/ps1` to use Python backend
+  - Eliminates yq v3/v4 syntax breaking changes
+  - Provides atomic, safe YAML updates without external dependency on yq
+
+### Changed
+
+- **Dependencies**: yq is no longer required for state management (Python 3 with PyYAML is used instead)
+
 ## [0.0.23-fork.1] - 2026-01-14
 
 ### Added

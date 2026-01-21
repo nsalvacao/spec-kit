@@ -107,10 +107,9 @@ For detailed guidance, see `docs/quickstart.md` and `docs/walkthrough.md`.
 ## 🔧 Prerequisites
 
 - **Linux/macOS/Windows**
-- **Python 3.11+**
+- **Python 3.11+** (includes PyYAML for state management)
 - **uv** for package management
 - **Git**
-- **yq** (YAML edits)
 - **ripgrep (rg)** (validation scripts)
 - An AI coding agent (see `docs/agents.md`)
 

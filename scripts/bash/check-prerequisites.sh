@@ -174,7 +174,14 @@ else
 fi
 
 check_cmd "uv" "uv"
-check_cmd "yq" "yq"
+# yq is now optional - state management uses Python/PyYAML
+if ! command -v yq >/dev/null 2>&1; then
+    log_dep "⚠ Optional tool not found: yq (YAML processor)"
+    log_dep "  Note: State management now uses Python/PyYAML instead"
+    log_dep "  yq is still useful for manual YAML queries"
+    install_hint "yq"
+    log_dep ""
+fi
 check_cmd "rg" "rg (ripgrep)"
 
 if $deps_missing; then
