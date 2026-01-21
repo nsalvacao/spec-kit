@@ -15,19 +15,24 @@ if (-not (Test-Path $stateFile)) {
 }
 
 # Use Python to check if the phase is in phases_completed array
-$pythonCode = @"
+# Pass values as command-line arguments to avoid code injection
+$pythonCode = @'
 import yaml
 import sys
-with open('$stateFile', 'r') as f:
+
+state_file = sys.argv[1]
+required_phase = sys.argv[2]
+
+with open(state_file, 'r') as f:
     data = yaml.safe_load(f)
 phases = data.get('phases_completed', [])
-if '$RequiredPhase' in phases:
+if required_phase in phases:
     sys.exit(0)
 else:
     sys.exit(1)
-"@
+'@
 
-$result = python3 -c $pythonCode
+$result = python3 -c $pythonCode $stateFile $RequiredPhase
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Phase '$RequiredPhase' must be completed first."
     exit 1

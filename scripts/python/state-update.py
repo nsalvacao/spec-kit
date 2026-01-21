@@ -47,7 +47,6 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 import json
-import os
 
 
 def load_yaml(file_path: Path) -> Dict[str, Any]:
@@ -147,7 +146,7 @@ def parse_value(value_str: str) -> Any:
 
 def operation_set_value(data: Dict[str, Any], args: argparse.Namespace) -> None:
     """Set a single key to a value."""
-    if not args.key or args.value is None:
+    if not args.key or not hasattr(args, 'value') or args.value is None:
         raise ValueError("--key and --value required for set-value operation")
     
     value = parse_value(args.value)
@@ -156,7 +155,7 @@ def operation_set_value(data: Dict[str, Any], args: argparse.Namespace) -> None:
 
 def operation_append_item(data: Dict[str, Any], args: argparse.Namespace) -> None:
     """Append an item to an array."""
-    if not args.key or args.value is None:
+    if not args.key or not hasattr(args, 'value') or args.value is None:
         raise ValueError("--key and --value required for append-item operation")
     
     value = parse_value(args.value)

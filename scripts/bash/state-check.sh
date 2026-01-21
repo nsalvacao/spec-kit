@@ -19,17 +19,22 @@ if [ ! -f "$STATE_FILE" ]; then
 fi
 
 # Use Python to check if the phase is in phases_completed array
+# Pass values as command-line arguments to avoid code injection
 if ! python3 -c "
 import yaml
 import sys
-with open('$STATE_FILE', 'r') as f:
+
+state_file = sys.argv[1]
+required_phase = sys.argv[2]
+
+with open(state_file, 'r') as f:
     data = yaml.safe_load(f)
 phases = data.get('phases_completed', [])
-if '$REQUIRED_PHASE' in phases:
+if required_phase in phases:
     sys.exit(0)
 else:
     sys.exit(1)
-"; then
+" "$STATE_FILE" "$REQUIRED_PHASE"; then
   echo "Error: Phase '$REQUIRED_PHASE' must be completed first."
   exit 1
 fi
