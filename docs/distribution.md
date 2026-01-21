@@ -7,30 +7,33 @@ This document explains how to install and use the fork, including template overr
 ### Persistent Installation (recommended)
 
 ```bash
-uv tool install specify-cli --from git+https://github.com/nsalvacao/spec-kit.git
-```
+uv tool install specify-cli --from git+<https://github.com/nsalvacao/spec-kit.git>
+```bash
 
 Upgrade:
 
 ```bash
-uv tool install specify-cli --force --from git+https://github.com/nsalvacao/spec-kit.git
-```
+uv tool install specify-cli --force --from git+<https://github.com/nsalvacao/spec-kit.git>
+```bash
 
 ### One-Time Usage
 
 ```bash
-uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <PROJECT_NAME>
-```
+uvx --from git+<https://github.com/nsalvacao/spec-kit.git> specify init <PROJECT_NAME>
+```bash
 
 ### Alternative Package Managers
 
 ```bash
+
 # pipx
-pipx install git+https://github.com/nsalvacao/spec-kit.git
+
+pipx install git+<https://github.com/nsalvacao/spec-kit.git>
 
 # pip (virtualenv recommended)
-pip install git+https://github.com/nsalvacao/spec-kit.git
-```
+
+pip install git+<https://github.com/nsalvacao/spec-kit.git>
+```bash
 
 ## Template Override (Advanced)
 
@@ -39,7 +42,7 @@ By default, the forked CLI uses fork templates. You can override the template so
 ```bash
 export SPECIFY_TEMPLATE_REPO=nsalvacao/spec-kit
 specify init <PROJECT_NAME>
-```
+```bash
 
 Or per command:
 
@@ -53,8 +56,9 @@ If you need upstream templates for compatibility testing:
 ```bash
 export SPECIFY_TEMPLATE_REPO=github/spec-kit
 specify init <PROJECT_NAME>
-```
-```
+
+```bash
+```bash
 
 ## Deployment / Usage by User Type
 

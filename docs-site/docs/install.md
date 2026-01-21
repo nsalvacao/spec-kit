@@ -6,7 +6,8 @@ This fork ships with Phase 0 as a recommended prerequisite before the core SDD w
 
 ```bash
 uv tool install specify-cli --from git+https://github.com/nsalvacao/spec-kit.git
-```
+
+```text
 
 ## One-Time Usage
 
@@ -18,4 +19,5 @@ uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <PROJECT_N
 
 ```bash
 SPECIFY_TEMPLATE_REPO=nsalvacao/spec-kit specify init <PROJECT_NAME>
-```
+
+```text

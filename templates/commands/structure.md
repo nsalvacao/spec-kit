@@ -18,13 +18,13 @@ agent_scripts:
    - Overwrite: delete ai_vision_canvas.md, vision_brief.md, approvals/g0-validation-report.md then re-run.
    - Append: keep existing artifacts and add a "Revision" section to the vision brief.
    - Cancel: exit without changes.
-3. Ensure SELECT completed (state-check).
-4. Load selected idea from .spec-kit/idea_selection.md.
-5. Fill Integrated Canvas (JTBD + Lean + AI) using ai-vision-canvas-template.md.
-6. Validate canvas completeness with validate-canvas.{sh|ps}.
-7. Transform canvas into vision_brief.md using vision-brief-template.md.
-8. Update state: set current_phase=validate; record ai_vision_canvas and vision_brief paths.
-9. Report completion and handoff readiness.
+1. Ensure SELECT completed (state-check).
+2. Load selected idea from .spec-kit/idea_selection.md.
+3. Fill Integrated Canvas (JTBD + Lean + AI) using ai-vision-canvas-template.md.
+4. Validate canvas completeness with validate-canvas.{sh|ps}.
+5. Transform canvas into vision_brief.md using vision-brief-template.md.
+6. Update state: set current_phase=validate; record ai_vision_canvas and vision_brief paths.
+7. Report completion and handoff readiness.
 -->
 
 ## Required Inputs

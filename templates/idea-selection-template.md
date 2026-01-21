@@ -13,6 +13,7 @@ selected_idea_id: [IDEA_ID]
 
 <!--
 Guidance:
+
 - AI-RICE is based on RICE (Reach, Impact, Confidence, Effort).
 - AI-RICE adds Data_Readiness and Risk.
 - Use consistent time window for Reach (e.g., per quarter).
@@ -26,12 +27,12 @@ Guidance:
 ## AI-RICE Scoring Table
 
 | Idea ID | Reach | Impact | Confidence | Data_Readiness | Effort | Risk | AI-RICE Score |
-|---------|-------|--------|------------|----------------|--------|------|---------------|
-| S1      | 1000  | 2.0    | 70%        | 80%            | 4      | 3    | 93.3          |
-| SC1-Substitute | 1500 | 1.5 | 60%     | 50%            | 6      | 5    | 37.5          |
-| ...     | ...   | ...    | ...        | ...            | ...    | ...  | ...           |
+| --------- | ------- | -------- | ------------ | ---------------- | -------- | ------ | --------------- |
+| S1 | 1000 | 2.0 | 70% | 80% | 4 | 3 | 93.3 |
+| SC1-Substitute | 1500 | 1.5 | 60% | 50% | 6 | 5 | 37.5 |
+| ... | ... | ... | ... | ... | ... | ... | ... |
 
-**Formula**: (Reach * Impact * Confidence * Data_Readiness) / (Effort * Risk)
+**Formula**: (Reach \* Impact \* Confidence \* Data_Readiness) / (Effort \* Risk)
 
 ## Selected Idea
 
@@ -56,15 +57,17 @@ Guidance:
 ## Runner-Ups (Pivot Options)
 
 ### 2nd Place: [IDEA_ID]
+
 - Score: [value]
 - Why it is a strong alternative
 
 ### 3rd Place: [IDEA_ID]
+
 - Score: [value]
 - Why it is a strong alternative
 
 ## Risk Mitigation (Selected Idea)
 
 | Risk | Mitigation | Owner | Notes |
-|------|------------|-------|-------|
+| ------ | ------------ | ------- | ------- |
 | [Risk] | [Mitigation] | [Owner] | [Notes] |

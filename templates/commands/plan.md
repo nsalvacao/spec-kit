@@ -1,10 +1,12 @@
 ---
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
 handoffs: 
+
   - label: Create Tasks
     agent: speckit.tasks
     prompt: Break the plan into tasks
     send: true
+
   - label: Create Checklist
     agent: speckit.checklist
     prompt: Create a checklist for the following domain...
@@ -20,7 +22,8 @@ agent_scripts:
 
 ```text
 $ARGUMENTS
-```
+
+```text
 
 You **MUST** consider the user input before proceeding (if not empty).
 
@@ -50,7 +53,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - For each dependency → best practices task
    - For each integration → patterns task
 
-2. **Generate and dispatch research agents**:
+1. **Generate and dispatch research agents**:
 
    ```text
    For each unknown in Technical Context:
@@ -59,7 +62,7 @@ You **MUST** consider the user input before proceeding (if not empty).
      Task: "Find best practices for {tech} in {domain}"
    ```
 
-3. **Consolidate findings** in `research.md` using format:
+1. **Consolidate findings** in `research.md` using format:
    - Decision: [what was chosen]
    - Rationale: [why chosen]
    - Alternatives considered: [what else evaluated]

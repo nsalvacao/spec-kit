@@ -16,7 +16,8 @@ The easiest way to get started is to initialize a new project:
 
 ```bash
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <PROJECT_NAME>
-```
+
+```text
 
 Or initialize in the current directory:
 
@@ -35,7 +36,8 @@ uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <project_n
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <project_name> --ai gemini
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <project_name> --ai copilot
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <project_name> --ai codebuddy
-```
+
+```text
 
 ### Specify Script Type (Shell vs PowerShell)
 
@@ -63,8 +65,10 @@ export SPECIFY_TEMPLATE_REPO="your-org/spec-kit"
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <project_name> --ai codex
 
 # or pass explicitly
+
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <project_name> --template-repo your-org/spec-kit --ai codex
-```
+
+```text
 
 ### Ignore Agent Tools Check
 
@@ -105,4 +109,5 @@ echo "Configuring Git to use GCM..."
 git config --global credential.helper manager
 echo "Cleaning up..."
 rm gcm-linux_amd64.2.6.1.deb
-```
+
+```text

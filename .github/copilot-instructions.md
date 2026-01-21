@@ -38,13 +38,13 @@ When testing template or command changes:
    ./.github/workflows/scripts/create-release-packages.sh v1.0.0
    ```
 
-2. Copy the relevant package to your test project:
+1. Copy the relevant package to your test project:
 
    ```bash
    cp -r .genreleases/sdd-copilot-package-sh/. <path-to-test-project>/
    ```
 
-3. Test the agent in your test project directory
+1. Test the agent in your test project directory
 
 ## Repository Structure
 
@@ -96,7 +96,8 @@ templates/              # Templates for SDD workflow
 
 docs/                   # Documentation
 media/                  # Images, logos, and media assets
-```
+
+```text
 
 ## Key Guidelines
 

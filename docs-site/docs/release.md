@@ -13,7 +13,8 @@ Optional helper script (if used by upstream):
 
 ```bash
 ./.github/workflows/scripts/update-version.sh
-```
+
+```text
 
 ## 2) Build Release Packages
 
@@ -27,7 +28,8 @@ This should generate zip assets under `.genreleases/`.
 
 ```bash
 ./.github/workflows/scripts/create-github-release.sh
-```
+
+```text
 
 Confirm the release tag and assets are published to `nsalvacao/spec-kit`.
 

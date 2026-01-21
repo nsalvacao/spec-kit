@@ -33,7 +33,8 @@ specify init . --here --ai claude
 specify init my-project --ai copilot --script ps
 specify init my-project --ai gemini --no-git
 specify check
-```
+
+```text
 
 ## Template Override (Fork Templates)
 

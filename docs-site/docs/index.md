@@ -31,7 +31,7 @@ Spec-Driven Development is a structured process that emphasizes:
 ## Development Phases
 
 | Phase | Focus | Key Activities |
-|-------|-------|----------------|
+| ------- | ------- | ---------------- |
 | **0-to-1 Development** ("Greenfield") | Generate from scratch | <ul><li>Start with high-level requirements</li><li>Generate specifications</li><li>Plan implementation steps</li><li>Build production-ready applications</li></ul> |
 | **Creative Exploration** | Parallel implementations | <ul><li>Explore diverse solutions</li><li>Support multiple technology stacks & architectures</li><li>Experiment with UX patterns</li></ul> |
 | **Iterative Enhancement** ("Brownfield") | Brownfield modernization | <ul><li>Add features iteratively</li><li>Modernize legacy systems</li><li>Adapt processes</li></ul> |
@@ -64,8 +64,8 @@ Our research and experimentation focus on:
 
 ## Contributing
 
-Please see our [Contributing Guide](https://github.com/nsalvacao/spec-kit/blob/main/CONTRIBUTING.md) for information on how to contribute to this project.
+Please see our [Contributing Guide](<https://github.com/nsalvacao/spec-kit/blob/main/CONTRIBUTING.md>) for information on how to contribute to this project.
 
 ## Support
 
-For support, please check our [Support Guide](https://github.com/nsalvacao/spec-kit/blob/main/SUPPORT.md) or open an issue on GitHub.
+For support, please check our [Support Guide](<https://github.com/nsalvacao/spec-kit/blob/main/SUPPORT.md>) or open an issue on GitHub.

@@ -12,14 +12,14 @@ To build the documentation locally:
    dotnet tool install -g docfx
    ```
 
-2. Build the documentation:
+1. Build the documentation:
 
    ```bash
    cd docs
    docfx docfx.json --serve
    ```
 
-3. Open your browser to `http://localhost:8080` to view the documentation.
+1. Open your browser to `http://localhost:8080` to view the documentation.
 
 ## Structure
 

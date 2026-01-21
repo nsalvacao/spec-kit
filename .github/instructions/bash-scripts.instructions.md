@@ -8,7 +8,7 @@ When working on Bash scripts in `scripts/bash/`, follow these guidelines:
 
 ## Script Standards
 
-1. **Shebang**: Always use `#!/bin/bash` (not `/bin/sh`)
+1. **Shebang**: Always use `#!/usr/bin/env bash` (not `/bin/sh`)
 2. **Error Handling**: Use `set -e` to exit on errors where appropriate
 3. **Variables**: Use `${VARIABLE}` syntax for clarity
 4. **Functions**: Define functions before use, use descriptive names

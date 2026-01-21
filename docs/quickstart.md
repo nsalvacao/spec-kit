@@ -15,12 +15,16 @@ This guide helps you get started with the forked Spec Kit workflow, which includ
 **In your terminal**, run the `specify` CLI command to initialize your project:
 
 ```bash
+
 # Create a new project directory
+
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <PROJECT_NAME>
 
 # OR initialize in the current directory
+
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init .
-```
+
+```text
 
 Pick script type explicitly (optional):
 
@@ -38,7 +42,8 @@ Run the Phase 0 commands in order:
 /speckit.select
 /speckit.structure
 /speckit.validate
-```
+
+```text
 
 These produce `.spec-kit/` artifacts (ideas backlog, selection report, vision canvas/brief, and Gate G0 validation) that feed into `/speckit.constitution`.
 
@@ -56,7 +61,8 @@ These produce `.spec-kit/` artifacts (ideas backlog, selection report, vision ca
 
 ```markdown
 /speckit.specify Build an application that can help me organize my photos in separate photo albums. Albums are grouped by date and can be re-organized by dragging and dropping on the main page. Albums are never in other nested albums. Within each album, photos are previewed in a tile-like interface.
-```
+
+```text
 
 ### Step 5: Refine the Spec
 
@@ -72,7 +78,8 @@ These produce `.spec-kit/` artifacts (ideas backlog, selection report, vision ca
 
 ```markdown
 /speckit.plan The application uses Vite with minimal number of libraries. Use vanilla HTML, CSS, and JavaScript as much as possible. Images are not uploaded anywhere and metadata is stored in a local SQLite database.
-```
+
+```text
 
 ### Step 7: Break Down and Implement
 
@@ -86,7 +93,8 @@ Optionally, validate the plan with `/speckit.analyze`:
 
 ```markdown
 /speckit.analyze
-```
+
+```text
 
 Then, use the `/speckit.implement` slash command to execute the plan.
 
@@ -104,7 +112,8 @@ Initialize the project's constitution to set ground rules:
 
 ```markdown
 /speckit.constitution Taskify is a "Security-First" application. All user inputs must be validated. We use a microservices architecture. Code must be fully documented.
-```
+
+```text
 
 ### Step 2: Define Requirements with `/speckit.specify`
 
@@ -124,7 +133,8 @@ Use the `/speckit.clarify` command to interactively resolve any ambiguities in y
 
 ```bash
 /speckit.clarify I want to clarify the task card details. For each task in the UI for a task card, you should be able to change the current status of the task between the different columns in the Kanban work board. You should be able to leave an unlimited number of comments for a particular card. You should be able to, from that task card, assign one of the valid users.
-```
+
+```text
 
 You can continue to refine the spec with more details using `/speckit.clarify`:
 
@@ -138,7 +148,8 @@ Validate the specification checklist using the `/speckit.checklist` command:
 
 ```bash
 /speckit.checklist
-```
+
+```text
 
 ### Step 5: Generate Technical Plan with `/speckit.plan`
 
@@ -154,7 +165,8 @@ Have your AI agent audit the implementation plan using `/speckit.analyze`:
 
 ```bash
 /speckit.analyze
-```
+
+```text
 
 Finally, implement the solution:
 
