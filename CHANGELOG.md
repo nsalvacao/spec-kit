@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **P015: Phase 0 onboarding integration** - Updated welcome message to show complete Phase 0 → SDD workflow
+  - Phase 0 commands (`/speckit.ideate`, `/speckit.select`, `/speckit.structure`) now displayed in onboarding
+  - Moved quality commands (`/speckit.clarify`, `/speckit.analyze`, `/speckit.checklist`) from "Enhancement Commands" to "Core SDD Workflow"
+  - Auto-create `.gitignore` with security patterns for agent credentials:
+    - `.github/agents/*.credentials.md`
+    - `.specify/memory/*.sensitive.md`
+  - Updated security notice to confirm automatic `.gitignore` protection
+
 ### Fixed
 
 - **P001: State management yq compatibility** - Replaced yq-based state scripts with Python implementation using PyYAML
