@@ -519,12 +519,15 @@ def check_tool(tool: str, tracker: StepTracker = None) -> bool:
     
     return found
 
-def ensure_gitignore_security(project_path: Path, tracker: StepTracker | None = None) -> None:
+def ensure_gitignore_security(project_path: Path, tracker: StepTracker | None = None) -> str:
     """Create or update .gitignore with security patterns for agent credentials.
     
     Args:
         project_path: Path to the project root
         tracker: Optional tracker for status updates
+    
+    Returns:
+        Status string: "added", "already_configured", or "failed"
     """
     gitignore_path = project_path / ".gitignore"
     
@@ -536,7 +539,6 @@ def ensure_gitignore_security(project_path: Path, tracker: StepTracker | None = 
     ]
     
     if tracker:
-        tracker.add("gitignore", "Configure .gitignore")
         tracker.start("gitignore")
     
     try:
@@ -547,35 +549,43 @@ def ensure_gitignore_security(project_path: Path, tracker: StepTracker | None = 
                 existing_content = f.read()
                 existing_lines = [line.strip() for line in existing_content.splitlines()]
         
-        # Check if patterns already exist (line-by-line to avoid false positives)
-        needs_update = False
+        # Determine which non-comment patterns are missing to keep operation idempotent
+        missing_patterns: list[str] = []
         for pattern in security_patterns:
             if pattern.startswith("#"):
-                continue  # Skip comment line
+                continue  # Skip comment line when checking for missing patterns
             if pattern.strip() not in existing_lines:
-                needs_update = True
-                break
+                missing_patterns.append(pattern)
         
-        if needs_update:
+        if missing_patterns:
+            # Build the list of lines to append (optional header + missing patterns)
+            lines_to_add: list[str] = []
+            header = security_patterns[0]
+            if header not in existing_lines:
+                lines_to_add.append(header)
+            lines_to_add.extend(missing_patterns)
+            
             # Add security section to .gitignore
             with open(gitignore_path, 'a', encoding='utf-8') as f:
                 if existing_content and not existing_content.endswith('\n'):
                     f.write('\n')
                 if existing_content:
                     f.write('\n')  # Add blank line before section
-                for pattern in security_patterns:
+                for pattern in lines_to_add:
                     f.write(pattern + '\n')
             
             if tracker:
                 tracker.complete("gitignore", "security patterns added")
+            return "added"
         else:
             if tracker:
                 tracker.complete("gitignore", "already configured")
+            return "already_configured"
     
     except Exception as e:
         if tracker:
             tracker.error("gitignore", f"failed: {e}")
-        # Don't raise - .gitignore creation is not critical
+        return "failed"
 
 def is_git_repo(path: Path = None) -> bool:
     """Check if the specified path is inside a git repository."""
@@ -1210,6 +1220,7 @@ def init(
         ("zip-list", "Archive contents"),
         ("extracted-summary", "Extraction summary"),
         ("chmod", "Ensure scripts executable"),
+        ("gitignore", "Configure .gitignore"),
         ("cleanup", "Cleanup"),
         ("git", "Initialize git repository"),
         ("final", "Finalize")
@@ -1218,6 +1229,7 @@ def init(
 
     # Track git error message outside Live context so it persists
     git_error_message = None
+    gitignore_status = None  # Track .gitignore update status
 
     with Live(tracker.render(), console=console, refresh_per_second=8, transient=True) as live:
         tracker.attach_refresh(lambda: live.update(tracker.render()))
@@ -1243,7 +1255,7 @@ def init(
             ensure_executable_scripts(project_path, tracker=tracker)
 
             # Ensure .gitignore has security patterns for agent credentials
-            ensure_gitignore_security(project_path, tracker=tracker)
+            gitignore_status = ensure_gitignore_security(project_path, tracker=tracker)
 
             if not no_git:
                 tracker.start("git")
@@ -1304,14 +1316,43 @@ def init(
     agent_config = AGENT_CONFIG.get(selected_ai)
     if agent_config:
         agent_folder = agent_config["folder"]
+        
+        # Adjust message based on .gitignore status
+        if gitignore_status == "added":
+            security_message = (
+                f"[green]✓[/green] Security patterns have been added to [cyan].gitignore[/cyan] to protect agent credentials.\n\n"
+                f"The following patterns are now protected:\n"
+                f"  • [cyan].github/agents/*.credentials.md[/cyan]\n"
+                f"  • [cyan].specify/memory/*.sensitive.md[/cyan]\n\n"
+                f"Review [cyan].gitignore[/cyan] if you need to add additional patterns for [cyan]{agent_folder}[/cyan]."
+            )
+            title = "[green]Agent Security Configured[/green]"
+            border_style = "green"
+        elif gitignore_status == "already_configured":
+            security_message = (
+                f"[green]✓[/green] Security patterns are already present in [cyan].gitignore[/cyan].\n\n"
+                f"The following patterns are protected:\n"
+                f"  • [cyan].github/agents/*.credentials.md[/cyan]\n"
+                f"  • [cyan].specify/memory/*.sensitive.md[/cyan]\n\n"
+                f"Review [cyan].gitignore[/cyan] if you need to add additional patterns for [cyan]{agent_folder}[/cyan]."
+            )
+            title = "[green]Agent Security Configured[/green]"
+            border_style = "green"
+        else:  # failed
+            security_message = (
+                f"[yellow]⚠[/yellow] Failed to automatically update [cyan].gitignore[/cyan].\n\n"
+                f"Please manually add these patterns to protect agent credentials:\n"
+                f"  • [cyan].github/agents/*.credentials.md[/cyan]\n"
+                f"  • [cyan].specify/memory/*.sensitive.md[/cyan]\n\n"
+                f"Review [cyan].gitignore[/cyan] and add any additional patterns for [cyan]{agent_folder}[/cyan]."
+            )
+            title = "[yellow]Agent Security Recommended[/yellow]"
+            border_style = "yellow"
+        
         security_notice = Panel(
-            f"[green]✓[/green] Security patterns have been added to [cyan].gitignore[/cyan] to protect agent credentials.\n\n"
-            f"The following patterns are now protected:\n"
-            f"  • [cyan].github/agents/*.credentials.md[/cyan]\n"
-            f"  • [cyan].specify/memory/*.sensitive.md[/cyan]\n\n"
-            f"Review [cyan].gitignore[/cyan] if you need to add additional patterns for [cyan]{agent_folder}[/cyan].",
-            title="[green]Agent Security Configured[/green]",
-            border_style="green",
+            security_message,
+            title=title,
+            border_style=border_style,
             padding=(1, 2)
         )
         console.print()
