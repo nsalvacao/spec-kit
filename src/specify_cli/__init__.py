@@ -527,7 +527,10 @@ def ensure_gitignore_security(project_path: Path, tracker: StepTracker | None = 
         tracker: Optional tracker for status updates
     
     Returns:
-        Status string: "added", "already_configured", or "failed"
+        Status string indicating the result:
+        - "added": New security patterns were added to .gitignore
+        - "already_configured": All security patterns already present
+        - "failed": Failed to update .gitignore (exception occurred)
     """
     gitignore_path = project_path / ".gitignore"
     
@@ -560,7 +563,9 @@ def ensure_gitignore_security(project_path: Path, tracker: StepTracker | None = 
         if missing_patterns:
             # Build the list of lines to append (optional header + missing patterns)
             lines_to_add: list[str] = []
+            # First pattern in security_patterns is always the header comment
             header = security_patterns[0]
+            assert header.startswith("#"), "First security pattern must be a comment header"
             if header not in existing_lines:
                 lines_to_add.append(header)
             lines_to_add.extend(missing_patterns)
