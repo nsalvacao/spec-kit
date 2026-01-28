@@ -125,8 +125,8 @@ model_word_count=$(awk '
   }
   # Stop counting when we hit the next ** subsection header (e.g., **Evaluation**)
   in_section && sub_section && /^\*\*/ {sub_section=0}
-  # Count words on all lines in the Model Approach subsection
-  in_section && sub_section {
+  # Count words on all lines in the Model Approach subsection (skip empty lines)
+  in_section && sub_section && length($0) > 0 {
     n=split($0, words, /[[:space:]]+/)
     count+=n
   }
