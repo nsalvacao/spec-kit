@@ -103,12 +103,18 @@ if [ "$data_source_count" -lt 1 ]; then
   fail "Expected at least 1 data source, found $data_source_count"
 fi
 
+# Count words in Model Approach subsection
+# Must read all lines until next ** header to handle multi-line paragraphs
 model_word_count=$(awk '
   BEGIN{in_section=0; sub_section=0}
+  # Enter Data & Model Strategy section
   /^## Data & Model Strategy/ {in_section=1; sub_section=0; next}
+  # Exit on next main section header
   /^## / {in_section=0; sub_section=0}
+  # Found Model Approach subsection header
   in_section && /^\*\*Model Approach\*\*/ {
     sub_section=1
+    # Count words on same line as header (if any)
     line=$0
     sub(/^\*\*Model Approach\*\*:? ?/, "", line)
     if (length(line) > 0) {
@@ -117,8 +123,10 @@ model_word_count=$(awk '
     }
     next
   }
+  # Stop counting when we hit the next ** subsection header (e.g., **Evaluation**)
   in_section && sub_section && /^\*\*/ {sub_section=0}
-  in_section && sub_section {
+  # Count words on all lines in the Model Approach subsection (skip empty lines)
+  in_section && sub_section && length($0) > 0 {
     n=split($0, words, /[[:space:]]+/)
     count+=n
   }
