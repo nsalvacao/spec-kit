@@ -214,7 +214,7 @@ elif selected_ai == "windsurf":
 
 ### Using Actual CLI Tool Names as Keys
 
-**CRITICAL**: When adding a new agent to AGENT_CONFIG, always use the **actual executable name** as the dictionary key, not a shortened or convenient version.
+**CRITICAL**: When adding a new agent to AGENT_CONFIG, always use the actual executable name as the dictionary key, not a shortened or convenient version.
 
 **Why this matters:**
 
@@ -421,3 +421,12 @@ When adding new agents:
 ---
 
 *This documentation should be updated whenever new agents are added to maintain accuracy and completeness.*
+
+## Agent Operating Protocol
+
+When operating on this repository (fixing bugs, implementing features), all AI agents must adhere to the **Phased Execution Strategy**.
+
+1. **Read `CONTRIBUTING.md`**: Understand the `[Ph0]` to `[Ph6]` taxonomy.
+2. **Check Dependencies**: Before starting a task, verify if lower-numbered phases are complete.
+3. **Respect Parallelism**: You may pick up any issue in the current active phase.
+4. **Update Issues**: When creating new issues, always apply the correct `[PhX]` prefix, Category, and Priority labels.

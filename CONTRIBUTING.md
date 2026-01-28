@@ -44,6 +44,28 @@ On [GitHub Codespaces](https://github.com/features/codespaces) it's even simpler
 7. Push to your fork and submit a pull request
 8. Wait for your pull request to be reviewed and merged.
 
+## Issue Taxonomy & Phasing Strategy
+
+To maintain stability while moving fast, we use a **Phased Execution Strategy** for issues.
+All engineering tasks must use the `[PhX]` prefix in their title.
+
+### Phase Definitions
+
+| Phase | Description | Parallelism |
+| :--- | :--- | :--- |
+| **[Ph0] Blockers** | Critical bugs preventing basic usage. Fix immediately. | ❌ Serial |
+| **[Ph1] Core Enablers** | Foundation utilities/structs needed by other tasks. | ❌ Serial |
+| **[Ph2] Automation** | Core scripts and features. | ✅ Parallel |
+| **[Ph3] Integration** | Templates, docs, and metadata linking. | ✅ Parallel |
+| **[Ph4] Governance** | Validators and quality gates. | ✅ Parallel |
+| **[Ph5] UX & Polish** | Non-blocking improvements. | ✅ Parallel |
+| **[Ph6] Backlog** | Future ideas and nice-to-haves. | ✅ Parallel |
+
+**Rules for Agents & Contributors:**
+1. **Respect Order:** Do not start a `Ph3` task if `Ph2` dependencies aren't met.
+2. **Parallelize:** Tasks with the **same prefix** can be executed concurrently.
+3. **Prefixing:** All new technical issues must carry a prefix.
+
 Here are a few things you can do that will increase the likelihood of your pull request being accepted:
 
 - Follow the project's coding conventions.

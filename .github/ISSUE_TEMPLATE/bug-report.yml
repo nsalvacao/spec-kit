@@ -7,6 +7,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report!
+        **(Maintainers/Agents: Please assign a `[PhX]` prefix based on the Phase Taxonomy in CONTRIBUTING.md)**.
   
   - type: dropdown
     id: category

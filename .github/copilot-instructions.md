@@ -196,6 +196,19 @@ Keep PRs focused:
 - Write good commit messages
 - Test with the SDD workflow
 
+### 11. Issue Management (Phased Execution)
+
+- **Taxonomy:** All engineering tasks must be prefixed with `[PhX]` (e.g., `[Ph0] [BUG] ...`).
+- **Phases:**
+  - `Ph0`: Blockers (Serial)
+  - `Ph1`: Core Enablers (Serial)
+  - `Ph2`: Automation (Parallel)
+  - `Ph3`: Integration (Parallel)
+  - `Ph4`: Quality (Parallel)
+  - `Ph5`: UX (Parallel)
+  - `Ph6`: Backlog (Parallel)
+- **Protocol:** Respect dependencies; do not implement `Ph3` before `Ph2` is ready.
+
 ## Common Commands Reference
 
 ```bash

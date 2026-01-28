@@ -1,0 +1,79 @@
+name: 🛠️ Task Execution
+description: Create a planned engineering task (Internal/Agent use)
+title: "[PhX] [TASK] "
+labels: ["maintenance", "task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for planned engineering tasks, refactoring, or technical work.
+        Please adhere to the **Phase Taxonomy** defined in CONTRIBUTING.md.
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Execution Phase
+      description: Select the execution phase based on dependencies.
+      options:
+        - "Ph0: Blockers (Serial)"
+        - "Ph1: Core Enablers (Serial)"
+        - "Ph2: Automation Impl (Parallel)"
+        - "Ph3: Integration (Parallel)"
+        - "Ph4: Quality & Governance (Parallel)"
+        - "Ph5: UX & Polish (Parallel)"
+        - "Ph6: Backlog/Future (Parallel)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - "cat:state-management"
+        - "cat:phase0-integration"
+        - "cat:automation-scripts"
+        - "cat:validators"
+        - "cat:cli-ux"
+        - "cat:framework-design"
+        - "cat:qa-docs"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - "severity:high (Must Have)"
+        - "severity:medium (Nice to Have)"
+        - "severity:low (Future)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      description: Detailed description of what needs to be done.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List issues this task blocks or depends on (e.g., Depends on #10).
+      placeholder: "Depends on #..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How do we know this is done?
+      placeholder: "- [ ] Script runs without errors
+- [ ] Output file matches schema"
+    validations:
+      required: true
