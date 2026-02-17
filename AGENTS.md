@@ -430,3 +430,48 @@ When operating on this repository (fixing bugs, implementing features), all AI a
 2. **Check Dependencies**: Before starting a task, verify if lower-numbered phases are complete.
 3. **Respect Parallelism**: You may pick up any issue in the current active phase.
 4. **Update Issues**: When creating new issues, always apply the correct `[PhX]` prefix, Category, and Priority labels.
+
+## Upstream PR Intake Workflow (Fork Safety Policy)
+
+This repository may selectively ingest work from `github/spec-kit` open PRs to accelerate improvements.
+This workflow complements the general upstream synchronization process described in [docs/upstream-sync.md](docs/upstream-sync.md) and applies specifically to selective upstream PR intake for this fork.
+
+### Goal
+
+- Reuse valuable upstream work with controlled risk.
+- Preserve traceability, authorship, and license context.
+- Avoid regressions in `nsalvacao/spec-kit`.
+
+### Compliance and Provenance
+
+- Upstream project license is MIT; reuse is allowed under MIT terms.
+- Keep original authorship whenever importing upstream commits.
+- Prefer importing the full upstream PR head when feasible.
+- If cherry-picking, use `git cherry-pick -x` to record commit provenance.
+- Never use `--reset-author` when importing third-party commits.
+- Keep `LICENSE` and any existing license headers/notices intact.
+
+### Branching Convention
+
+- Stable baseline branch: `baseline/main-sync-YYYY-MM-DD`
+- Intake branch per upstream PR: `intake/lote-<A|B|C>-pr-<upstream_pr_number>`
+- Review PR target: `intake/... -> baseline/...`
+- Final promotion PR target: `baseline/... -> main`
+
+### Mandatory 7-Step Workflow
+
+1. Create or refresh baseline from clean, synced `main`.
+2. Import upstream PR into a dedicated `intake/...` branch (1 upstream PR = 1 branch).
+3. Open PR from `intake/...` into baseline (`baseline/...`), no immediate merge.
+4. Wait for GitHub Actions to complete the automated Gemini/Copilot review workflows and collect feedback from status checks and bot comments on the PR.
+5. Resolve feedback comment-by-comment, then run relevant tests/validation.
+6. Merge approved intake PR into baseline only after tests and review threads are resolved.
+7. After completing all intake PRs planned for the current batch, open one promotion PR from baseline to `main`.
+
+### Safety Gates
+
+- Never merge intake branches directly into `main`.
+- Process intake PRs one at a time.
+- Require green validations for each intake PR before merge.
+- If conflicts or unclear behavior appear, pause and review before continuing.
+- Keep local and `origin` synchronized before creating new branches and after merging pull requests.
