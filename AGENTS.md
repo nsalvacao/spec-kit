@@ -465,7 +465,7 @@ This repository may selectively ingest work from `github/spec-kit` open PRs to a
 4. Wait for automated review round (Gemini/Copilot) and collect feedback.
 5. Resolve feedback comment-by-comment, then run relevant tests/validation.
 6. Merge approved intake PR into baseline only after tests and review threads are resolved.
-7. After finishing the selected lot, open one promotion PR from baseline to `main`.
+7. After completing all intake PRs planned for the current batch, open one promotion PR from baseline to `main`.
 
 ### Safety Gates
 
