@@ -462,7 +462,7 @@ This repository may selectively ingest work from `github/spec-kit` open PRs to a
 1. Create or refresh baseline from clean, synced `main`.
 2. Import upstream PR into a dedicated `intake/...` branch (1 upstream PR = 1 branch).
 3. Open PR from `intake/...` into baseline (`baseline/...`), no immediate merge.
-4. Wait for automated review round (Gemini/Copilot) and collect feedback.
+4. Wait for GitHub Actions to complete the automated Gemini/Copilot review workflows and collect feedback from status checks and bot comments on the PR.
 5. Resolve feedback comment-by-comment, then run relevant tests/validation.
 6. Merge approved intake PR into baseline only after tests and review threads are resolved.
 7. After completing all intake PRs planned for the current batch, open one promotion PR from baseline to `main`.
