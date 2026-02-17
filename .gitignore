@@ -53,3 +53,9 @@ CLAUDE.md
 /.codex
 /.github/prompts
 /.spec-kit-dev-notes
+docs/dev
+
+# Extension system
+.specify/extensions/.cache/
+.specify/extensions/.backup/
+.specify/extensions/*/local-config.yml
