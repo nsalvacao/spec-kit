@@ -1,0 +1,16 @@
+# AI-powered issue triage (GitHub Models free tier)
+# Calls reusable workflow from nsalvacao/actions-hub
+name: AI Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    uses: nsalvacao/actions-hub/.github/workflows/ai-issue-triage.yml@main
+    with:
+      auto_label: true
+      language: "en"
+    secrets: inherit
+
