@@ -434,6 +434,7 @@ When operating on this repository (fixing bugs, implementing features), all AI a
 ## Upstream PR Intake Workflow (Fork Safety Policy)
 
 This repository may selectively ingest work from `github/spec-kit` open PRs to accelerate improvements.
+This workflow complements the general upstream synchronization process described in [docs/upstream-sync.md](docs/upstream-sync.md) and applies specifically to selective upstream PR intake for this fork.
 
 ### Goal
 
