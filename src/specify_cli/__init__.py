@@ -1616,7 +1616,7 @@ def get_speckit_version() -> str:
     import importlib.metadata
     try:
         return importlib.metadata.version("specify-cli")
-    except Exception:
+    except importlib.metadata.PackageNotFoundError:
         # Fallback: try reading from pyproject.toml
         try:
             import tomllib

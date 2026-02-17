@@ -21,6 +21,7 @@ from specify_cli.extensions import (
     ExtensionManager,
     CommandRegistrar,
     ExtensionCatalog,
+    HookExecutor,
     ExtensionError,
     ValidationError,
     CompatibilityError,
@@ -1090,3 +1091,35 @@ class TestExtensionCatalog:
 
         assert not catalog.cache_file.exists()
         assert not catalog.cache_metadata_file.exists()
+
+
+# ===== HookExecutor Tests =====
+
+class TestHookExecutor:
+    """Test HookExecutor condition parsing and evaluation."""
+
+    def test_condition_config_is_set_supports_hyphenated_keys(self, temp_dir):
+        """Test 'is set' condition supports hyphenated YAML keys."""
+        project_dir = temp_dir / "project"
+        project_dir.mkdir()
+        (project_dir / ".specify").mkdir()
+
+        extension_dir = project_dir / ".specify" / "extensions" / "jira"
+        extension_dir.mkdir(parents=True)
+        (extension_dir / "jira-config.yml").write_text("project:\n  issue-type: bug\n")
+
+        executor = HookExecutor(project_dir)
+        assert executor._evaluate_condition("config.project.issue-type is set", "jira") is True
+
+    def test_condition_config_equals_supports_hyphenated_keys(self, temp_dir):
+        """Test equality condition supports hyphenated YAML keys."""
+        project_dir = temp_dir / "project"
+        project_dir.mkdir()
+        (project_dir / ".specify").mkdir()
+
+        extension_dir = project_dir / ".specify" / "extensions" / "jira"
+        extension_dir.mkdir(parents=True)
+        (extension_dir / "jira-config.yml").write_text("project:\n  issue-type: bug\n")
+
+        executor = HookExecutor(project_dir)
+        assert executor._evaluate_condition("config.project.issue-type == 'bug'", "jira") is True

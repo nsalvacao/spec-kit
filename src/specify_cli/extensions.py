@@ -1639,7 +1639,7 @@ class HookExecutor:
         condition = condition.strip()
 
         # Pattern: "config.key.path is set"
-        if match := re.match(r'config\.([a-z0-9_.]+)\s+is\s+set', condition, re.IGNORECASE):
+        if match := re.match(r'config\.([a-z0-9_.-]+)\s+is\s+set', condition, re.IGNORECASE):
             key_path = match.group(1)
             if not extension_id:
                 return False
@@ -1648,7 +1648,7 @@ class HookExecutor:
             return config_manager.has_value(key_path)
 
         # Pattern: "config.key.path == 'value'" or "config.key.path != 'value'"
-        if match := re.match(r'config\.([a-z0-9_.]+)\s*(==|!=)\s*["\']([^"\']+)["\']', condition, re.IGNORECASE):
+        if match := re.match(r'config\.([a-z0-9_.-]+)\s*(==|!=)\s*["\']([^"\']+)["\']', condition, re.IGNORECASE):
             key_path = match.group(1)
             operator = match.group(2)
             expected_value = match.group(3)

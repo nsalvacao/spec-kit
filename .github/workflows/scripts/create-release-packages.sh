@@ -31,6 +31,9 @@ mkdir -p "$GENRELEASES_DIR"
 rm -rf "$GENRELEASES_DIR"/* || true
 
 rewrite_paths() {
+  # Normalize paths in generated command templates.
+  # Note: substitutions below can hit already-prefixed values like ".specify/memory/"
+  # and create ".specify.specify/..."; keep the final cleanup rule to avoid regressions.
   sed -E \
     -e 's@(/?)memory/@.specify/memory/@g' \
     -e 's@(/?)scripts/@.specify/scripts/@g' \
