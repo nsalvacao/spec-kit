@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `.github/agents/*.credentials.md`
     - `.specify/memory/*.sensitive.md`
   - Updated security notice to confirm automatic `.gitignore` protection
+- **Upstream sync (2026-02-17)** - Integrated extension-system foundations from upstream:
+  - `specify extension` command group and extension manager module
+  - Extension docs/templates/test suite scaffolding
+  - Antigravity (`agy`) agent support in CLI and packaging scripts
+  - `constitution-template` initialization flow for new projects
 
 ### Fixed
 
@@ -26,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `state-log-violation.sh/ps1`, `state-reconstruct.sh/ps1`, and `state-check.sh/ps1` to use Python backend
   - Eliminates yq v3/v4 syntax breaking changes
   - Provides atomic, safe YAML updates without external dependency on yq
+- Security hardening for extension installation/registration:
+  - Validate command file paths remain inside extension directory
+  - Validate command aliases/identifiers before writing generated files
+  - Validate extension IDs used by catalog downloads
+  - Use generated temporary ZIP filenames for `specify extension add --from`
 
 ### Changed
 
