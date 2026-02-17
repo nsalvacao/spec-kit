@@ -473,4 +473,4 @@ This repository may selectively ingest work from `github/spec-kit` open PRs to a
 - Process intake PRs one at a time.
 - Require green validations for each intake PR before merge.
 - If conflicts or unclear behavior appear, pause and review before continuing.
-- Keep local and `origin` synchronized at every stage boundary.
+- Keep local and `origin` synchronized before creating new branches and after merging pull requests.
