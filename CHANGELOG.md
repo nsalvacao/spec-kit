@@ -41,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Dependencies**: yq is no longer required for state management (Python 3 with PyYAML is used instead)
 
+## [0.0.24] - 2026-02-18
+
+### Changed
+
+- **Versioning**: Simplified version scheme to standard `MAJOR.MINOR.PATCH` (SemVer), dropping the `-fork.N` suffix.
+  - `pyproject.toml` version is now PEP 440 compliant.
+  - `get-next-version.sh` now correctly parses patch versions that include pre-release suffixes.
+- **CI**: Added `test.yml` GitHub Actions workflow — runs `pytest` on every push to `main` and on PRs.
+- **CI**: Fixed `get-next-version.sh` to correctly extract the numeric patch component from fork-style version tags.
+
 ## [0.0.23-fork.1] - 2026-01-14
 
 ### Added

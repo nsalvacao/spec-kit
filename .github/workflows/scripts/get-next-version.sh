@@ -14,7 +14,7 @@ VERSION=$(echo $LATEST_TAG | sed 's/v//')
 IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
 MAJOR=${VERSION_PARTS[0]:-0}
 MINOR=${VERSION_PARTS[1]:-0}
-PATCH=${VERSION_PARTS[2]:-0}
+PATCH=$(echo "${VERSION_PARTS[2]:-0}" | grep -oE '^[0-9]+')
 
 # Increment patch version
 PATCH=$((PATCH + 1))
