@@ -274,6 +274,7 @@ When choosing what to work on, apply this order:
 ### Known CI Status
 
 All workflows are healthy as of v0.0.26. The following were fixed:
+
 - `release.yml` — versioning script fixed (47de07e)
 - `test.yml` — added pytest CI (47de07e); `uv.lock` tracked (5845dac)
 - `ai-review.yml` / `ai-triage.yml` — explicit permissions added (0c173ce)
@@ -546,3 +547,37 @@ See `README.md` for the full list with links and support status.
 ## Phase 0: AI System Ideation
 
 This fork includes **Phase 0: AI System Ideation** integrated before the standard SDD workflow. This phase focuses on exploring the problem space and generating ideas before diving into formal specifications.
+
+The Phase 0 commands (`ideate`, `select`, `structure`, `validate`) are part of a broader **Integrated Development Pipeline** that spans from strategic ideation through specification, development, and pre-launch quality gates.
+
+## Integrated Development Pipeline
+
+The complete pipeline — combining spec-kit with complementary plugins and skills — is documented in detail at:
+
+**`.ideas/integrated-pipeline.md`** (private, gitignored)
+
+This document describes:
+
+- **Layer 0**: Repository setup (`repo-structure` plugin + `productivity-cockpit`)
+- **Layer 1**: Strategy (`strategy-toolkit` brainstorm → Phase 0 → execution-plan)
+- **Layer 2**: Specification (spec-kit CLI — the core of this project)
+- **Layer 3**: Development loop (configurable TDD cycle — see §5 of the pipeline doc)
+- **Layer 4**: Quality gate (`strategic-review` + `advanced-evaluation` skill + `repo-audit`)
+
+### Session Start Protocol
+
+At the beginning of every work session:
+
+1. `/productivity-cockpit:start` — launches dashboard at `http://localhost:8001` if not already running
+2. Check `TASKS.md` for active work
+3. Review `memory/` or CLAUDE.md for relevant context from previous sessions
+
+### Plugin and Skill Sources
+
+| Component | Status | Path |
+|-----------|--------|------|
+| `strategy-toolkit` | ✅ Installed | `~/.copilot/installed-plugins/nsalvacao-claude-code-plugins/strategy-toolkit` |
+| `repo-structure` | ✅ Installed | `~/.copilot/installed-plugins/nsalvacao-claude-code-plugins/repo-structure` |
+| `productivity-cockpit` | ✅ Installed | `~/.copilot/installed-plugins/nsalvacao-claude-code-plugins/productivity-cockpit` |
+| `advanced-evaluation` skill | ✅ Installed | `~/.copilot/skills/advanced-evaluation/` |
+| `dev_loop` config in constitution | ❌ Planned | see `.ideas/integrated-pipeline.md §10` |
