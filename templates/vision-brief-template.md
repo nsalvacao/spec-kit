@@ -1,8 +1,10 @@
 ---
 artifact: vision_brief
 phase: structure
+schema_version: "1.0"
 generated: [ISO_8601_TIMESTAMP]
 derived_from: .spec-kit/ai_vision_canvas.md
+enables: .spec-kit/g0_validation_report.md
 gate_g0_status: pending
 ---
 

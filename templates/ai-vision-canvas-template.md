@@ -1,8 +1,11 @@
 ---
 artifact: ai_vision_canvas
 phase: structure
+schema_version: "1.0"
 generated: [ISO_8601_TIMESTAMP]
 selected_idea_id: [IDEA_ID]
+derived_from: .spec-kit/idea_selection.md
+enables: .spec-kit/vision_brief.md
 ---
 
 # AI System Vision Canvas: [PROJECT_NAME]
