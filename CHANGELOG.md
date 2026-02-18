@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P007 (#15): Phase 0 scaffolding scripts (ideate, select, structure)**
+  - New `ideate.sh` / `ideate.ps1`: scaffold `.spec-kit/ideas_backlog.md` with SCAMPER + HMW template (#15)
+  - New `select.sh` / `select.ps1`: scaffold `.spec-kit/idea_selection.md` with AI-RICE scoring table (#15)
+  - New `structure.sh` / `structure.ps1`: scaffold `.spec-kit/ai_vision_canvas.md` with 18-section canvas (#15)
+  - All three scripts substitute `[PROJECT_NAME]` and `[ISO_8601_TIMESTAMP]` placeholders automatically (#15)
+  - Idempotent: exit non-zero if artifact already exists; `--force` / `-Force` flag allows overwrite (#15)
+  - `--help` / `-Help` prints usage with prerequisites and next-step guidance (#15)
+  - 30 new pytest tests covering creation, idempotency, force, help, timestamp substitution, project name (#15)
+
 - **P025 (#88): Self-update check and upgrade command for specify CLI**
   - New `specify update` command: checks for newer release, shows version diff, prompts to upgrade (#88)
   - `specify update --check`: scriptable flag — exits 0 if up-to-date, 1 if update available (#88)
@@ -20,7 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Passive check respects `CI=true` and `SPECIFY_NO_UPDATE_CHECK=1` env vars; explicit `specify update` always proceeds (#88)
   - Upgrade command shown for both `uv` (primary) and `pip` (fallback) users (#88)
   - Network failures silently ignored — never crash main commands (#88)
-
 
   - Configurable model IDs via `env:` block (`REVIEW_MODEL`, `SUMMARY_MODEL`) — no hardcoded model strings (#77)
   - Configurable token limits via `env:` block (`MAX_REVIEW_TOKENS: 1500`, `MAX_SUMMARY_TOKENS: 800`) (#77)
