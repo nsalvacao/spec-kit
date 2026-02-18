@@ -266,23 +266,21 @@ When choosing what to work on, apply this order:
 | `lint.yml` | ✅ Healthy | Push/PR — runs `markdownlint-cli2` |
 | `docs.yml` | ✅ Healthy | Push to `main` (`docs-site/**`) |
 | `stale.yml` | ✅ Healthy | Daily cron — marks stale after 150d |
-| `ai-review.yml` | ✅ Active | PR — Gemini AI review |
-| `ai-triage.yml` | ✅ Active | Issues — automatic triage |
-| `release.yml` | 🔴 FAILING | Push to `main` — `get-next-version.sh` breaks on fork version tags |
+| `ai-review.yml` | ✅ Active | PR — GPT-4.1 AI review via actions-hub |
+| `ai-triage.yml` | ✅ Active | Issues — GPT-4.1-mini automatic triage |
+| `test.yml` | ✅ Active | Push/PR — uv run pytest |
+| `release.yml` | ✅ Active | Push to `main` — semantic versioning (v0.0.26) |
 
-### Known CI Gap
+### Known CI Status
 
-**Missing `test.yml`**: There is no automated pytest workflow. Every push to `main` or PR should run:
-
-```yaml
-uv run pytest tests/ --tb=short
-```
-
-This gap must be fixed before adding new test-dependent features.
+All workflows are healthy as of v0.0.26. The following were fixed:
+- `release.yml` — versioning script fixed (47de07e)
+- `test.yml` — added pytest CI (47de07e); `uv.lock` tracked (5845dac)
+- `ai-review.yml` / `ai-triage.yml` — explicit permissions added (0c173ce)
 
 ### Release Version Convention
 
-Version format: `vMAJOR.MINOR.PATCH-fork.N` (e.g., `v0.0.23-fork.2`)
+Version format: `vMAJOR.MINOR.PATCH` (e.g., `v0.0.26`, standard SemVer without fork suffix)
 
 Python/PyPI equivalent: `MAJOR.MINOR.PATCH.postN` (e.g., `0.0.23.post2`)
 
