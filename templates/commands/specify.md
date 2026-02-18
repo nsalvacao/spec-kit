@@ -26,6 +26,13 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
+> **Phase 0 Context**: Before proceeding, check if `.spec-kit/` exists. If it does, read
+> `.spec-kit/ai_vision_canvas.md` and `.spec-kit/idea_selection.md` to align the specification
+> with validated strategic decisions from Phase 0. Also check `.ideas/` if it exists (Strategy
+> Toolkit artifacts — gitignored): `.ideas/brainstorm-expansion.md` and `.ideas/execution-plan.md`
+> provide complementary strategic context. Phase 0 and `.ideas/` artifacts take precedence over
+> inferences from README alone.
+
 The text the user typed after `/speckit.specify` in the triggering message **is** the feature description. Assume you always have it available in this conversation even if `{ARGS}` appears literally below. Do not ask the user to repeat it unless they provided an empty command.
 
 Given that feature description, do this:

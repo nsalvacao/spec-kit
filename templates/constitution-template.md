@@ -2,6 +2,27 @@
 
 <!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
 
+<!-- PHASE 0 INTEGRATION CHECK
+     If you ran Phase 0 (IDEATE → SELECT → STRUCTURE → VALIDATE), your principles
+     should be derived from the artifacts in .spec-kit/:
+
+     - .spec-kit/ideas_backlog.md  → SCAMPER/HMW insights that revealed what matters most
+     - .spec-kit/idea_selection.md → AI-RICE scoring that justified strategic choices
+     - .spec-kit/ai_vision_canvas.md → value proposition, constraints, and success criteria
+     - .spec-kit/g0_validation_report.md → risks and gates that must be embedded as principles
+
+     If you used the Strategy Toolkit (brainstorm/execution-plan/strategic-review commands),
+     also check .ideas/ (gitignored, private) for complementary artifacts:
+
+     - .ideas/brainstorm-expansion.md → structured ideation with strategic frameworks
+     - .ideas/execution-plan.md       → roadmap, tier ranking, risk mapping
+     - .ideas/evaluation-results.md   → pre-launch quality and readiness scores
+
+     Translate each validated strategic decision into a non-negotiable principle below.
+     If neither Phase 0 nor Strategy Toolkit was used, derive principles from README,
+     docs, and team conventions.
+-->
+
 ## Core Principles
 
 ### [PRINCIPLE_1_NAME]
