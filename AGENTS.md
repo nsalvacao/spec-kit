@@ -438,40 +438,40 @@ This workflow complements the general upstream synchronization process described
 
 ### Goal
 
-- Reuse valuable upstream work with controlled risk.
-- Preserve traceability, authorship, and license context.
-- Avoid regressions in `nsalvacao/spec-kit`.
+> **Upstream Intelligence**: Periodically review upstream PRs to accelerate evolution and capture valuable ideas/features we may not have planned internally.
+> **Selection Method**: Triage candidates by category (bugfix/reliability, CI/docs, core workflow, agent support), then prioritize by impact, risk, and integration cost.
+> **Adoption Rule**: Import one upstream PR per temporary branch, run isolated review/testing, and merge only after all safety gates pass.
 
 ### Compliance and Provenance
 
-- Upstream project license is MIT; reuse is allowed under MIT terms.
-- Keep original authorship whenever importing upstream commits.
-- Prefer importing the full upstream PR head when feasible.
-- If cherry-picking, use `git cherry-pick -x` to record commit provenance.
-- Never use `--reset-author` when importing third-party commits.
-- Keep `LICENSE` and any existing license headers/notices intact.
+> **Upstream License**: Upstream project license is MIT; reuse is allowed under MIT terms.
+> **Authorship**: Keep original authorship whenever importing upstream commits.
+> **Integration**: Prefer importing the full upstream PR head when feasible.
+> **Provenance**: If cherry-picking, use `git cherry-pick -x` to record commit provenance.
+> **Authorship**: Never use `--reset-author` when importing third-party commits.
+> **License Headers**: Keep `LICENSE` and any existing license headers/notices intact.
 
 ### Branching Convention
 
-- Stable baseline branch: `baseline/main-sync-YYYY-MM-DD`
-- Intake branch per upstream PR: `intake/lote-<A|B|C>-pr-<upstream_pr_number>`
-- Review PR target: `intake/... -> baseline/...`
-- Final promotion PR target: `baseline/... -> main`
+> **Baseline**: Stable baseline branch: `baseline/main-sync-YYYY-MM-DD`
+> **Intake**: Intake branch per upstream PR: `intake/lote-<A|B|C>-pr-<upstream_pr_number>`
+> **Review**: Review PR target: `intake/... -> baseline/...`
+> **Final**: Final promotion PR target: `baseline/... -> main`
 
 ### Mandatory 7-Step Workflow
 
-1. Create or refresh baseline from clean, synced `main`.
-2. Import upstream PR into a dedicated `intake/...` branch (1 upstream PR = 1 branch).
-3. Open PR from `intake/...` into baseline (`baseline/...`), no immediate merge.
-4. Wait for GitHub Actions to complete the automated Gemini/Copilot review workflows and collect feedback from status checks and bot comments on the PR.
-5. Resolve feedback comment-by-comment, then run relevant tests/validation.
-6. Merge approved intake PR into baseline only after tests and review threads are resolved.
-7. After completing all intake PRs planned for the current batch, open one promotion PR from baseline to `main`.
+> **Step 1**: Create or refresh baseline from clean, synced `main`.
+> **Step 2**: Import upstream PR into a dedicated `intake/...` branch (1 upstream PR = 1 branch).
+> **Step 3**: Open PR from `intake/...` into baseline (`baseline/...`), no immediate merge.
+> **Step 4**: Wait for GitHub Actions to complete the automated Gemini/Copilot review workflows and collect feedback from status checks and bot comments on the PR.
+> **Step 5**: Resolve feedback comment-by-comment, then run relevant tests/validation.
+> **Step 6**: Merge approved intake PR into baseline only after tests and review threads are resolved.
+> **Step 7**: After completing all intake PRs planned for the current batch, open one promotion PR from baseline to `main`.
 
 ### Safety Gates
 
-- Never merge intake branches directly into `main`.
-- Process intake PRs one at a time.
-- Require green validations for each intake PR before merge.
-- If conflicts or unclear behavior appear, pause and review before continuing.
-- Keep local and `origin` synchronized before creating new branches and after merging pull requests.
+> **Never merge intake branches directly into `main`**.
+> **Process intake PRs one at a time**.
+> **Require green validations for each intake PR before merge**.
+> **If conflicts or unclear behavior appear, pause and review before continuing**.
+> **Keep local and `origin` synchronized before creating new branches and after merging pull requests**.
