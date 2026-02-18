@@ -1,7 +1,4 @@
-# AI-powered issue triage (GitHub Models free tier)
-# Calls reusable workflow from nsalvacao/actions-hub
 name: AI Triage
-
 on:
   issues:
     types: [opened]
@@ -12,5 +9,6 @@ jobs:
     with:
       auto_label: true
       language: "en"
-    secrets: inherit
+    secrets:
+      MODELS_PAT: ${{ secrets.MODELS_PAT }}
 
