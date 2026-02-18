@@ -1090,7 +1090,7 @@ def ensure_constitution_from_template(project_path: Path, tracker: StepTracker |
 @app.command()
 def init(
     project_name: str = typer.Argument(None, help="Name for your new project directory (optional if using --here, or use '.' for current directory)"),
-    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, codebuddy, amp, shai, q, agy, bob, or qoder "),
+    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use (comma-separated for multi-agent): claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, codebuddy, amp, shai, q, agy, bob, qoder — e.g. --ai copilot,claude"),
     script_type: str = typer.Option(None, "--script", help="Script type to use: sh or ps"),
     template_repo: str = typer.Option(None, "--template-repo", help="Override template repo (owner/name). Defaults to SPECIFY_TEMPLATE_REPO or nsalvacao/spec-kit"),
     ignore_agent_tools: bool = typer.Option(False, "--ignore-agent-tools", help="Skip checks for AI agent tools like Claude Code"),
@@ -1202,10 +1202,14 @@ def init(
             console.print("[yellow]Git not found - will skip repository initialization[/yellow]")
 
     if ai_assistant:
-        if ai_assistant not in AGENT_CONFIG:
-            console.print(f"[red]Error:[/red] Invalid AI assistant '{ai_assistant}'. Choose from: {', '.join(AGENT_CONFIG.keys())}")
+        # Support comma-separated list: --ai copilot,claude
+        ai_list = [a.strip() for a in ai_assistant.split(",") if a.strip()]
+        invalid = [a for a in ai_list if a not in AGENT_CONFIG]
+        if invalid:
+            console.print(f"[red]Error:[/red] Invalid AI assistant(s): {', '.join(invalid)}. Choose from: {', '.join(AGENT_CONFIG.keys())}")
             raise typer.Exit(1)
-        selected_ai = ai_assistant
+        selected_ai = ai_list[0]
+        extra_agents = ai_list[1:]
     else:
         # Create options dict for selection (agent_key: display_name)
         ai_choices = {key: config["name"] for key, config in AGENT_CONFIG.items()}
@@ -1214,24 +1218,26 @@ def init(
             "Choose your AI assistant:", 
             "copilot"
         )
+        extra_agents = []
 
     if not ignore_agent_tools:
-        agent_config = AGENT_CONFIG.get(selected_ai)
-        if agent_config and agent_config["requires_cli"]:
-            install_url = agent_config["install_url"]
-            if not check_tool(selected_ai):
-                error_panel = Panel(
-                    f"[cyan]{selected_ai}[/cyan] not found\n"
-                    f"Install from: [cyan]{install_url}[/cyan]\n"
-                    f"{agent_config['name']} is required to continue with this project type.\n\n"
-                    "Tip: Use [cyan]--ignore-agent-tools[/cyan] to skip this check",
-                    title="[red]Agent Detection Error[/red]",
-                    border_style="red",
-                    padding=(1, 2)
-                )
-                console.print()
-                console.print(error_panel)
-                raise typer.Exit(1)
+        for agent_key in [selected_ai] + extra_agents:
+            agent_config = AGENT_CONFIG.get(agent_key)
+            if agent_config and agent_config["requires_cli"]:
+                install_url = agent_config["install_url"]
+                if not check_tool(agent_key):
+                    error_panel = Panel(
+                        f"[cyan]{agent_key}[/cyan] not found\n"
+                        f"Install from: [cyan]{install_url}[/cyan]\n"
+                        f"{agent_config['name']} is required to continue with this project type.\n\n"
+                        "Tip: Use [cyan]--ignore-agent-tools[/cyan] to skip this check",
+                        title="[red]Agent Detection Error[/red]",
+                        border_style="red",
+                        padding=(1, 2)
+                    )
+                    console.print()
+                    console.print(error_panel)
+                    raise typer.Exit(1)
 
     rg_available = check_tool("rg")
     if not rg_available:
@@ -1263,7 +1269,8 @@ def init(
         else:
             selected_script = default_script
 
-    console.print(f"[cyan]Selected AI assistant:[/cyan] {selected_ai}")
+    all_agents_display = ", ".join([selected_ai] + extra_agents)
+    console.print(f"[cyan]Selected AI assistant:[/cyan] {all_agents_display}")
     console.print(f"[cyan]Selected script type:[/cyan] {selected_script}")
 
     tracker = StepTracker("Initialize Specify Project")
@@ -1276,7 +1283,7 @@ def init(
     else:
         tracker.skip("precheck", "rg not found — install ripgrep for validators")
     tracker.add("ai-select", "Select AI assistant")
-    tracker.complete("ai-select", f"{selected_ai}")
+    tracker.complete("ai-select", all_agents_display)
     tracker.add("script-select", "Select script type")
     tracker.complete("script-select", selected_script)
     for key, label in [
@@ -1285,6 +1292,13 @@ def init(
         ("extract", "Extract template"),
         ("zip-list", "Archive contents"),
         ("extracted-summary", "Extraction summary"),
+    ]:
+        tracker.add(key, label)
+    # Pre-register extra-agent fetch steps
+    for extra in extra_agents:
+        tracker.add(f"fetch-{extra}", f"Fetch template for {extra}")
+        tracker.add(f"extract-{extra}", f"Extract template for {extra}")
+    for key, label in [
         ("chmod", "Ensure scripts executable"),
         ("gitignore", "Configure .gitignore"),
         ("constitution", "Constitution setup"),
@@ -1318,6 +1332,36 @@ def init(
                 repo_owner=repo_owner,
                 repo_name=repo_name,
             )
+
+            # Install extra agents (multi-agent: --ai copilot,claude)
+            for extra in extra_agents:
+                extra_tracker = StepTracker(f"agent-{extra}")
+                extra_tracker.add("fetch", f"Fetch template for {extra}")
+                extra_tracker.add("download", f"Download template for {extra}")
+                extra_tracker.add("extract", f"Extract template for {extra}")
+                extra_tracker.add("zip-list", "Archive contents")
+                extra_tracker.add("extracted-summary", "Extraction summary")
+                extra_tracker.add("cleanup", "Cleanup")
+                tracker.start(f"fetch-{extra}")
+                try:
+                    download_and_extract_template(
+                        project_path,
+                        extra,
+                        selected_script,
+                        is_current_dir=True,  # always overlay into existing dir
+                        verbose=False,
+                        tracker=extra_tracker,
+                        client=local_client,
+                        debug=debug,
+                        github_token=github_token,
+                        repo_owner=repo_owner,
+                        repo_name=repo_name,
+                    )
+                    tracker.complete(f"fetch-{extra}", "done")
+                    tracker.complete(f"extract-{extra}", "overlaid")
+                except Exception as extra_e:
+                    tracker.error(f"fetch-{extra}", str(extra_e))
+                    tracker.error(f"extract-{extra}", "failed")
 
             ensure_executable_scripts(project_path, tracker=tracker)
 

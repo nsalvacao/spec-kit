@@ -393,7 +393,7 @@ wheels = [
 
 [[package]]
 name = "specify-cli"
-version = "0.0.24"
+version = "0.0.26"
 source = { editable = "." }
 dependencies = [
     { name = "httpx", extra = ["socks"] },

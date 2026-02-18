@@ -26,7 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **P001: State management yq compatibility** - Replaced yq-based state scripts with Python implementation using PyYAML
+- **P004 (#25): Multi-agent `--ai` support** - `specify init --ai copilot,claude` now works correctly
+  - Accepts comma-separated list of agents (e.g. `--ai copilot,claude,gemini`)
+  - Validates all agents before starting; exits with clear error if any is invalid
+  - Primary agent creates the project; extra agents overlay their templates into the same directory
+  - Extra agent downloads are isolated — a failure does not abort the overall init
+  - `precheck` and `ai-select` tracker steps now show all selected agents
+  - Tests: 10 new unit/integration tests in `tests/test_multi_agent_init.py`
+
+
   - Created `scripts/python/state-update.py` for atomic YAML updates
   - Updated `state-log-violation.sh/ps1`, `state-reconstruct.sh/ps1`, and `state-check.sh/ps1` to use Python backend
   - Eliminates yq v3/v4 syntax breaking changes
