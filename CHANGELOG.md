@@ -9,13 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **P023 (#80): Fix DEFAULT_CATALOG_URL and catalog.json to point to fork nsalvacao/spec-kit**
-  - `src/specify_cli/extensions.py`: `DEFAULT_CATALOG_URL` updated from `github/spec-kit` to `nsalvacao/spec-kit`
-  - `extensions/catalog.json`: `catalog_url` field updated from `github/spec-kit` to `nsalvacao/spec-kit`
-  - Ensures `specify extension search` fetches the fork's catalog by default
-
 ### Added
 
 - **P022 (#11, #12): Phase 0 + Strategy Toolkit integration in constitution template and SDD agent docs**
@@ -50,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `constitution-template` initialization flow for new projects
 
 ### Fixed
+
+- **P023 (#80): Fix DEFAULT_CATALOG_URL and catalog.json to point to fork nsalvacao/spec-kit**
+  - `src/specify_cli/extensions.py`: `DEFAULT_CATALOG_URL` updated from `github/spec-kit` to `nsalvacao/spec-kit`
+  - `extensions/catalog.json`: `catalog_url` field updated from `github/spec-kit` to `nsalvacao/spec-kit`
+  - Ensures `specify extension search` fetches the fork's catalog by default
 
 - **P004 (#25): Multi-agent `--ai` support** - `specify init --ai copilot,claude` now works correctly
   - Accepts comma-separated list of agents (e.g. `--ai copilot,claude,gemini`)
