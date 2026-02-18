@@ -40,7 +40,7 @@ SDD (Gate G0 passed)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `artifact` | string | ✅ | Machine-readable artifact type (no spaces, underscores) |
+| `artifact` | string | ✅ | Machine-readable artifact type in snake_case (e.g., `vision_brief`) |
 | `phase` | string | ✅ | Phase that produced this artifact |
 | `schema_version` | string | ✅ | Always `"1.0"` for this version of the protocol |
 | `generated` | ISO-8601 | ✅ | Creation timestamp (`YYYY-MM-DDTHH:MM:SSZ`) |

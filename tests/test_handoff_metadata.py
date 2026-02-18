@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Optional
 
 import pytest
 import yaml
@@ -56,9 +57,15 @@ REQUIRED_FIELDS = ["artifact", "phase", "schema_version", "generated", "derived_
 
 
 def _parse_frontmatter(path: Path) -> dict:
-    """Extract YAML frontmatter from a markdown file."""
+    """Extract YAML frontmatter from a markdown file.
+
+    Requires the frontmatter to start at the very first line of the file
+    (the opening ``---`` must be on line 1). Uses a non-greedy match so
+    any additional ``---`` dividers inside the body are ignored.
+    """
     content = path.read_text(encoding="utf-8")
-    match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+    # Strict: opening --- must be at byte 0, closing --- on its own line
+    match = re.match(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|$)", content, re.DOTALL)
     if not match:
         return {}
     return yaml.safe_load(match.group(1)) or {}
@@ -182,3 +189,37 @@ class TestDocumentationExists:
         assert "schema_version" in doc
         assert "derived_from" in doc
         assert "enables" in doc
+
+
+class TestNegativeCases:
+    """_parse_frontmatter must handle malformed or missing frontmatter gracefully."""
+
+    def test_no_frontmatter_returns_empty_dict(self, tmp_path: Path) -> None:
+        f = tmp_path / "no-fm.md"
+        f.write_text("# Just a heading\n\nNo frontmatter here.\n")
+        assert _parse_frontmatter(f) == {}
+
+    def test_frontmatter_not_at_start_returns_empty_dict(self, tmp_path: Path) -> None:
+        f = tmp_path / "late-fm.md"
+        f.write_text("Some preamble\n---\nkey: value\n---\n")
+        assert _parse_frontmatter(f) == {}
+
+    def test_unclosed_frontmatter_returns_empty_dict(self, tmp_path: Path) -> None:
+        f = tmp_path / "unclosed-fm.md"
+        f.write_text("---\nkey: value\n# No closing delimiter\n")
+        assert _parse_frontmatter(f) == {}
+
+    def test_empty_frontmatter_returns_empty_dict(self, tmp_path: Path) -> None:
+        f = tmp_path / "empty-fm.md"
+        f.write_text("---\n---\n# Body\n")
+        assert _parse_frontmatter(f) == {}
+
+    def test_missing_required_field_is_detected(self, tmp_path: Path) -> None:
+        """A template missing a required field should fail the required-fields check."""
+        f = tmp_path / "partial-fm.md"
+        # Missing 'enables' and 'derived_from'
+        f.write_text("---\nartifact: test\nphase: ideate\nschema_version: \"1.0\"\ngenerated: 2024-01-01T00:00:00Z\n---\n# Body\n")
+        fm = _parse_frontmatter(f)
+        missing = [field for field in REQUIRED_FIELDS if field not in fm]
+        assert "enables" in missing
+        assert "derived_from" in missing
