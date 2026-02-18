@@ -39,6 +39,7 @@ from typing import Optional, Tuple
 import typer
 import httpx
 from rich.console import Console
+from rich.markup import escape as markup_escape
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.text import Text
@@ -1709,9 +1710,11 @@ def check():
         except Exception:
             is_newer = latest != current
         if is_newer:
-            console.print(f"\n[bold yellow]💡 Update available: v{current} → v{latest}. Run `specify update` to upgrade.[/bold yellow]")
+            console.print(f"\n[bold yellow]💡 Update available: v{markup_escape(current)} → v{markup_escape(latest)}. Run `specify update` to upgrade.[/bold yellow]")
 
 
+@app.command()
+def version():
     """Display version and system information."""
     import platform
     import importlib.metadata
@@ -1823,10 +1826,10 @@ def update(
 
     console.print()
     console.print(f"[bold]🔍 Update available![/bold]")
-    console.print(f"   Current version : [yellow]v{current}[/yellow]")
-    console.print(f"   Latest release  : [bold green]v{latest}[/bold green]")
+    console.print(f"   Current version : [yellow]v{markup_escape(current)}[/yellow]")
+    console.print(f"   Latest release  : [bold green]v{markup_escape(latest)}[/bold green]")
     if release_url:
-        console.print(f"   Release notes   : [cyan]{release_url}[/cyan]")
+        console.print(f"   Release notes   : [cyan]{markup_escape(release_url)}[/cyan]")
     console.print()
     console.print("[dim]Upgrade command (uv):[/dim]")
     console.print(f"  [bold cyan]{_INSTALL_CMD_UV}[/bold cyan]")

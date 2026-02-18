@@ -162,7 +162,9 @@ class TestFetchLatestRelease:
 # ---------------------------------------------------------------------------
 
 class TestCheckForUpdate:
-    def test_uses_cache_when_fresh(self, valid_cache):
+    def test_uses_cache_when_fresh(self, valid_cache, monkeypatch):
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("SPECIFY_NO_UPDATE_CHECK", raising=False)
         with patch("specify_cli._get_update_cache_path", return_value=valid_cache):
             with patch("specify_cli._fetch_latest_release") as mock_fetch:
                 result = _check_for_update()
@@ -171,7 +173,9 @@ class TestCheckForUpdate:
         assert result is not None
         assert result["latest_version"] == "0.0.50"
 
-    def test_fetches_when_cache_stale(self, stale_cache, tmp_path):
+    def test_fetches_when_cache_stale(self, stale_cache, tmp_path, monkeypatch):
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("SPECIFY_NO_UPDATE_CHECK", raising=False)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -186,8 +190,10 @@ class TestCheckForUpdate:
         assert result is not None
         assert result["latest_version"] == "0.0.99"
 
-    def test_returns_none_on_network_failure(self, tmp_path):
+    def test_returns_none_on_network_failure(self, tmp_path, monkeypatch):
         import httpx
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("SPECIFY_NO_UPDATE_CHECK", raising=False)
         cache_file = tmp_path / "specify-cli" / "update_cache.json"
         with patch("specify_cli._get_update_cache_path", return_value=cache_file):
             with patch("specify_cli.client") as mock_client:
