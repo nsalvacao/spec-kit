@@ -1,6 +1,13 @@
 # =============================================================================
 # 🤖 AI Review — inline, no cross-repo reusable dependency
 # Uses GitHub Models free tier — ZERO premium requests consumed
+#
+# Configurable via env block at the top of each job:
+#   REVIEW_MODEL       — model used for code review  (#77)
+#   SUMMARY_MODEL      — model used for PR summary   (#77)
+#   MAX_REVIEW_CHARS   — max diff chars for review   (#76)
+#   MAX_SUMMARY_CHARS  — max diff chars for summary  (#76)
+#   MAX_RETRY          — number of retry attempts    (#77)
 # =============================================================================
 name: AI Review
 
@@ -24,6 +31,12 @@ jobs:
   code-review:
     name: AI Code Review
     runs-on: ubuntu-latest
+    # Skip review for PRs labelled 'skip-ai-review' (#76)
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
+    env:
+      REVIEW_MODEL: "openai/gpt-4.1"
+      MAX_REVIEW_CHARS: "8000"
+      MAX_RETRY: "3"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,13 +50,15 @@ jobs:
           DIFF_SIZE=$(wc -c < diff_full.txt)
           echo "full_size=$DIFF_SIZE" >> $GITHUB_OUTPUT
 
-          MAX=8000
+          MAX=${{ env.MAX_REVIEW_CHARS }}
           if [ "$DIFF_SIZE" -gt "$MAX" ]; then
             head -c "$MAX" diff_full.txt > diff.txt
             echo "truncated=true" >> $GITHUB_OUTPUT
+            echo "truncated_at=$MAX" >> $GITHUB_OUTPUT
           else
             cp diff_full.txt diff.txt
             echo "truncated=false" >> $GITHUB_OUTPUT
+            echo "truncated_at=0" >> $GITHUB_OUTPUT
           fi
 
           if [ ! -s diff.txt ]; then
@@ -52,7 +67,7 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: AI Review via GitHub Models
+      - name: AI Review via GitHub Models (with retry)
         if: steps.diff.outputs.skip != 'true'
         id: review
         env:
@@ -61,33 +76,60 @@ jobs:
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
           DIFF_CONTENT=$(cat diff.txt)
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "https://models.github.ai/inference/chat/completions" \
-            -H "Authorization: Bearer $GH_MODELS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg system "$SYSTEM_PROMPT" \
-              --arg diff "$DIFF_CONTENT" \
-              '{
-                model: "openai/gpt-4.1",
-                messages: [
-                  {role: "system", content: $system},
-                  {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
-                ],
-                max_tokens: 1500,
-                temperature: 0.2
-              }')")
+          # Retry loop with exponential backoff (#77)
+          MAX_RETRY=${{ env.MAX_RETRY }}
+          ATTEMPT=0
+          HTTP_CODE=""
+          while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Attempt $ATTEMPT/$MAX_RETRY..."
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://models.github.ai/inference/chat/completions" \
+              -H "Authorization: Bearer $GH_MODELS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n \
+                --arg system "$SYSTEM_PROMPT" \
+                --arg diff "$DIFF_CONTENT" \
+                --arg model "${{ env.REVIEW_MODEL }}" \
+                '{
+                  model: $model,
+                  messages: [
+                    {role: "system", content: $system},
+                    {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
+                  ],
+                  max_tokens: 1500,
+                  temperature: 0.2
+                }')")
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              break
+            fi
+
+            echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
+            if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
+              SLEEP=$((2 ** ATTEMPT))
+              echo "Retrying in ${SLEEP}s..."
+              sleep "$SLEEP"
+            fi
+          done
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Models API returned HTTP $HTTP_CODE"
+            echo "::error::Models API returned HTTP $HTTP_CODE after $MAX_RETRY attempts"
             echo "$BODY" | jq .error 2>/dev/null || echo "$BODY"
             exit 1
           fi
 
-          echo "$BODY" | jq -r '.choices[0].message.content' > review.md
+          # Validate output is non-empty and starts with a markdown heading (#77)
+          REVIEW_TEXT=$(echo "$BODY" | jq -r '.choices[0].message.content')
+          if [ -z "$REVIEW_TEXT" ] || ! echo "$REVIEW_TEXT" | grep -qE '^#|^\*\*|^##'; then
+            echo "::warning::Model returned empty or non-markdown response; posting raw output"
+          fi
+
+          echo "$REVIEW_TEXT" > review.md
           echo "tokens=$(echo "$BODY" | jq '.usage.total_tokens')" >> $GITHUB_OUTPUT
 
       - name: Post review comment
@@ -99,11 +141,13 @@ jobs:
             const fs = require('fs');
             const review = fs.readFileSync('review.md', 'utf8');
             const truncated = '${{ steps.diff.outputs.truncated }}' === 'true';
+            const truncatedAt = '${{ steps.diff.outputs.truncated_at }}';
             const tokens = '${{ steps.review.outputs.tokens }}';
+            const model = '${{ env.REVIEW_MODEL }}';
 
-            let footer = `\n\n---\n*🤖 AI Review · openai/gpt-4.1 · ${tokens} tokens · GitHub Models free tier · 0 premium requests*`;
+            let footer = `\n\n---\n*🤖 AI Review · ${model} · ${tokens} tokens · GitHub Models free tier · 0 premium requests*`;
             if (truncated) {
-              footer += `\n⚠️ Diff truncated to 8000 chars`;
+              footer += `\n\n> ⚠️ **Diff truncated** to ${truncatedAt} chars (full diff: ${{ steps.diff.outputs.full_size }} chars). Changes beyond this point were **not reviewed**. Add label \`skip-ai-review\` to suppress, or split the PR.`;
             }
 
             await github.rest.issues.createComment({
@@ -119,6 +163,11 @@ jobs:
   pr-summary:
     name: AI PR Summary
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
+    env:
+      SUMMARY_MODEL: "openai/gpt-4.1-mini"
+      MAX_SUMMARY_CHARS: "6000"
+      MAX_RETRY: "3"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -129,7 +178,7 @@ jobs:
         id: info
         run: |
           git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
-          head -c 6000 diff_full.txt > diff.txt
+          head -c ${{ env.MAX_SUMMARY_CHARS }} diff_full.txt > diff.txt
           git diff --name-status ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > files.txt
 
           if [ ! -s diff.txt ]; then
@@ -138,7 +187,7 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Generate summary
+      - name: Generate summary (with retry)
         if: steps.info.outputs.skip != 'true'
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
@@ -147,29 +196,50 @@ jobs:
           FILES=$(cat files.txt)
           DIFF=$(cat diff.txt)
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "https://models.github.ai/inference/chat/completions" \
-            -H "Authorization: Bearer $GH_MODELS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg system "$SYSTEM" \
-              --arg files "$FILES" \
-              --arg diff "$DIFF" \
-              '{
-                model: "openai/gpt-4.1-mini",
-                messages: [
-                  {role: "system", content: $system},
-                  {role: "user", content: ("Files changed:\n" + $files + "\n\nDiff:\n" + $diff)}
-                ],
-                max_tokens: 800,
-                temperature: 0.3
-              }')")
+          # Retry loop with exponential backoff (#77)
+          MAX_RETRY=${{ env.MAX_RETRY }}
+          ATTEMPT=0
+          HTTP_CODE=""
+          while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Attempt $ATTEMPT/$MAX_RETRY..."
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://models.github.ai/inference/chat/completions" \
+              -H "Authorization: Bearer $GH_MODELS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n \
+                --arg system "$SYSTEM" \
+                --arg files "$FILES" \
+                --arg diff "$DIFF" \
+                --arg model "${{ env.SUMMARY_MODEL }}" \
+                '{
+                  model: $model,
+                  messages: [
+                    {role: "system", content: $system},
+                    {role: "user", content: ("Files changed:\n" + $files + "\n\nDiff:\n" + $diff)}
+                  ],
+                  max_tokens: 800,
+                  temperature: 0.3
+                }')")
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              break
+            fi
+
+            echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
+            if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
+              SLEEP=$((2 ** ATTEMPT))
+              echo "Retrying in ${SLEEP}s..."
+              sleep "$SLEEP"
+            fi
+          done
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Models API returned HTTP $HTTP_CODE"
+            echo "::error::Models API returned HTTP $HTTP_CODE after $MAX_RETRY attempts"
             echo "$BODY" | jq .error 2>/dev/null || echo "$BODY"
             exit 1
           fi
@@ -184,8 +254,9 @@ jobs:
           script: |
             const fs = require('fs');
             const summary = fs.readFileSync('summary.md', 'utf8');
+            const model = '${{ env.SUMMARY_MODEL }}';
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: context.issue.number,
-              body: `## 📝 AI PR Summary\n\n${summary}\n\n---\n*🤖 Auto-generated · openai/gpt-4.1-mini · GitHub Models free tier · 0 premium requests*`
+              body: `## 📝 AI PR Summary\n\n${summary}\n\n---\n*🤖 Auto-generated · ${model} · GitHub Models free tier · 0 premium requests*`
             });
