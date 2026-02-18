@@ -860,7 +860,9 @@ def should_execute_hook(hook: dict, config: dict) -> bool:
 
 ### Central Catalog
 
-**URL**: `https://raw.githubusercontent.com/github/spec-kit/main/extensions/catalog.json`
+**URL**: `https://raw.githubusercontent.com/nsalvacao/spec-kit/main/extensions/catalog.json`
+
+> **Note**: This fork uses its own catalog by default. To use the upstream catalog instead, set `SPECKIT_CATALOG_URL=https://raw.githubusercontent.com/github/spec-kit/main/extensions/catalog.json`.
 
 **Format**:
 
