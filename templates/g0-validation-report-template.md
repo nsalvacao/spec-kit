@@ -1,7 +1,10 @@
 ---
 artifact: g0_validation_report
 phase: validate
+schema_version: "1.0"
 generated: [ISO_8601_TIMESTAMP]
+derived_from: .spec-kit/vision_brief.md
+enables: .specify/spec.md
 vision_brief: .spec-kit/vision_brief.md
 overall_score: [X/20]
 status: PASS | PASS WITH WAIVER | FAIL
