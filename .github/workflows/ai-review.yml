@@ -48,25 +48,25 @@ jobs:
       - name: Get PR diff
         id: diff
         run: |
+          set -euo pipefail
           git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
           DIFF_SIZE=$(wc -c < diff_full.txt)
-          echo "full_size=$DIFF_SIZE" >> $GITHUB_OUTPUT
+          echo "full_size=$DIFF_SIZE" >> "$GITHUB_OUTPUT"
 
-          MAX=${{ env.MAX_REVIEW_CHARS }}
-          if [ "$DIFF_SIZE" -gt "$MAX" ]; then
-            head -c "$MAX" diff_full.txt > diff.txt
-            echo "truncated=true" >> $GITHUB_OUTPUT
-            echo "truncated_at=$MAX" >> $GITHUB_OUTPUT
+          if [ "$DIFF_SIZE" -gt "$MAX_REVIEW_CHARS" ]; then
+            head -c "$MAX_REVIEW_CHARS" diff_full.txt > diff.txt
+            echo "truncated=true" >> "$GITHUB_OUTPUT"
+            echo "truncated_at=$MAX_REVIEW_CHARS" >> "$GITHUB_OUTPUT"
           else
             cp diff_full.txt diff.txt
-            echo "truncated=false" >> $GITHUB_OUTPUT
-            echo "truncated_at=0" >> $GITHUB_OUTPUT
+            echo "truncated=false" >> "$GITHUB_OUTPUT"
+            echo "truncated_at=0" >> "$GITHUB_OUTPUT"
           fi
 
           if [ ! -s diff.txt ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: AI Review via GitHub Models (with retry)
@@ -75,6 +75,7 @@ jobs:
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
         run: |
+          set -euo pipefail
           # Mask token to prevent accidental log exposure
           echo "::add-mask::$GH_MODELS_TOKEN"
 
@@ -82,8 +83,6 @@ jobs:
           DIFF_CONTENT=$(cat diff.txt)
 
           # Retry loop with exponential backoff, capped at MAX_RETRY_SLEEP seconds (#77)
-          MAX_RETRY=${{ env.MAX_RETRY }}
-          MAX_SLEEP=${{ env.MAX_RETRY_SLEEP }}
           ATTEMPT=0
           HTTP_CODE=""
           while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
@@ -97,8 +96,8 @@ jobs:
               -d "$(jq -n \
                 --arg system "$SYSTEM_PROMPT" \
                 --arg diff "$DIFF_CONTENT" \
-                --arg model "${{ env.REVIEW_MODEL }}" \
-                --argjson max_tokens ${{ env.MAX_REVIEW_TOKENS }} \
+                --arg model "$REVIEW_MODEL" \
+                --argjson max_tokens "$MAX_REVIEW_TOKENS" \
                 '{
                   model: $model,
                   messages: [
@@ -119,7 +118,7 @@ jobs:
             echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
             if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
               RAW_SLEEP=$((2 ** ATTEMPT))
-              SLEEP=$(( RAW_SLEEP < MAX_SLEEP ? RAW_SLEEP : MAX_SLEEP ))
+              SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
               echo "Retrying in ${SLEEP}s..."
               sleep "$SLEEP"
             fi
@@ -127,7 +126,7 @@ jobs:
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::error::Models API returned HTTP $HTTP_CODE after $MAX_RETRY attempts"
-            echo "$BODY" | jq .error 2>/dev/null || echo "$BODY"
+            echo "$BODY" | jq .error 2>/dev/null || true
             exit 1
           fi
 
@@ -138,7 +137,7 @@ jobs:
           fi
 
           echo "$REVIEW_TEXT" > review.md
-          echo "tokens=$(echo "$BODY" | jq '.usage.total_tokens')" >> $GITHUB_OUTPUT
+          echo "tokens=$(echo "$BODY" | jq '.usage.total_tokens')" >> "$GITHUB_OUTPUT"
 
       - name: Post review comment
         if: steps.diff.outputs.skip != 'true'
@@ -187,14 +186,15 @@ jobs:
       - name: Get PR info
         id: info
         run: |
+          set -euo pipefail
           git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
-          head -c ${{ env.MAX_SUMMARY_CHARS }} diff_full.txt > diff.txt
+          head -c "$MAX_SUMMARY_CHARS" diff_full.txt > diff.txt
           git diff --name-status ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > files.txt
 
           if [ ! -s diff.txt ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Generate summary (with retry)
@@ -202,6 +202,7 @@ jobs:
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
         run: |
+          set -euo pipefail
           # Mask token to prevent accidental log exposure
           echo "::add-mask::$GH_MODELS_TOKEN"
 
@@ -210,8 +211,6 @@ jobs:
           DIFF=$(cat diff.txt)
 
           # Retry loop with exponential backoff, capped at MAX_RETRY_SLEEP seconds (#77)
-          MAX_RETRY=${{ env.MAX_RETRY }}
-          MAX_SLEEP=${{ env.MAX_RETRY_SLEEP }}
           ATTEMPT=0
           HTTP_CODE=""
           while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
@@ -226,8 +225,8 @@ jobs:
                 --arg system "$SYSTEM" \
                 --arg files "$FILES" \
                 --arg diff "$DIFF" \
-                --arg model "${{ env.SUMMARY_MODEL }}" \
-                --argjson max_tokens ${{ env.MAX_SUMMARY_TOKENS }} \
+                --arg model "$SUMMARY_MODEL" \
+                --argjson max_tokens "$MAX_SUMMARY_TOKENS" \
                 '{
                   model: $model,
                   messages: [
@@ -248,7 +247,7 @@ jobs:
             echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
             if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
               RAW_SLEEP=$((2 ** ATTEMPT))
-              SLEEP=$(( RAW_SLEEP < MAX_SLEEP ? RAW_SLEEP : MAX_SLEEP ))
+              SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
               echo "Retrying in ${SLEEP}s..."
               sleep "$SLEEP"
             fi
@@ -256,7 +255,7 @@ jobs:
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::error::Models API returned HTTP $HTTP_CODE after $MAX_RETRY attempts"
-            echo "$BODY" | jq .error 2>/dev/null || echo "$BODY"
+            echo "$BODY" | jq .error 2>/dev/null || true
             exit 1
           fi
 
