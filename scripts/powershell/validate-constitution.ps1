@@ -29,6 +29,17 @@ function Write-LogViolation {
     }
 }
 
+# Validate file paths stay within project directory
+$projectDir = (Resolve-Path .).Path
+if ((Test-Path $FilePath) -and -not (Resolve-Path $FilePath).Path.StartsWith($projectDir)) {
+    Write-Error "Error: FilePath '$FilePath' is outside the project directory."
+    exit 1
+}
+if ($ReportPath -and (Test-Path $ReportPath) -and -not (Resolve-Path $ReportPath).Path.StartsWith($projectDir)) {
+    Write-Error "Error: ReportPath '$ReportPath' is outside the project directory."
+    exit 1
+}
+
 function Fail-Auto {
     param([string]$Criterion, [string]$Message)
     Write-Error "FAIL [$Criterion] $Message"
@@ -215,8 +226,23 @@ if ($Waive.Count -gt 0 -and $ReportPath -ne '' -and (Test-Path $ReportPath -Path
     $reportContent  = Get-Content $ReportPath -Raw
     $waiversSection = '## Waivers'
     if ($reportContent -match [regex]::Escape($waiversSection)) {
-        $reportContent = $reportContent.Replace($waiversSection, "$waiversSection`n$waiversBlock")
-        Set-Content -Path $ReportPath -Value $reportContent -NoNewline
+        # Idempotent: remove previously inserted table rows, then insert fresh ones
+        $lines = $reportContent -split "`n"
+        $newLines = [System.Collections.Generic.List[string]]::new()
+        $inWaivers = $false
+        foreach ($line in $lines) {
+            if ($line -match '^## Waivers') {
+                $newLines.Add($line)
+                $newLines.Add('')
+                $newLines.Add($waiversBlock.TrimEnd())
+                $inWaivers = $true
+                continue
+            }
+            if ($inWaivers -and $line -match '^\| ') { continue }
+            $inWaivers = $false
+            $newLines.Add($line)
+        }
+        Set-Content -Path $ReportPath -Value ($newLines -join "`n") -NoNewline
         Write-Output "Waivers registered in $ReportPath"
     }
 }

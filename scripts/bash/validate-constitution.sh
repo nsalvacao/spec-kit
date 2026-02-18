@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # validate-constitution.sh — Constitution validator with Waiver Mechanism
+# Requires: Bash 4+ (for associative arrays)
 #
 # Usage:
 #   validate-constitution.sh [FILE_PATH] [--waive CRITERION_ID "justification"] [--report REPORT_PATH]
@@ -21,7 +22,7 @@ STATE_LOG="$SCRIPT_DIR/state-log-violation.sh"
 declare -A WAIVERS=()  # WAIVERS[CRITERION_ID]="justification"
 
 # Check required binaries
-for _bin in rg awk; do
+for _bin in rg awk wc; do
   if ! command -v "$_bin" &>/dev/null; then
     echo "Error: required binary '$_bin' not found. Install it and retry." >&2
     exit 2
@@ -51,6 +52,17 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Validate that file paths stay within the project directory
+_project_dir=$(realpath .)
+if [ -e "$FILE_PATH" ] && [[ "$(realpath "$FILE_PATH")" != "$_project_dir"* ]]; then
+  echo "Error: FILE_PATH '$FILE_PATH' is outside the project directory." >&2
+  exit 1
+fi
+if [ -n "$REPORT_PATH" ] && [ -e "$REPORT_PATH" ] && [[ "$(realpath "$REPORT_PATH")" != "$_project_dir"* ]]; then
+  echo "Error: REPORT_PATH '$REPORT_PATH' is outside the project directory." >&2
+  exit 1
+fi
 
 log_violation() {
   local message="$1"
@@ -194,18 +206,17 @@ check_manual "Q1" "Phase 0 integration comment block removed" "$q1_passed" \
 
 # Q2: Each principle has substantive description (not just a one-liner <= 20 chars)
 short_principles=$(awk '
+  function check_prev() {
+    if (in_principle && desc_len <= 20) count++
+  }
   /^## Core Principles/ { in_section=1; in_principle=0; next }
-  /^## /                { in_section=0 }
-  in_section && /^### / { in_principle=1; desc_len=0; next }
+  /^## / && in_section   { check_prev(); in_section=0; in_principle=0 }
+  in_section && /^### /  { check_prev(); in_principle=1; desc_len=0; next }
   in_section && in_principle && /^[^#<]/ && length($0) > 3 {
     desc_len += length($0)
   }
-  in_section && /^### / {
-    if (desc_len <= 20) count++
-    in_principle=1; desc_len=0; next
-  }
   END {
-    if (in_principle && desc_len <= 20) count++
+    if (in_section) check_prev()
     print count+0
   }
 ' "$FILE_PATH")
@@ -273,9 +284,11 @@ if [ ${#WAIVERS[@]} -gt 0 ] && [ -n "$REPORT_PATH" ] && [ -f "$REPORT_PATH" ]; t
   done
 
   if rg -q "^## Waivers" "$REPORT_PATH"; then
+    # Idempotent: remove any previously inserted waiver table rows, then insert fresh ones
     WAIVER_BLOCK="$waiver_block" awk '
-      /^## Waivers/ {print; print ""; printf "%s", ENVIRON["WAIVER_BLOCK"]; next}
-      {print}
+      /^## Waivers/ { print; print ""; printf "%s", ENVIRON["WAIVER_BLOCK"]; in_waivers=1; next }
+      in_waivers && /^\| / { next }
+      { in_waivers=0; print }
     ' "$REPORT_PATH" > "${REPORT_PATH}.tmp" && mv "${REPORT_PATH}.tmp" "$REPORT_PATH"
     echo "Waivers registered in $REPORT_PATH"
   fi
