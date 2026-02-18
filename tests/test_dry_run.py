@@ -12,7 +12,7 @@ Tests cover:
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -71,8 +71,8 @@ class TestDryRunFlag:
         """Output must clearly indicate this is a dry run."""
         result = _run_dry_run()
         output_lower = result.output.lower()
-        assert "dry" in output_lower or "preview" in output_lower or "would" in output_lower, (
-            f"Expected dry-run indicator in output, got:\n{result.output}"
+        assert "dry run" in output_lower and "no files will be written" in output_lower, (
+            f"Expected 'dry run' and 'no files will be written' in output, got:\n{result.output}"
         )
 
     def test_dry_run_shows_agent(self):
@@ -108,8 +108,11 @@ class TestDryRunFlag:
                 "--ignore-agent-tools",
                 "--force",
             ], catch_exceptions=False)
-            # tmpdir still empty (or only contains what was there before)
             assert result.exit_code == 0, result.output
+            output_lower = result.output.lower()
+            assert "dry run" in output_lower and "no files will be written" in output_lower, (
+                f"Expected dry-run indicator with --here:\n{result.output}"
+            )
 
     def test_dry_run_invalid_agent_still_errors(self):
         """--dry-run with invalid --ai must still exit with error (validation first)."""
