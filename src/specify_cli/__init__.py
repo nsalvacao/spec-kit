@@ -1100,6 +1100,7 @@ def init(
     skip_tls: bool = typer.Option(False, "--skip-tls", help="Skip SSL/TLS verification (not recommended)"),
     debug: bool = typer.Option(False, "--debug", help="Show verbose diagnostic output for network and extraction failures"),
     github_token: str = typer.Option(None, "--github-token", help="GitHub token to use for API requests (or set GH_TOKEN or GITHUB_TOKEN environment variable)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview what would be done without writing any files"),
 ):
     """
     Initialize a new Specify project from the latest template.
@@ -1125,6 +1126,7 @@ def init(
         specify init --here
         specify init --here --force  # Skip confirmation when current directory not empty
         specify init . --template-repo my-org/spec-kit
+        specify init my-project --dry-run --ai claude  # Preview without writing files
     """
 
     show_banner()
@@ -1272,6 +1274,23 @@ def init(
     all_agents_display = ", ".join([selected_ai] + extra_agents)
     console.print(f"[cyan]Selected AI assistant:[/cyan] {all_agents_display}")
     console.print(f"[cyan]Selected script type:[/cyan] {selected_script}")
+
+    if dry_run:
+        target = "current directory" if here else str(project_path)
+        preview_lines = [
+            "[bold yellow]DRY RUN — no files will be written[/bold yellow]",
+            "",
+            f"{'Project':<18} [green]{project_name or Path.cwd().name}[/green]",
+            f"{'Target path':<18} [dim]{target}[/dim]",
+            f"{'AI assistant':<18} [cyan]{all_agents_display}[/cyan]",
+            f"{'Script type':<18} [cyan]{selected_script}[/cyan]",
+            f"{'Template repo':<18} [dim]{template_repo_value}[/dim]",
+            f"{'Git init':<18} [dim]{'skipped (--no-git)' if no_git else 'yes'}[/dim]",
+            "",
+            "[dim]Re-run without --dry-run to apply these changes.[/dim]",
+        ]
+        console.print(Panel("\n".join(preview_lines), title="[yellow]Preview[/yellow]", border_style="yellow", padding=(1, 2)))
+        raise typer.Exit(0)
 
     tracker = StepTracker("Initialize Specify Project")
 
