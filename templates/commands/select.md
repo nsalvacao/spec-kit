@@ -24,6 +24,11 @@ agent_scripts:
 4. Calculate AI-RICE score: (Reach * Impact * Confidence * Data_Readiness) / (Effort * Risk).
 5. Identify top-scoring idea; include runner-ups.
 6. Write .spec-kit/idea_selection.md using idea-selection-template.md.
+   - For every Idea ID in the table and in Selected/Runner-Up sections, generate a markdown
+     link to the corresponding heading anchor in ideas_backlog.md.
+   - Anchor derivation: lowercase the heading text after "### Idea ", replace spaces with
+     hyphens. Examples: "Idea S1" → #idea-s1; "Idea SC1-Substitute" → #idea-sc1-substitute.
+   - Link format: [IDEA_ID](.spec-kit/ideas_backlog.md#idea-<anchor>)
 7. Validate AI-RICE completeness with validate-airice.{sh|ps}.
 8. Update state: set current_phase=structure; record idea_selection path.
 9. Report completion and selected idea.
