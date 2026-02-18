@@ -55,3 +55,4 @@ AI-RICE extends RICE by adding Data_Readiness and Risk.
 - Score formula applied consistently
 - Winner + runner-ups documented
 - Validator passes
+- **Note**: Risk mitigations are NOT defined here; they belong in STRUCTURE (canvas component 16) and are validated in VALIDATE (G0 criterion Q5).
