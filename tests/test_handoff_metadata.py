@@ -100,6 +100,11 @@ def _template_path(filename: str) -> Path:
     return TEMPLATES / filename
 
 
+def _is_valid_generated_format(value: str) -> bool:
+    """Return True if value is a valid ISO-8601 timestamp or a [PLACEHOLDER] string."""
+    return bool(_ISO8601_RE.match(value)) or bool(_PLACEHOLDER_RE.match(value))
+
+
 class TestRequiredFields:
     """All Phase 0 templates must have the full set of required frontmatter fields."""
 
@@ -108,13 +113,6 @@ class TestRequiredFields:
         fm = _parse_frontmatter(_template_path(filename))
         missing = [f for f in REQUIRED_FIELDS if f not in fm]
         assert not missing, f"{filename}: missing frontmatter fields: {missing}"
-
-    @pytest.mark.parametrize("filename,_,__", PHASE0_CHAIN + SDD_CHAIN)
-    def test_schema_version_is_1_0(self, filename, _, __):
-        fm = _parse_frontmatter(_template_path(filename))
-        assert fm.get("schema_version") == "1.0", (
-            f"{filename}: schema_version should be '1.0', got {fm.get('schema_version')!r}"
-        )
 
     @pytest.mark.parametrize("filename,_,__", PHASE0_CHAIN + SDD_CHAIN)
     def test_artifact_field_is_snake_case(self, filename, _, __):
@@ -140,8 +138,7 @@ class TestFieldValues:
     def test_generated_is_iso8601_or_placeholder(self, filename: str, _: object, __: object) -> None:
         fm = _parse_frontmatter(_template_path(filename))
         generated = str(fm.get("generated", ""))
-        is_valid = bool(_ISO8601_RE.match(generated)) or bool(_PLACEHOLDER_RE.match(generated))
-        assert is_valid, (
+        assert _is_valid_generated_format(generated), (
             f"{filename}: generated={generated!r} must be ISO-8601 datetime or a [PLACEHOLDER]"
         )
 
@@ -152,6 +149,7 @@ class TestFieldValues:
             f"{filename}: schema_version should be {SCHEMA_VERSION!r}, "
             f"got {fm.get('schema_version')!r}"
         )
+
 
 class TestHandoffChain:
     """Templates must declare correct derived_from/enables links."""
@@ -279,15 +277,19 @@ class TestNegativeCases:
 
     def test_invalid_phase_is_detected(self, tmp_path: Path) -> None:
         """A template with an unrecognised phase value should fail the phase check."""
-        phase = "unknown_phase"
+        f = tmp_path / "invalid-phase.md"
+        f.write_text("---\nphase: unknown_phase\n---\n")
+        fm = _parse_frontmatter(f)
+        phase = fm.get("phase")
         assert phase not in VALID_PHASES
 
     def test_invalid_generated_timestamp_is_detected(self, tmp_path: Path) -> None:
         """A non-ISO-8601, non-placeholder generated value should be rejected."""
         bad_values = ["not-a-date", "2024/01/01", "01-01-2024", "yesterday"]
         for val in bad_values:
-            is_valid = bool(_ISO8601_RE.match(val)) or bool(_PLACEHOLDER_RE.match(val))
-            assert not is_valid, f"Expected {val!r} to be invalid but it matched"
+            assert not _is_valid_generated_format(val), (
+                f"Expected {val!r} to be invalid but it matched"
+            )
 
     def test_valid_iso8601_formats_are_accepted(self, tmp_path: Path) -> None:
         """Various valid ISO-8601 datetime strings should be accepted."""
@@ -300,5 +302,6 @@ class TestNegativeCases:
             "[TIMESTAMP]",           # generic placeholder
         ]
         for val in valid_values:
-            is_valid = bool(_ISO8601_RE.match(val)) or bool(_PLACEHOLDER_RE.match(val))
-            assert is_valid, f"Expected {val!r} to be valid but it did not match"
+            assert _is_valid_generated_format(val), (
+                f"Expected {val!r} to be valid but it did not match"
+            )
