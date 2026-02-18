@@ -51,12 +51,12 @@ You **MUST** consider the user input before proceeding (if not empty). The text 
 
    ```bash
    git fetch --all --prune
-   # Check remote branches, local branches, and specs/ directories for existing numbers
-   git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'
-   git branch | grep -E '^[* ]*[0-9]+-<short-name>$'
+   # Search ALL feature branches (not just this short-name) to find the global highest number
+   git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-'
+   git branch | grep -E '^[* ]*[0-9]+-'
    ```
 
-   Use `highest_found + 1`; start at `1` if none found. Run `{SCRIPT}` exactly once:
+   Extract all numbers, take the highest across remote branches, local branches, and `specs/` directories. Use `highest_found + 1`; start at `1` if none found. Run `{SCRIPT}` exactly once:
 
    ```bash
    # Bash:  {SCRIPT} --json --number N --short-name "short-name" "Feature description"
