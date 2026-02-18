@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P020 (#26): `--dry-run` flag for `specify init`** - Preview what would be done without writing any files
+  - Shows project name, target path, AI assistant, script type, template repo, and git init plan
+  - Validates all inputs (agent, script type) before showing preview — invalid flags still error correctly
+  - Works with `--here` flag for current-directory initialization
+  - Does not download templates, create directories, or modify the filesystem
+
 - **P015: Phase 0 onboarding integration** - Updated welcome message to show complete Phase 0 → SDD workflow
   - Phase 0 commands (`/speckit.ideate`, `/speckit.select`, `/speckit.structure`) now displayed in onboarding
   - Moved quality commands (`/speckit.clarify`, `/speckit.analyze`, `/speckit.checklist`) from "Enhancement Commands" to "Core SDD Workflow"
@@ -33,8 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extra agent downloads are isolated — a failure does not abort the overall init
   - `precheck` and `ai-select` tracker steps now show all selected agents
   - Tests: 10 new unit/integration tests in `tests/test_multi_agent_init.py`
-
-
   - Created `scripts/python/state-update.py` for atomic YAML updates
   - Updated `state-log-violation.sh/ps1`, `state-reconstruct.sh/ps1`, and `state-check.sh/ps1` to use Python backend
   - Eliminates yq v3/v4 syntax breaking changes
