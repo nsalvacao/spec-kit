@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P021 (#27): `--no-banner` flag for `specify init`** - Suppress ASCII art banner for CI/CD pipelines
+  - Use `--no-banner` to skip the decorative banner when running in non-interactive environments
+  - All init functionality remains intact — only the visual banner is suppressed
+  - Works with `--dry-run`, `--here`, and all other flags
+
 - **P020 (#26): `--dry-run` flag for `specify init`** - Preview what would be done without writing any files
   - Shows project name, target path, AI assistant, script type, template repo, and git init plan
   - Validates all inputs (agent, script type) before showing preview — invalid flags still error correctly

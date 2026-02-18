@@ -1101,6 +1101,7 @@ def init(
     debug: bool = typer.Option(False, "--debug", help="Show verbose diagnostic output for network and extraction failures"),
     github_token: str = typer.Option(None, "--github-token", help="GitHub token to use for API requests (or set GH_TOKEN or GITHUB_TOKEN environment variable)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview what would be done without writing any files"),
+    no_banner: bool = typer.Option(False, "--no-banner", help="Suppress the ASCII art banner (useful for CI/CD)"),
 ):
     """
     Initialize a new Specify project from the latest template.
@@ -1127,9 +1128,11 @@ def init(
         specify init --here --force  # Skip confirmation when current directory not empty
         specify init . --template-repo my-org/spec-kit
         specify init my-project --dry-run --ai claude  # Preview without writing files
+        specify init my-project --no-banner --ai claude  # Suppress banner for CI/CD
     """
 
-    show_banner()
+    if not no_banner:
+        show_banner()
 
     if project_name == ".":
         here = True
