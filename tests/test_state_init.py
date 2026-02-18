@@ -1,4 +1,4 @@
-"""Tests for state-init.sh and state-init.ps1 utilities (issue #23).
+"""Tests for state-init.sh utility (issue #23).
 
 Tests cover:
 - Creates .spec-kit/ directory when missing
@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import pytest
+import yaml
 
 SCRIPT_DIR = Path(__file__).parent.parent / "scripts" / "bash"
 STATE_INIT_SCRIPT = SCRIPT_DIR / "state-init.sh"
@@ -79,9 +80,9 @@ class TestStateInitScript:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
             run_script(tmp)
-            content = (tmp / ".spec-kit" / "state.yaml").read_text()
+            data = yaml.safe_load((tmp / ".spec-kit" / "state.yaml").read_text())
             for key in EXPECTED_STATE_KEYS:
-                assert key in content, f"Missing key '{key}' in state.yaml"
+                assert key in data, f"Missing key '{key}' in state.yaml"
 
     def test_idempotent_state_yaml(self) -> None:
         """Running twice must not overwrite an existing state.yaml."""
