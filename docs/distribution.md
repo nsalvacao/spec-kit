@@ -65,7 +65,7 @@ specify init <PROJECT_NAME>
 ### CLI Users (local dev)
 
 - Use `uv tool install` for a persistent CLI
-- Fork templates are used by default; set `SPECIFY_TEMPLATE_REPO=github/spec-kit` only to opt-in to upstream templates
+- Fork templates are used by default; set `SPECIFY_TEMPLATE_REPO=github/spec-kit` or use `--template-repo github/spec-kit` to opt-in to upstream templates
 
 ### IDE Users (Copilot / Claude / Cursor / Codex)
 
