@@ -69,8 +69,12 @@ Guidance:
 - Score: [value]
 - Why it is a strong alternative
 
-## Risk Mitigation (Selected Idea)
+## Risk Note
 
-| Risk | Mitigation | Owner | Notes |
-| ------ | ------------ | ------- | ------- |
-| [Risk] | [Mitigation] | [Owner] | [Notes] |
+> **Risk mitigations are defined in the STRUCTURE phase**, not here.
+>
+> The **Risk** dimension above (1–10 scale) feeds the AI-RICE score to inform selection.
+> Concrete mitigations, owners, and controls are documented in:
+>
+> - `ai_vision_canvas.md` → Component 16: Safety & Risk (created in STRUCTURE)
+> - `approvals/g0-validation-report.md` → Criterion Q5: Risk mitigations defined (validated in VALIDATE)
