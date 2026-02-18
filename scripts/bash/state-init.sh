@@ -4,8 +4,6 @@ set -euo pipefail
 STATE_DIR=".spec-kit"
 STATE_FILE="$STATE_DIR/state.yaml"
 
-command -v yq >/dev/null 2>&1 || { echo "Error: yq not found. Install: brew install yq || sudo apt install yq"; exit 1; }
-
 mkdir -p "$STATE_DIR"
 
 if [ ! -f "$STATE_FILE" ]; then

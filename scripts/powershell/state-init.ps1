@@ -1,11 +1,6 @@
 $stateDir = '.spec-kit'
 $stateFile = Join-Path $stateDir 'state.yaml'
 
-if (-not (Get-Command yq -ErrorAction SilentlyContinue)) {
-    Write-Error 'yq not found. Install: https://github.com/mikefarah/yq'
-    exit 1
-}
-
 if (-not (Test-Path $stateDir)) {
     New-Item -ItemType Directory -Path $stateDir | Out-Null
 }
