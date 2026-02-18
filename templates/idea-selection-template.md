@@ -56,7 +56,7 @@ Guidance:
 
 ## Selected Idea
 
-**ID**: [[IDEA_ID]](.spec-kit/ideas_backlog.md#idea-[IDEA_ID_ANCHOR])
+**ID**: [IDEA_ID](.spec-kit/ideas_backlog.md#idea-[IDEA_ID_ANCHOR])
 **Text**: [Idea description]
 **Tag**: [SEED | SCAMPER-<Lens> | HMW-<Dimension>]
 **AI-RICE Score**: [raw score] (Norm: [Norm_Score]/100)
@@ -76,12 +76,12 @@ Guidance:
 
 ## Runner-Ups (Pivot Options)
 
-### 2nd Place: [[IDEA_ID]](.spec-kit/ideas_backlog.md#idea-[IDEA_ID_ANCHOR])
+### 2nd Place: [IDEA_ID](.spec-kit/ideas_backlog.md#idea-[IDEA_ID_ANCHOR])
 
 - Score: [raw score] (Norm: [Norm_Score]/100)
 - Why it is a strong alternative
 
-### 3rd Place: [[IDEA_ID]](.spec-kit/ideas_backlog.md#idea-[IDEA_ID_ANCHOR])
+### 3rd Place: [IDEA_ID](.spec-kit/ideas_backlog.md#idea-[IDEA_ID_ANCHOR])
 
 - Score: [raw score] (Norm: [Norm_Score]/100)
 - Why it is a strong alternative
