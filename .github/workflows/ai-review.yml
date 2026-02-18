@@ -15,6 +15,9 @@ on:
 
 jobs:
   code-review:
+    permissions:
+      contents: read
+      pull-requests: write
     uses: nsalvacao/actions-hub/.github/workflows/ai-code-review.yml@main
     with:
       model: "openai/gpt-4.1"
@@ -24,6 +27,9 @@ jobs:
       MODELS_PAT: ${{ secrets.MODELS_PAT }}
 
   pr-summary:
+    permissions:
+      contents: read
+      pull-requests: write
     uses: nsalvacao/actions-hub/.github/workflows/ai-pr-summary.yml@main
     with:
       model: "openai/gpt-4.1-mini"
