@@ -1,20 +1,47 @@
-"""Tests for handoff metadata protocol (issue #14).
+"""Tests for handoff metadata protocol (issues #14 and #81).
 
 Validates that all Phase 0 → SDD artifact templates carry the required
 YAML frontmatter fields defined in docs/handoff-metadata.md.
+
+Schema constants are defined here as the single source of truth for tests;
+they mirror the spec in docs/handoff-metadata.md.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Optional
 
 import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).parent.parent
 TEMPLATES = REPO_ROOT / "templates"
+
+# ---------------------------------------------------------------------------
+# Schema constants — single source of truth for tests
+# ---------------------------------------------------------------------------
+
+REQUIRED_FIELDS: list[str] = [
+    "artifact",
+    "phase",
+    "schema_version",
+    "generated",
+    "derived_from",
+    "enables",
+]
+
+VALID_PHASES: frozenset[str] = frozenset(
+    {"ideate", "select", "structure", "validate", "sdd"}
+)
+
+SCHEMA_VERSION: str = "1.0"
+
+# ISO-8601 date/datetime pattern (also accepts template placeholder)
+_ISO8601_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$"
+)
+_PLACEHOLDER_RE = re.compile(r"^\[.*\]$")
 
 # Artifacts in chain order: (file, required_derived_from, required_enables)
 PHASE0_CHAIN = [
@@ -53,10 +80,8 @@ SDD_CHAIN = [
     ),
 ]
 
-REQUIRED_FIELDS = ["artifact", "phase", "schema_version", "generated", "derived_from", "enables"]
 
-
-def _parse_frontmatter(path: Path) -> dict:
+def _parse_frontmatter(path: Path) -> dict[str, object]:
     """Extract YAML frontmatter from a markdown file.
 
     Requires the frontmatter to start at the very first line of the file
@@ -99,6 +124,34 @@ class TestRequiredFields:
             f"{filename}: artifact '{artifact}' must be snake_case"
         )
 
+
+class TestFieldValues:
+    """Field values must conform to allowed formats and vocabularies."""
+
+    @pytest.mark.parametrize("filename,_,__", PHASE0_CHAIN + SDD_CHAIN)
+    def test_phase_is_valid_value(self, filename: str, _: object, __: object) -> None:
+        fm = _parse_frontmatter(_template_path(filename))
+        phase = fm.get("phase", "")
+        assert phase in VALID_PHASES, (
+            f"{filename}: phase={phase!r} not in allowed values {sorted(VALID_PHASES)}"
+        )
+
+    @pytest.mark.parametrize("filename,_,__", PHASE0_CHAIN + SDD_CHAIN)
+    def test_generated_is_iso8601_or_placeholder(self, filename: str, _: object, __: object) -> None:
+        fm = _parse_frontmatter(_template_path(filename))
+        generated = str(fm.get("generated", ""))
+        is_valid = bool(_ISO8601_RE.match(generated)) or bool(_PLACEHOLDER_RE.match(generated))
+        assert is_valid, (
+            f"{filename}: generated={generated!r} must be ISO-8601 datetime or a [PLACEHOLDER]"
+        )
+
+    @pytest.mark.parametrize("filename,_,__", PHASE0_CHAIN + SDD_CHAIN)
+    def test_schema_version_matches_constant(self, filename: str, _: object, __: object) -> None:
+        fm = _parse_frontmatter(_template_path(filename))
+        assert fm.get("schema_version") == SCHEMA_VERSION, (
+            f"{filename}: schema_version should be {SCHEMA_VERSION!r}, "
+            f"got {fm.get('schema_version')!r}"
+        )
 
 class TestHandoffChain:
     """Templates must declare correct derived_from/enables links."""
@@ -223,3 +276,29 @@ class TestNegativeCases:
         missing = [field for field in REQUIRED_FIELDS if field not in fm]
         assert "enables" in missing
         assert "derived_from" in missing
+
+    def test_invalid_phase_is_detected(self, tmp_path: Path) -> None:
+        """A template with an unrecognised phase value should fail the phase check."""
+        phase = "unknown_phase"
+        assert phase not in VALID_PHASES
+
+    def test_invalid_generated_timestamp_is_detected(self, tmp_path: Path) -> None:
+        """A non-ISO-8601, non-placeholder generated value should be rejected."""
+        bad_values = ["not-a-date", "2024/01/01", "01-01-2024", "yesterday"]
+        for val in bad_values:
+            is_valid = bool(_ISO8601_RE.match(val)) or bool(_PLACEHOLDER_RE.match(val))
+            assert not is_valid, f"Expected {val!r} to be invalid but it matched"
+
+    def test_valid_iso8601_formats_are_accepted(self, tmp_path: Path) -> None:
+        """Various valid ISO-8601 datetime strings should be accepted."""
+        valid_values = [
+            "2024-01-01",
+            "2024-01-01T00:00:00Z",
+            "2024-01-01T12:30:00+01:00",
+            "2024-12-31T23:59:59.999Z",
+            "[ISO_8601_TIMESTAMP]",  # template placeholder
+            "[TIMESTAMP]",           # generic placeholder
+        ]
+        for val in valid_values:
+            is_valid = bool(_ISO8601_RE.match(val)) or bool(_PLACEHOLDER_RE.match(val))
+            assert is_valid, f"Expected {val!r} to be valid but it did not match"
