@@ -1,0 +1,14 @@
+name: AI Triage
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    uses: nsalvacao/actions-hub/.github/workflows/ai-issue-triage.yml@main
+    with:
+      auto_label: true
+      language: "en"
+    secrets:
+      MODELS_PAT: ${{ secrets.MODELS_PAT }}
+
