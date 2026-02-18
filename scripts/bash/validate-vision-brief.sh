@@ -20,6 +20,14 @@ REPORT_PATH=""
 STATE_LOG="$SCRIPT_DIR/state-log-violation.sh"
 declare -A WAIVERS=()  # WAIVERS[CRITERION_ID]="justification"
 
+# Check required binaries
+for _bin in rg awk; do
+  if ! command -v "$_bin" &>/dev/null; then
+    echo "Error: required binary '$_bin' not found. Install it and retry." >&2
+    exit 2
+  fi
+done
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
