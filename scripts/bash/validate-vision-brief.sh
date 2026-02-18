@@ -14,9 +14,10 @@
 # Manual checks (Q1-Q5, AI1-AI4, C1-C3) may be waived with a justification.
 set -eo pipefail
 
+SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FILE_PATH=".spec-kit/vision_brief.md"
 REPORT_PATH=""
-STATE_LOG="scripts/bash/state-log-violation.sh"
+STATE_LOG="$SCRIPT_DIR/state-log-violation.sh"
 declare -A WAIVERS=()  # WAIVERS[CRITERION_ID]="justification"
 
 # Parse arguments
@@ -209,7 +210,7 @@ check_manual "Q1" "Assumptions have validation methods" "$has_validation_methods
 
 # Q2: Metrics are SMART (look for time-bound indicators)
 has_smart_metrics="false"
-if rg -i -q "(by |within |Q[0-9]|month|week|year|target:|%|≥|≤)" "$FILE_PATH" 2>/dev/null; then
+if rg -i -q "(by |within |Q[0-9]|month|week|year|target:|%|>=|<=|≥|≤)" "$FILE_PATH" 2>/dev/null; then
   has_smart_metrics="true"
 fi
 check_manual "Q2" "Metrics are SMART" "$has_smart_metrics" \
@@ -325,9 +326,9 @@ if [ ${#WAIVERS[@]} -gt 0 ] && [ -n "$REPORT_PATH" ] && [ -f "$REPORT_PATH" ]; t
   done
 
   if rg -q "^## Waivers" "$REPORT_PATH"; then
-    # Append waivers after the Waivers section header
-    awk -v block="$waiver_block" '
-      /^## Waivers/ {print; print ""; printf "%s", block; next}
+    # Append waivers after the Waivers section header using ENVIRON to avoid awk -v escape injection
+    WAIVER_BLOCK="$waiver_block" awk '
+      /^## Waivers/ {print; print ""; printf "%s", ENVIRON["WAIVER_BLOCK"]; next}
       {print}
     ' "$REPORT_PATH" > "${REPORT_PATH}.tmp" && mv "${REPORT_PATH}.tmp" "$REPORT_PATH"
     echo "Waivers registered in $REPORT_PATH"
@@ -341,14 +342,13 @@ fi
 # ──────────────────────────────────────────────────────────────
 
 echo ""
-waiver_count="${#WAIVERS[@]}"
 
-if [ "$manual_warns" -gt 0 ] && [ "$waiver_count" -lt "$manual_warns" ]; then
+if [ "$manual_warns" -gt 0 ]; then
   echo "RESULT: FAIL — $manual_warns manual check(s) unresolved"
   echo "  → Provide --waive CRITERION_ID \"justification\" for each unresolved check"
   log_violation "$manual_warns manual checks failed in vision_brief validation" "high"
   exit 1
-elif [ "$waiver_count" -gt 0 ]; then
+elif [ "${#WAIVERS[@]}" -gt 0 ]; then
   echo "RESULT: PASS WITH WAIVER — all automated checks passed; $waiver_count waiver(s) applied"
 else
   echo "RESULT: PASS — all checks passed"

@@ -18,7 +18,8 @@ param(
     [string]$ReportPath = ''
 )
 
-$stateLog = 'scripts/powershell/state-log-violation.ps1'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$stateLog = Join-Path $scriptDir 'state-log-violation.ps1'
 $manualWarns = 0
 
 function Write-LogViolation {
@@ -241,7 +242,7 @@ if ($Waive.Count -gt 0 -and $ReportPath -and (Test-Path $ReportPath -PathType Le
             $waiversBlock += "**Timestamp**: ${timestamp}`n`n"
             $waiverNum++
         }
-        $reportContent = $reportContent -replace [regex]::Escape($waiversSection), "$waiversSection$waiversBlock"
+        $reportContent = $reportContent.Replace($waiversSection, "$waiversSection$waiversBlock")
         Set-Content $ReportPath $reportContent -NoNewline
         Write-Output "Waivers registered in $ReportPath"
     } else {
@@ -254,15 +255,14 @@ if ($Waive.Count -gt 0 -and $ReportPath -and (Test-Path $ReportPath -PathType Le
 # ──────────────────────────────────────────────────────────────
 
 Write-Output ''
-$waiverCount = $Waive.Count
 
-if ($manualWarns -gt 0 -and $waiverCount -lt $manualWarns) {
+if ($manualWarns -gt 0) {
     $msg = "$manualWarns manual check(s) unresolved"
     Write-Error "RESULT: FAIL — $msg"
     Write-LogViolation $msg 'high'
     exit 1
-} elseif ($waiverCount -gt 0) {
-    Write-Output "RESULT: PASS WITH WAIVER — all automated checks passed; $waiverCount waiver(s) applied"
+} elseif ($Waive.Count -gt 0) {
+    Write-Output "RESULT: PASS WITH WAIVER — all automated checks passed; $($Waive.Count) waiver(s) applied"
 } else {
     Write-Output 'RESULT: PASS — all checks passed'
 }

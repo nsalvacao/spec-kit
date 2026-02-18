@@ -302,9 +302,22 @@ class TestWaiverMechanism:
         assert justification in result.stdout
 
     def test_pass_with_waiver_result_when_waivers_applied(self, workdir, valid_brief):
-        result = run_script(workdir, valid_brief, "--waive", "C3", "C17/C14 ref confirmed in canvas")
+        """PASS WITH WAIVER only appears when a check fails but is waived."""
+        import re
+        # Strip all tokens that C3 looks for so C3 fails, then waive it
+        brief_no_c3 = re.sub(
+            r"\b(latency|C17|C14)\b",
+            "REMOVED",
+            MINIMAL_VALID_BRIEF,
+            flags=re.IGNORECASE,
+        )
+        brief_path = workdir / "vision_brief.md"
+        (workdir / ".spec-kit").mkdir(exist_ok=True)
+        brief_path = workdir / ".spec-kit" / "vision_brief.md"
+        brief_path.write_text(brief_no_c3)
+        result = run_script(workdir, brief_path, "--waive", "C3", "C17/C14 ref confirmed in canvas")
         assert result.returncode == 0
-        assert "PASS WITH WAIVER" in result.stdout or "PASS" in result.stdout
+        assert "PASS WITH WAIVER" in result.stdout
 
     def test_automated_checks_not_waivable(self, workdir):
         """Even with --waive A1, missing file should still fail."""
