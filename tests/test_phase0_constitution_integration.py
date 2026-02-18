@@ -86,6 +86,10 @@ def test_constitution_template_references_ideas_dir():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    not (AGENTS_DIR / "speckit.constitution.agent.md").exists(),
+    reason=".github/agents/ is gitignored; skipped in CI (generated locally by specify init)",
+)
 class TestConstitutionAgentDocPhase0(object):
     """Validate that .github/agents/speckit.constitution.agent.md instructs
     the AI agent to discover and use .spec-kit/ Phase 0 artifacts."""
