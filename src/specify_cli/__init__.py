@@ -39,6 +39,7 @@ from typing import Optional, Tuple
 import typer
 import httpx
 from rich.console import Console
+from rich.markup import escape as markup_escape
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.text import Text
@@ -254,6 +255,98 @@ BANNER = """
 
 TAGLINE = "Nexo Spec Kit — Phase 0 Ideation + Spec-Driven Development"
 TAGLINE_SUB = "Fork of GitHub Spec Kit (not affiliated)"
+
+# ===== Update check helpers (issue #88) =====
+
+import time
+from packaging.version import Version
+from platformdirs import user_data_dir
+
+_UPDATE_CACHE_TTL = 86400  # 24 hours in seconds
+_RELEASES_API = "https://api.github.com/repos/nsalvacao/spec-kit/releases/latest"
+_INSTALL_CMD_UV = "uv tool install --reinstall specify-cli --from git+https://github.com/nsalvacao/spec-kit.git"
+_INSTALL_CMD_PIP = "pip install --upgrade git+https://github.com/nsalvacao/spec-kit.git"
+
+
+def _get_update_cache_path() -> Path:
+    """Return the path to the update cache file."""
+    return Path(user_data_dir("specify-cli")) / "update_cache.json"
+
+
+def _load_update_cache(cache_path: Path) -> dict | None:
+    """Load update cache if it exists and is fresh (< 24h old). Returns None otherwise."""
+    try:
+        if not cache_path.exists():
+            return None
+        data = json.loads(cache_path.read_text())
+        required = {"last_check", "latest_version", "release_url"}
+        if not required.issubset(data.keys()):
+            return None
+        last_check = datetime.fromisoformat(data["last_check"])
+        age = time.time() - last_check.timestamp()
+        if age > _UPDATE_CACHE_TTL:
+            return None
+        return data
+    except Exception:
+        return None
+
+
+def _save_update_cache(cache_path: Path, version: str, release_url: str) -> None:
+    """Persist update data to cache file."""
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            "last_check": datetime.now(timezone.utc).isoformat(),
+            "latest_version": version,
+            "release_url": release_url,
+        }
+        cache_path.write_text(json.dumps(data))
+    except Exception:
+        pass
+
+
+def _fetch_latest_release() -> tuple[str, str] | None:
+    """Fetch latest release from GitHub API. Returns (version, url) or None on failure."""
+    try:
+        response = client.get(_RELEASES_API, timeout=5, follow_redirects=True, headers=_github_auth_headers())
+        if response.status_code != 200:
+            return None
+        data = response.json()
+        tag = data.get("tag_name", "")
+        url = data.get("html_url", "")
+        version = tag.lstrip("v")
+        if not version:
+            return None
+        return version, url
+    except Exception:
+        return None
+
+
+def _check_for_update(passive: bool = True) -> dict | None:
+    """Check for a newer version. Returns cache dict or None.
+
+    Args:
+        passive: If True, respect CI/SPECIFY_NO_UPDATE_CHECK env vars to skip check.
+                 If False (explicit `specify update`), always proceed.
+    """
+    if passive:
+        if os.environ.get("CI") or os.environ.get("SPECIFY_NO_UPDATE_CHECK"):
+            return None
+
+    cache_path = _get_update_cache_path()
+    cached = _load_update_cache(cache_path)
+    if cached is not None:
+        return cached
+
+    result = _fetch_latest_release()
+    if result is None:
+        return None
+
+    version, url = result
+    _save_update_cache(cache_path, version, url)
+    return {"latest_version": version, "release_url": url}
+
+
 class StepTracker:
     """Track and render hierarchical steps without emojis, similar to Claude Code tree output.
     Supports live auto-refresh via an attached refresh callback.
@@ -1607,6 +1700,19 @@ def check():
     if not any(agent_results.values()):
         console.print("[dim]Tip: Install an AI assistant for the best experience[/dim]")
 
+    # Passive update notification (#88)
+    update_info = _check_for_update(passive=True)
+    if update_info:
+        current = get_speckit_version()
+        latest = update_info["latest_version"]
+        try:
+            is_newer = Version(latest) > Version(current)
+        except Exception:
+            is_newer = latest != current
+        if is_newer:
+            console.print(f"\n[bold yellow]💡 Update available: v{markup_escape(current)} → v{markup_escape(latest)}. Run `specify update` to upgrade.[/bold yellow]")
+
+
 @app.command()
 def version():
     """Display version and system information."""
@@ -1687,7 +1793,64 @@ def version():
     console.print()
 
 
-# ===== Extension Commands =====
+@app.command()
+def update(
+    check: bool = typer.Option(False, "--check", help="Exit 0 if up-to-date, 1 if update available (no output)."),
+    no_upgrade: bool = typer.Option(False, "--no-upgrade", help="Show info but do not prompt to upgrade."),
+):
+    """Check for updates and optionally upgrade specify CLI."""
+    current = get_speckit_version()
+    update_info = _check_for_update(passive=False)
+
+    if update_info is None:
+        if check:
+            raise typer.Exit(0)
+        console.print("[yellow]⚠️  Could not reach GitHub to check for updates.[/yellow]")
+        console.print("[dim]Check your internet connection and try again.[/dim]")
+        return
+
+    latest = update_info["latest_version"]
+    release_url = update_info.get("release_url", "")
+
+    try:
+        is_newer = Version(latest) > Version(current)
+    except Exception:
+        is_newer = latest != current
+
+    if check:
+        raise typer.Exit(1 if is_newer else 0)
+
+    if not is_newer:
+        console.print(f"[bold green]✅ You are running the latest version (v{current}).[/bold green]")
+        return
+
+    console.print()
+    console.print(f"[bold]🔍 Update available![/bold]")
+    console.print(f"   Current version : [yellow]v{markup_escape(current)}[/yellow]")
+    console.print(f"   Latest release  : [bold green]v{markup_escape(latest)}[/bold green]")
+    if release_url:
+        console.print(f"   Release notes   : [cyan]{markup_escape(release_url)}[/cyan]")
+    console.print()
+    console.print("[dim]Upgrade command (uv):[/dim]")
+    console.print(f"  [bold cyan]{_INSTALL_CMD_UV}[/bold cyan]")
+    console.print()
+    console.print("[dim]Upgrade command (pip fallback):[/dim]")
+    console.print(f"  [bold cyan]{_INSTALL_CMD_PIP}[/bold cyan]")
+    console.print()
+
+    if no_upgrade:
+        return
+
+    confirm = typer.confirm("Upgrade now?", default=False)
+    if confirm:
+        import shutil as _shutil
+        if _shutil.which("uv"):
+            run_command(_INSTALL_CMD_UV.split(), check_return=False)
+        else:
+            run_command(_INSTALL_CMD_PIP.split(), check_return=False)
+        console.print("[bold green]✅ Upgrade complete! Restart your shell if needed.[/bold green]")
+
+
 
 extension_app = typer.Typer(
     name="extension",

@@ -11,7 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **P024 (#76, #77): AI Review workflow improvements**
+- **P025 (#88): Self-update check and upgrade command for specify CLI**
+  - New `specify update` command: checks for newer release, shows version diff, prompts to upgrade (#88)
+  - `specify update --check`: scriptable flag — exits 0 if up-to-date, 1 if update available (#88)
+  - `specify update --no-upgrade`: show update info without prompting to run upgrade (#88)
+  - Passive notification at end of `specify check` when a newer version is cached (#88)
+  - 24-hour cache (`platformdirs.user_data_dir("specify-cli") / "update_cache.json"`) avoids repeated API calls (#88)
+  - Passive check respects `CI=true` and `SPECIFY_NO_UPDATE_CHECK=1` env vars; explicit `specify update` always proceeds (#88)
+  - Upgrade command shown for both `uv` (primary) and `pip` (fallback) users (#88)
+  - Network failures silently ignored — never crash main commands (#88)
+
+
   - Configurable model IDs via `env:` block (`REVIEW_MODEL`, `SUMMARY_MODEL`) — no hardcoded model strings (#77)
   - Configurable token limits via `env:` block (`MAX_REVIEW_TOKENS: 1500`, `MAX_SUMMARY_TOKENS: 800`) (#77)
   - Retry loop with exponential backoff (up to `MAX_RETRY` attempts, capped at `MAX_RETRY_SLEEP` seconds per sleep, default 30s) for both jobs (#77)
