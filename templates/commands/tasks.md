@@ -27,6 +27,11 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
+> **Phase 0 Context**: Before generating tasks, check if `.spec-kit/` or `.ideas/` exist.
+> `.spec-kit/g0_validation_report.md` may contain mandatory gates that must appear as tasks.
+> `.ideas/execution-plan.md` (Strategy Toolkit, gitignored) may already define tier/phase
+> structure to follow. Align generated tasks with these artifacts when present.
+
 1. **Setup**: Run `{SCRIPT}` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Load design documents**: Read from FEATURE_DIR:

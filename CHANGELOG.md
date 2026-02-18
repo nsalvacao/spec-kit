@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **P022 (#11, #12): Phase 0 + Strategy Toolkit integration in constitution template and SDD agent docs**
+  - `templates/constitution-template.md`: Added `PHASE 0 INTEGRATION CHECK` comment block guiding derivation of principles from `.spec-kit/` (Phase 0) and `.ideas/` (Strategy Toolkit) artifacts
+  - `.github/agents/speckit.constitution.agent.md`: Step 2 now discovers Phase 0 artifacts (`.spec-kit/`) and Strategy Toolkit artifacts (`.ideas/`) before falling back to README; added Execution Model clarification ("You are the executor")
+  - `.github/agents/speckit.specify.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
+  - `.github/agents/speckit.plan.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
+  - `.github/agents/speckit.tasks.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
+
+### Added
+
 - **P021 (#27): `--no-banner` flag for `specify init`** - Suppress ASCII art banner for CI/CD pipelines
   - Use `--no-banner` to skip the decorative banner when running in non-interactive environments
   - All init functionality remains intact — only the visual banner is suppressed
