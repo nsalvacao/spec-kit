@@ -1233,6 +1233,23 @@ def init(
                 console.print(error_panel)
                 raise typer.Exit(1)
 
+    rg_available = check_tool("rg")
+    if not rg_available:
+        console.print()
+        console.print(Panel(
+            "[yellow]ripgrep (rg) not found.[/yellow]\n"
+            "The validation scripts installed by Specify require [cyan]rg[/cyan] to run.\n\n"
+            "Install ripgrep:\n"
+            "  [dim]Linux/macOS:[/dim]  [cyan]brew install ripgrep[/cyan] or [cyan]apt install ripgrep[/cyan]\n"
+            "  [dim]Windows:[/dim]     [cyan]winget install BurntSushi.ripgrep.MSVC[/cyan]\n"
+            "  [dim]Cargo:[/dim]       [cyan]cargo install ripgrep[/cyan]\n\n"
+            "Initialisation will continue, but [bold]validate-*.sh scripts will fail[/bold] until rg is installed.",
+            title="[yellow]⚠ Missing Dependency: ripgrep[/yellow]",
+            border_style="yellow",
+            padding=(1, 2),
+        ))
+        console.print()
+
     if script_type:
         if script_type not in SCRIPT_TYPE_CHOICES:
             console.print(f"[red]Error:[/red] Invalid script type '{script_type}'. Choose from: {', '.join(SCRIPT_TYPE_CHOICES.keys())}")
@@ -1254,7 +1271,10 @@ def init(
     sys._specify_tracker_active = True
 
     tracker.add("precheck", "Check required tools")
-    tracker.complete("precheck", "ok")
+    if rg_available:
+        tracker.complete("precheck", "ok")
+    else:
+        tracker.skip("precheck", "rg not found — install ripgrep for validators")
     tracker.add("ai-select", "Select AI assistant")
     tracker.complete("ai-select", f"{selected_ai}")
     tracker.add("script-select", "Select script type")

@@ -31,7 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `state-log-violation.sh/ps1`, `state-reconstruct.sh/ps1`, and `state-check.sh/ps1` to use Python backend
   - Eliminates yq v3/v4 syntax breaking changes
   - Provides atomic, safe YAML updates without external dependency on yq
-- Security hardening for extension installation/registration:
+- **P002: state-init yq hard-dependency** - Removed spurious `yq` hard-dependency from `state-init.sh` and `state-init.ps1`
+  - Both scripts only write static YAML via heredoc/Set-Content; yq was never invoked
+  - Fixes init failure on systems without yq installed
+- **P003 (#19): ripgrep not enforced at init** - `specify init` now checks for `rg` (ripgrep) and shows a
+  prominent yellow warning panel when it is not installed.
+  - Warning includes install instructions for Linux/macOS/Windows/Cargo
+  - Initialisation continues (rg is not required for `init` itself, only for validator scripts)
+  - `precheck` tracker step now reflects `rg` availability
+  - Security hardening for extension installation/registration:
   - Validate command file paths remain inside extension directory
   - Validate command aliases/identifiers before writing generated files
   - Validate extension IDs used by catalog downloads
@@ -40,6 +48,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Dependencies**: yq is no longer required for state management (Python 3 with PyYAML is used instead)
+
+## [0.0.25] - 2026-02-18
+
+### Fixed
+
+- **P002 (#9): state-init yq hard-dependency** - Removed spurious `yq` hard-dependency from `state-init.sh` and `state-init.ps1`
+  - Both scripts only write static YAML via heredoc/Set-Content; yq was never invoked
+  - Fixes init failure on systems without yq installed
+- **P003 (#19): ripgrep not enforced at init** - `specify init` now checks for `rg` (ripgrep) at startup
+  - Shows a prominent yellow warning panel when ripgrep is not installed
+  - Warning includes install instructions for Linux/macOS/Windows/Cargo
+  - Initialisation continues (rg is not required for `init`; validators need it)
+  - `precheck` tracker step now reflects `rg` availability accurately
+
+### Security
+
+- **Workflow permissions** - Added explicit `permissions` to all reusable workflow callers
+  - `ai-review.yml` jobs: `contents: read`, `pull-requests: write`
+  - `ai-triage.yml` job: `contents: read`, `issues: write`
+  - Resolves CodeQL alerts #7, #8, #9 (Medium — missing permissions)
 
 ## [0.0.24] - 2026-02-18
 
