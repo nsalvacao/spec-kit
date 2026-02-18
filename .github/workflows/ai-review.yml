@@ -1,18 +1,24 @@
 name: AI Review
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to review"
-        type: number
-        required: true
+    paths:
+      # Only run on real code/config changes — skip pure doc PRs
+      - "src/**"
+      - "tests/**"
+      - "scripts/**"
+      - "templates/**"
+      - ".github/workflows/**"
+      - "pyproject.toml"
+      - "uv.lock"
 
 jobs:
   code-review:
     uses: nsalvacao/actions-hub/.github/workflows/ai-code-review.yml@main
     with:
+      model: "openai/gpt-4.1"
+      max_diff_chars: 8000
       language: "en"
     secrets:
       MODELS_PAT: ${{ secrets.MODELS_PAT }}
@@ -20,7 +26,8 @@ jobs:
   pr-summary:
     uses: nsalvacao/actions-hub/.github/workflows/ai-pr-summary.yml@main
     with:
+      model: "openai/gpt-4.1-mini"
+      max_diff_chars: 6000
       language: "en"
     secrets:
       MODELS_PAT: ${{ secrets.MODELS_PAT }}
-

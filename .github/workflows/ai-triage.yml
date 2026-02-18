@@ -1,14 +1,21 @@
 name: AI Triage
+
 on:
   issues:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to triage manually"
+        type: number
+        required: true
 
 jobs:
   triage:
     uses: nsalvacao/actions-hub/.github/workflows/ai-issue-triage.yml@main
     with:
+      model: "openai/gpt-4.1-mini"
       auto_label: true
       language: "en"
     secrets:
       MODELS_PAT: ${{ secrets.MODELS_PAT }}
-
