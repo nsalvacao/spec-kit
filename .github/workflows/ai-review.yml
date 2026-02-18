@@ -94,7 +94,7 @@ jobs:
         if: steps.diff.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.MODELS_PAT }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const review = fs.readFileSync('review.md', 'utf8');
@@ -169,7 +169,7 @@ jobs:
         if: steps.info.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.MODELS_PAT }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const summary = fs.readFileSync('summary.md', 'utf8');
