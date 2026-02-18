@@ -62,8 +62,7 @@ print(json.dumps({
 PYEOF
     ) || result=""
 
-    detected=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if d['phase0'] else 'false')")
-    found_phases=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print(','.join(d['phases']) if d['phases'] else '')")
+    read -r detected found_phases < <(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print('true' if d.get('phase0') else 'false', ','.join(d.get('phases', [])))")
 
     if [ "$detected" = "true" ]; then
         if $JSON; then

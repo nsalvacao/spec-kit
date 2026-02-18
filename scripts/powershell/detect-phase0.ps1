@@ -75,7 +75,7 @@ print(json.dumps({
 # ─── Option A: Fallback — check .spec-kit/ideation/ directory ────────────────
 
 if (Test-Path $ideationDir) {
-    $files = Get-ChildItem -Path $ideationDir -Recurse -File -Depth 2 |
+    $files = Get-ChildItem -Path $ideationDir -Recurse -File -Depth 1 |
              Where-Object { $_.Name -notlike '.*' }
     $fileCount = ($files | Measure-Object).Count
 
