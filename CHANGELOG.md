@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Configurable `MAX_REVIEW_CHARS` (default 8000) and `MAX_SUMMARY_CHARS` (default 6000) via `env:` block (#76)
   - `truncated_at` output exposed — footer now shows exact truncation point and full diff size (#76)
   - `skip-ai-review` label support — add label to any PR to suppress both jobs (#76)
-  - Model name shown dynamically in review/summary footer comments
+  - Model name shown dynamically in review/summary footer comments (#77)
 
 - **P022 (#11, #12): Phase 0 + Strategy Toolkit integration in constitution template and SDD agent docs**
   - `templates/constitution-template.md`: Added `PHASE 0 INTEGRATION CHECK` comment block guiding derivation of principles from `.spec-kit/` (Phase 0) and `.ideas/` (Strategy Toolkit) artifacts
