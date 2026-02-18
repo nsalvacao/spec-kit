@@ -24,6 +24,19 @@ agent_scripts:
 4. Calculate AI-RICE score: (Reach * Impact * Confidence * Data_Readiness) / (Effort * Risk).
 5. Identify top-scoring idea; include runner-ups.
 6. Write .spec-kit/idea_selection.md using idea-selection-template.md.
+   - For every Idea ID in the table and in Selected/Runner-Up sections, generate a markdown
+     link to the corresponding heading anchor in ideas_backlog.md.
+   - Anchor derivation: take text after "### Idea ", lowercase it, replace spaces with hyphens,
+     drop other punctuation (GFM drops parentheses, colons, dots, etc.).
+     Examples: "Idea S1" → suffix "s1" → #idea-s1
+               "Idea SC1-Substitute" → suffix "sc1-substitute" → #idea-sc1-substitute
+               "Idea Beta (v2)" → suffix "beta-v2" → #idea-beta-v2
+   - [IDEA_ID_ANCHOR] in the link is ONLY the derived suffix; the "#idea-" prefix is hardcoded.
+   - Link format: [IDEA_ID](.spec-kit/ideas_backlog.md#idea-<anchor-suffix>)
+   - After computing raw AI-RICE scores, derive Norm_Score for each idea:
+     Norm_Score = round((raw_score / session_max_raw) * 100, 1)
+     where session_max_raw = highest raw score in this session (top idea = 100.0).
+   - Interpretation thresholds: 70-100 Strong; 40-69 Viable; 0-39 Weak.
 7. Validate AI-RICE completeness with validate-airice.{sh|ps}.
 8. Update state: set current_phase=structure; record idea_selection path.
 9. Report completion and selected idea.

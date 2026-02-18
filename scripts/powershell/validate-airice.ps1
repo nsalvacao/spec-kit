@@ -17,6 +17,12 @@ if (-not ($header -match 'Reach' -and $header -match 'Impact' -and $header -matc
     exit 1
 }
 
+if (-not ($header -match 'Norm_Score')) {
+    Write-Error 'AI-RICE scoring table missing Norm_Score column (normalized 0-100 score)'
+    if (Test-Path $stateLog) { & $stateLog 'select' 'Framework-Driven Development' 'AI-RICE table missing Norm_Score column' 'high' 'validate-airice' }
+    exit 1
+}
+
 $lines = (Select-String -Path $FilePath -Pattern '^\|' -AllMatches)
 if ($lines.Count -lt 3) {
     Write-Error 'AI-RICE scoring table has no data rows'
