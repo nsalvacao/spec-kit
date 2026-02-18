@@ -38,7 +38,9 @@ env/
 *.log
 .env
 .env.local
+# Note: uv.lock is intentionally tracked (excluded from *.lock below)
 *.lock
+!uv.lock
 
 # Spec Kit-specific files
 .genreleases/
@@ -59,3 +61,8 @@ docs/dev
 .specify/extensions/.cache/
 .specify/extensions/.backup/
 .specify/extensions/*/local-config.yml
+
+# Productivity system (local only)
+TASKS.md
+dashboard.html
+memory/
