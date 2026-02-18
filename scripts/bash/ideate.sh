@@ -17,6 +17,12 @@
 
 set -euo pipefail
 
+# Bash 4+ required for associative arrays and other features
+if ((BASH_VERSINFO[0] < 4)); then
+    echo "Error: Bash 4.0 or higher is required (running: ${BASH_VERSION})." >&2
+    exit 1
+fi
+
 FORCE=false
 PROJECT_DIR=""
 
@@ -49,7 +55,8 @@ for arg in "$@"; do
             ;;
         *)
             if [ -n "$PROJECT_DIR" ]; then
-                echo "Error: Unexpected argument '$arg'" >&2
+                echo "Error: Too many arguments. Expected at most one PROJECT_DIR." >&2
+                echo "Run '$(basename "$0") --help' for usage." >&2
                 exit 1
             fi
             PROJECT_DIR="$arg"
@@ -70,10 +77,25 @@ fi
 
 # Resolve to absolute path
 PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
+
+# Refuse dangerous system directories
+case "$PROJECT_DIR" in
+    /|/etc|/usr|/bin|/sbin|/lib|/lib64|/boot|/proc|/sys|/dev)
+        echo "Error: Refusing to use system directory as project directory: $PROJECT_DIR" >&2
+        exit 1
+        ;;
+esac
+
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 SPEC_KIT_DIR="$PROJECT_DIR/.spec-kit"
 TARGET="$SPEC_KIT_DIR/ideas_backlog.md"
 TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# Refuse to overwrite symlinks
+if [ -L "$TARGET" ]; then
+    echo "Error: $TARGET is a symlink. Remove it manually before proceeding." >&2
+    exit 1
+fi
 
 # Check idempotency
 if [ -f "$TARGET" ] && [ "$FORCE" = "false" ]; then

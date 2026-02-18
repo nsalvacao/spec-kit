@@ -3,6 +3,9 @@ description: Run Phase 0 SELECT to score ideas using AI-RICE and pick a winner.
 scripts:
   sh: "scripts/bash/state-check.sh ideate"
   ps: "scripts/powershell/state-check.ps1 -RequiredPhase ideate"
+scaffold_scripts:
+  sh: "scripts/bash/select.sh"
+  ps: "scripts/powershell/select.ps1"
 agent_scripts:
   sh: "scripts/bash/validate-airice.sh"
   ps: "scripts/powershell/validate-airice.ps1"
@@ -18,12 +21,15 @@ agent_scripts:
    - Overwrite: delete .spec-kit/idea_selection.md and downstream artifacts (ai_vision_canvas.md, vision_brief.md, approvals/g0-validation-report.md) then re-run.
    - Append: keep existing report and add a new "Revision" section with updated scoring.
    - Cancel: exit without changes.
-1. Ensure IDEATE completed (state-check).
-2. Load ideas from .spec-kit/ideas_backlog.md.
-3. Score each idea using AI-RICE (Reach, Impact, Confidence, Data_Readiness, Effort, Risk).
-4. Calculate AI-RICE score: (Reach * Impact * Confidence * Data_Readiness) / (Effort * Risk).
-5. Identify top-scoring idea; include runner-ups.
-6. Write .spec-kit/idea_selection.md using idea-selection-template.md.
+3. Ensure IDEATE completed (state-check).
+4. If .spec-kit/idea_selection.md does not exist, scaffold it:
+   - Run: `bash scripts/bash/select.sh [PROJECT_DIR]` (Linux/macOS)
+   - Or:  `pwsh scripts/powershell/select.ps1 [-ProjectDir PROJECT_DIR]` (Windows)
+5. Load ideas from .spec-kit/ideas_backlog.md.
+6. Score each idea using AI-RICE (Reach, Impact, Confidence, Data_Readiness, Effort, Risk).
+7. Calculate AI-RICE score: (Reach * Impact * Confidence * Data_Readiness) / (Effort * Risk).
+8. Identify top-scoring idea; include runner-ups.
+9. Write .spec-kit/idea_selection.md using idea-selection-template.md.
    - For every Idea ID in the table and in Selected/Runner-Up sections, generate a markdown
      link to the corresponding heading anchor in ideas_backlog.md.
    - Anchor derivation: take text after "### Idea ", lowercase it, replace spaces with hyphens,
@@ -37,9 +43,9 @@ agent_scripts:
      Norm_Score = round((raw_score / session_max_raw) * 100, 1)
      where session_max_raw = highest raw score in this session (top idea = 100.0).
    - Interpretation thresholds: 70-100 Strong; 40-69 Viable; 0-39 Weak.
-7. Validate AI-RICE completeness with validate-airice.{sh|ps}.
-8. Update state: set current_phase=structure; record idea_selection path.
-9. Report completion and selected idea.
+10. Validate AI-RICE completeness with validate-airice.{sh|ps}.
+11. Update state: set current_phase=structure; record idea_selection path.
+12. Report completion and selected idea.
 -->
 
 ## Required Inputs

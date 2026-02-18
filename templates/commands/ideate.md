@@ -6,6 +6,9 @@ description: Run Phase 0 IDEATE to generate the ideas backlog using SCAMPER + HM
 scripts:
   sh: "scripts/bash/state-init.sh"
   ps: "scripts/powershell/state-init.ps1"
+scaffold_scripts:
+  sh: "scripts/bash/ideate.sh"
+  ps: "scripts/powershell/ideate.ps1"
 agent_scripts:
   sh: "scripts/bash/validate-scamper.sh"
   ps: "scripts/powershell/validate-scamper.ps1"
@@ -21,13 +24,17 @@ agent_scripts:
    - Overwrite: delete .spec-kit/ideas_backlog.md (destructive) before proceeding.
    - Append: keep existing backlog and add new ideas with provenance.
    - Cancel: exit without changes.
-1. Collect 2-5 seed ideas (1-3 sentences each).
-2. Apply SCAMPER (all 7 lenses) to each seed (one variation per lens).
-3. Generate 5+ HMW questions across Data/Model/Safety/Cost/UX.
-4. Write .spec-kit/ideas_backlog.md using ideas-backlog-template.md.
-5. Validate with validate-scamper.{sh|ps}.
-6. Update state: set current_phase=select; record ideas_backlog path.
-7. Report completion and idea counts.
+3. If .spec-kit/ideas_backlog.md does not exist, scaffold it:
+   - Run: `bash scripts/bash/ideate.sh [PROJECT_DIR]` (Linux/macOS)
+   - Or:  `pwsh scripts/powershell/ideate.ps1 [-ProjectDir PROJECT_DIR]` (Windows)
+   - Pass $ARGUMENTS as context to help the user fill in the seed ideas.
+4. Collect 2-5 seed ideas (1-3 sentences each).
+5. Apply SCAMPER (all 7 lenses) to each seed (one variation per lens).
+6. Generate 5+ HMW questions across Data/Model/Safety/Cost/UX.
+7. Write .spec-kit/ideas_backlog.md using ideas-backlog-template.md.
+8. Validate with validate-scamper.{sh|ps}.
+9. Update state: set current_phase=select; record ideas_backlog path.
+10. Report completion and idea counts.
 -->
 
 ## Required Inputs
