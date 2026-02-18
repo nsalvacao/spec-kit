@@ -55,6 +55,10 @@ $target = Join-Path $specKitDir 'ideas_backlog.md'
 $timestamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
 # Check idempotency
+if ((Test-Path $target -PathType Container)) {
+    Write-Error "Error: $target is a directory, not a file. Remove it manually before proceeding."
+    exit 1
+}
 if ((Test-Path $target) -and -not $Force) {
     Write-Error "Error: $target already exists. Use -Force to overwrite."
     exit 1
@@ -70,7 +74,7 @@ artifact: ideas_backlog
 phase: ideate
 schema_version: "1.0"
 generated: $timestamp
-seed_count: 2
+seed_count: 2  # Update this to match the actual number of seed ideas you add below
 total_count: 2
 derived_from: null
 enables: .spec-kit/idea_selection.md

@@ -100,6 +100,12 @@ if [ -L "$TARGET" ]; then
     exit 1
 fi
 
+# Refuse if target path is a directory
+if [ -d "$TARGET" ]; then
+    echo "Error: $TARGET is a directory, not a file. Remove it manually before proceeding." >&2
+    exit 1
+fi
+
 # Check idempotency
 if [ -f "$TARGET" ] && [ "$FORCE" = "false" ]; then
     echo "Error: $TARGET already exists. Use --force to overwrite." >&2

@@ -97,6 +97,12 @@ if [ -L "$TARGET" ]; then
     exit 1
 fi
 
+# Refuse if target path is a directory
+if [ -d "$TARGET" ]; then
+    echo "Error: $TARGET is a directory, not a file. Remove it manually before proceeding." >&2
+    exit 1
+fi
+
 # Check idempotency
 if [ -f "$TARGET" ] && [ "$FORCE" = "false" ]; then
     echo "Error: $TARGET already exists. Use --force to overwrite." >&2
@@ -113,7 +119,7 @@ artifact: ideas_backlog
 phase: ideate
 schema_version: "1.0"
 generated: ${TIMESTAMP}
-seed_count: 2
+seed_count: 2  # Update this to match the actual number of seed ideas you add below
 total_count: 2
 derived_from: null
 enables: .spec-kit/idea_selection.md

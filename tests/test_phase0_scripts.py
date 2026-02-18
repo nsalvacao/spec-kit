@@ -9,16 +9,23 @@ Tests cover:
 - Created file contains expected YAML frontmatter and section headers
 """
 
+import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 
 import pytest
 
 SCRIPT_DIR = Path(__file__).parent.parent / "scripts" / "bash"
+PS1_DIR = Path(__file__).parent.parent / "scripts" / "powershell"
 IDEATE = SCRIPT_DIR / "ideate.sh"
 SELECT = SCRIPT_DIR / "select.sh"
 STRUCTURE = SCRIPT_DIR / "structure.sh"
+IDEATE_PS1 = PS1_DIR / "ideate.ps1"
+SELECT_PS1 = PS1_DIR / "select.ps1"
+STRUCTURE_PS1 = PS1_DIR / "structure.ps1"
+
+PWSH = shutil.which("pwsh")
+skip_no_pwsh = pytest.mark.skipif(PWSH is None, reason="pwsh not available")
 
 
 def run(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
@@ -73,7 +80,7 @@ class TestIdeate:
     def test_help_flag(self, tmp_path):
         result = run(IDEATE, "--help", cwd=tmp_path)
         assert result.returncode == 0
-        assert "Usage" in result.stdout or "usage" in result.stdout.lower()
+        assert "Usage:" in result.stdout
 
     def test_invalid_dir_exits_nonzero(self, tmp_path):
         result = run(IDEATE, str(tmp_path / "nonexistent_dir"))
@@ -139,7 +146,7 @@ class TestSelect:
     def test_help_flag(self, tmp_path):
         result = run(SELECT, "--help", cwd=tmp_path)
         assert result.returncode == 0
-        assert "Usage" in result.stdout or "usage" in result.stdout.lower()
+        assert "Usage:" in result.stdout
 
     def test_timestamp_substituted(self, tmp_path):
         run(SELECT, str(tmp_path))
@@ -193,7 +200,7 @@ class TestStructure:
     def test_help_flag(self, tmp_path):
         result = run(STRUCTURE, "--help", cwd=tmp_path)
         assert result.returncode == 0
-        assert "Usage" in result.stdout or "usage" in result.stdout.lower()
+        assert "Usage:" in result.stdout
 
     def test_timestamp_substituted(self, tmp_path):
         run(STRUCTURE, str(tmp_path))
@@ -212,3 +219,129 @@ class TestStructure:
         result = run(STRUCTURE, cwd=tmp_path)
         assert result.returncode == 0
         assert (tmp_path / ".spec-kit" / "ai_vision_canvas.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# Directory-as-target idempotency (bash, G2)
+# ---------------------------------------------------------------------------
+
+
+class TestDirectoryCollision:
+    """Scripts must refuse to write when target path is a directory."""
+
+    def test_ideate_refuses_if_target_is_dir(self, tmp_path):
+        target = tmp_path / ".spec-kit" / "ideas_backlog.md"
+        target.parent.mkdir(parents=True)
+        target.mkdir()  # create as directory instead of file
+        result = run(IDEATE, str(tmp_path))
+        assert result.returncode != 0
+
+    def test_select_refuses_if_target_is_dir(self, tmp_path):
+        target = tmp_path / ".spec-kit" / "idea_selection.md"
+        target.parent.mkdir(parents=True)
+        target.mkdir()
+        result = run(SELECT, str(tmp_path))
+        assert result.returncode != 0
+
+    def test_structure_refuses_if_target_is_dir(self, tmp_path):
+        target = tmp_path / ".spec-kit" / "ai_vision_canvas.md"
+        target.parent.mkdir(parents=True)
+        target.mkdir()
+        result = run(STRUCTURE, str(tmp_path))
+        assert result.returncode != 0
+
+
+# ---------------------------------------------------------------------------
+# PowerShell parity (G1) — skipped if pwsh unavailable
+# ---------------------------------------------------------------------------
+
+
+def run_ps1(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [PWSH, "-NonInteractive", "-File", str(script), *args],
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+    )
+
+
+@skip_no_pwsh
+class TestIdeatePowerShell:
+    def test_creates_ideas_backlog(self, tmp_path):
+        result = run_ps1(IDEATE_PS1, str(tmp_path))
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / ".spec-kit" / "ideas_backlog.md").exists()
+
+    def test_idempotent_no_overwrite(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
+        result2 = run_ps1(IDEATE_PS1, str(tmp_path))
+        assert result2.returncode != 0
+
+    def test_force_flag_overwrites(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
+        result2 = run_ps1(IDEATE_PS1, "-Force", str(tmp_path))
+        assert result2.returncode == 0
+
+    def test_help_flag(self, tmp_path):
+        result = run_ps1(IDEATE_PS1, "-Help", cwd=tmp_path)
+        assert result.returncode == 0
+        assert "Usage:" in result.stdout
+
+    def test_timestamp_substituted(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
+        content = (tmp_path / ".spec-kit" / "ideas_backlog.md").read_text()
+        assert "[ISO_8601_TIMESTAMP]" not in content
+
+    def test_frontmatter(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
+        content = (tmp_path / ".spec-kit" / "ideas_backlog.md").read_text()
+        assert "artifact: ideas_backlog" in content
+        assert "phase: ideate" in content
+
+
+@skip_no_pwsh
+class TestSelectPowerShell:
+    def test_creates_idea_selection(self, tmp_path):
+        result = run_ps1(SELECT_PS1, str(tmp_path))
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / ".spec-kit" / "idea_selection.md").exists()
+
+    def test_idempotent_no_overwrite(self, tmp_path):
+        run_ps1(SELECT_PS1, str(tmp_path))
+        result2 = run_ps1(SELECT_PS1, str(tmp_path))
+        assert result2.returncode != 0
+
+    def test_force_flag_overwrites(self, tmp_path):
+        run_ps1(SELECT_PS1, str(tmp_path))
+        result2 = run_ps1(SELECT_PS1, "-Force", str(tmp_path))
+        assert result2.returncode == 0
+
+    def test_timestamp_substituted(self, tmp_path):
+        run_ps1(SELECT_PS1, str(tmp_path))
+        content = (tmp_path / ".spec-kit" / "idea_selection.md").read_text()
+        assert "[ISO_8601_TIMESTAMP]" not in content
+
+
+@skip_no_pwsh
+class TestStructurePowerShell:
+    def test_creates_ai_vision_canvas(self, tmp_path):
+        result = run_ps1(STRUCTURE_PS1, str(tmp_path))
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / ".spec-kit" / "ai_vision_canvas.md").exists()
+
+    def test_idempotent_no_overwrite(self, tmp_path):
+        run_ps1(STRUCTURE_PS1, str(tmp_path))
+        result2 = run_ps1(STRUCTURE_PS1, str(tmp_path))
+        assert result2.returncode != 0
+
+    def test_force_flag_overwrites(self, tmp_path):
+        run_ps1(STRUCTURE_PS1, str(tmp_path))
+        result2 = run_ps1(STRUCTURE_PS1, "-Force", str(tmp_path))
+        assert result2.returncode == 0
+
+    def test_project_name_substituted(self, tmp_path):
+        named = tmp_path / "my-ps1-project"
+        named.mkdir()
+        run_ps1(STRUCTURE_PS1, str(named))
+        content = (named / ".spec-kit" / "ai_vision_canvas.md").read_text()
+        assert "my-ps1-project" in content

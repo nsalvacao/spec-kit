@@ -58,6 +58,10 @@ $target = Join-Path $specKitDir 'ai_vision_canvas.md'
 $timestamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
 # Check idempotency
+if ((Test-Path $target -PathType Container)) {
+    Write-Error "Error: $target is a directory, not a file. Remove it manually before proceeding."
+    exit 1
+}
 if ((Test-Path $target) -and -not $Force) {
     Write-Error "Error: $target already exists. Use -Force to overwrite."
     exit 1
