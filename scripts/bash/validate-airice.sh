@@ -21,6 +21,14 @@ if ! echo "$header_line" | rg -q "Reach" || ! echo "$header_line" | rg -q "Impac
   exit 1
 fi
 
+if ! echo "$header_line" | rg -q "Norm_Score"; then
+  echo "Error: AI-RICE scoring table missing Norm_Score column (normalized 0-100 score)"
+  if [ -x "$STATE_LOG" ]; then
+    "$STATE_LOG" "select" "Framework-Driven Development" "AI-RICE table missing Norm_Score column" "high" "validate-airice"
+  fi
+  exit 1
+fi
+
 rows=$(rg -n "^\|" "$FILE_PATH" | sed -n '3,$p' | rg -c "\|" || true)
 if [ "$rows" -lt 1 ]; then
   echo "Error: AI-RICE scoring table has no data rows"
