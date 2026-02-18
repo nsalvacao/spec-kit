@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **P023 (#80): Fix DEFAULT_CATALOG_URL and catalog.json to point to fork nsalvacao/spec-kit**
+  - `src/specify_cli/extensions.py`: `DEFAULT_CATALOG_URL` updated from `github/spec-kit` to `nsalvacao/spec-kit`
+  - `extensions/catalog.json`: `catalog_url` field updated from `github/spec-kit` to `nsalvacao/spec-kit`
+  - Ensures `specify extension search` fetches the fork's catalog by default
+
 ### Added
 
 - **P021 (#27): `--no-banner` flag for `specify init`** - Suppress ASCII art banner for CI/CD pipelines

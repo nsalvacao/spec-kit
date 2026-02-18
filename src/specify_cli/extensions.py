@@ -985,7 +985,7 @@ class CommandRegistrar:
 class ExtensionCatalog:
     """Manages extension catalog fetching, caching, and searching."""
 
-    DEFAULT_CATALOG_URL = "https://raw.githubusercontent.com/github/spec-kit/main/extensions/catalog.json"
+    DEFAULT_CATALOG_URL = "https://raw.githubusercontent.com/nsalvacao/spec-kit/main/extensions/catalog.json"
     CACHE_DURATION = 3600  # 1 hour in seconds
 
     def __init__(self, project_root: Path):
