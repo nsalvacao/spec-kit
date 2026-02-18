@@ -1,9 +1,12 @@
 ---
 artifact: ideas_backlog
 phase: ideate
+schema_version: "1.0"
 generated: [ISO_8601_TIMESTAMP]
 seed_count: [SEED_COUNT]
 total_count: [TOTAL_COUNT]
+derived_from: null
+enables: .spec-kit/idea_selection.md
 ---
 
 # Ideas Backlog: [PROJECT_NAME]

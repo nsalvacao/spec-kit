@@ -1,9 +1,12 @@
 ---
 artifact: idea_selection
 phase: select
+schema_version: "1.0"
 generated: [ISO_8601_TIMESTAMP]
 ideas_evaluated: [COUNT]
 selected_idea_id: [IDEA_ID]
+derived_from: .spec-kit/ideas_backlog.md
+enables: .spec-kit/ai_vision_canvas.md
 ---
 
 # Idea Selection Report

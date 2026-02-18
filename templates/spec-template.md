@@ -1,3 +1,12 @@
+---
+artifact: spec
+phase: sdd
+schema_version: "1.0"
+generated: [ISO_8601_TIMESTAMP]
+derived_from: .spec-kit/g0_validation_report.md
+enables: null
+---
+
 # Feature Specification: [FEATURE NAME]
 
 **Feature Branch**: `[###-feature-name]`  
