@@ -4,7 +4,7 @@ set -euo pipefail
 STATE_DIR=".spec-kit"
 STATE_FILE="$STATE_DIR/state.yaml"
 
-mkdir -p "$STATE_DIR"
+mkdir -p "$STATE_DIR/approvals"
 
 if [ ! -f "$STATE_FILE" ]; then
   cat > "$STATE_FILE" <<'EOF'

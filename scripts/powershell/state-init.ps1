@@ -5,6 +5,11 @@ if (-not (Test-Path $stateDir)) {
     New-Item -ItemType Directory -Path $stateDir | Out-Null
 }
 
+$approvalsDir = Join-Path $stateDir 'approvals'
+if (-not (Test-Path $approvalsDir)) {
+    New-Item -ItemType Directory -Path $approvalsDir | Out-Null
+}
+
 if (-not (Test-Path $stateFile)) {
 @'
 workflow_version: "1.0"
