@@ -22,6 +22,8 @@ You are updating the project constitution at `.specify/memory/constitution.md`. 
 
 **Note**: If `.specify/memory/constitution.md` does not exist yet, it should have been initialized from `.specify/templates/constitution-template.md` during project setup. If it's missing, copy the template first.
 
+**Execution Model — You Are the Executor**: You write files directly using your file-creation tools. If a script is missing or unavailable, perform the task yourself by creating the artifact directly. Do not halt waiting for automation that may not exist yet.
+
 Follow this execution flow:
 
 1. Load the existing constitution at `.specify/memory/constitution.md`.
@@ -30,6 +32,18 @@ Follow this execution flow:
 
 2. Collect/derive values for placeholders:
    - If user input (conversation) supplies a value, use it.
+   - **Phase 0 artifacts** (check `.spec-kit/` directory first if it exists):
+     - `.spec-kit/ideas_backlog.md` — SCAMPER/HMW insights revealing strategic priorities
+     - `.spec-kit/idea_selection.md` — AI-RICE scores justifying strategic choices
+     - `.spec-kit/ai_vision_canvas.md` — value proposition, constraints, success criteria
+     - `.spec-kit/g0_validation_report.md` — risks and gates to embed as principles
+     - Translate each validated Phase 0 decision into a non-negotiable principle.
+   - **Strategy Toolkit artifacts** (check `.ideas/` directory if it exists — gitignored, private):
+     - `.ideas/brainstorm-expansion.md` — structured ideation with strategic frameworks (SCAMPER, HMW, etc.)
+     - `.ideas/execution-plan.md` — roadmap, tier ranking, risk mapping
+     - `.ideas/evaluation-results.md` — pre-launch quality and readiness scores
+     - `.ideas/launch-blockers.md` — critical issues flagged before public exposure
+     - Use these to enrich or cross-validate principles derived from Phase 0 or README.
    - Otherwise infer from existing repo context (README, docs, prior constitution versions if embedded).
    - For governance dates: `RATIFICATION_DATE` is the original adoption date (if unknown ask or mark TODO), `LAST_AMENDED_DATE` is today if changes are made, otherwise keep previous.
    - `CONSTITUTION_VERSION` must increment according to semantic versioning rules:
