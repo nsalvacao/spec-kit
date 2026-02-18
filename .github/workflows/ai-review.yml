@@ -36,7 +36,9 @@ jobs:
     env:
       REVIEW_MODEL: "openai/gpt-4.1"
       MAX_REVIEW_CHARS: "8000"
+      MAX_REVIEW_TOKENS: "1500"
       MAX_RETRY: "3"
+      MAX_RETRY_SLEEP: "30"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,11 +75,15 @@ jobs:
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
         run: |
+          # Mask token to prevent accidental log exposure
+          echo "::add-mask::$GH_MODELS_TOKEN"
+
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
           DIFF_CONTENT=$(cat diff.txt)
 
-          # Retry loop with exponential backoff (#77)
+          # Retry loop with exponential backoff, capped at MAX_RETRY_SLEEP seconds (#77)
           MAX_RETRY=${{ env.MAX_RETRY }}
+          MAX_SLEEP=${{ env.MAX_RETRY_SLEEP }}
           ATTEMPT=0
           HTTP_CODE=""
           while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
@@ -92,13 +98,14 @@ jobs:
                 --arg system "$SYSTEM_PROMPT" \
                 --arg diff "$DIFF_CONTENT" \
                 --arg model "${{ env.REVIEW_MODEL }}" \
+                --argjson max_tokens ${{ env.MAX_REVIEW_TOKENS }} \
                 '{
                   model: $model,
                   messages: [
                     {role: "system", content: $system},
                     {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
                   ],
-                  max_tokens: 1500,
+                  max_tokens: $max_tokens,
                   temperature: 0.2
                 }')")
 
@@ -111,7 +118,8 @@ jobs:
 
             echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
             if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-              SLEEP=$((2 ** ATTEMPT))
+              RAW_SLEEP=$((2 ** ATTEMPT))
+              SLEEP=$(( RAW_SLEEP < MAX_SLEEP ? RAW_SLEEP : MAX_SLEEP ))
               echo "Retrying in ${SLEEP}s..."
               sleep "$SLEEP"
             fi
@@ -167,7 +175,9 @@ jobs:
     env:
       SUMMARY_MODEL: "openai/gpt-4.1-mini"
       MAX_SUMMARY_CHARS: "6000"
+      MAX_SUMMARY_TOKENS: "800"
       MAX_RETRY: "3"
+      MAX_RETRY_SLEEP: "30"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -192,12 +202,16 @@ jobs:
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
         run: |
+          # Mask token to prevent accidental log exposure
+          echo "::add-mask::$GH_MODELS_TOKEN"
+
           SYSTEM="Generate a concise PR summary in markdown. Include: ## Summary (1-2 sentences), ## Changes (list key changes), ## Impact (what's affected). Be concise."
           FILES=$(cat files.txt)
           DIFF=$(cat diff.txt)
 
-          # Retry loop with exponential backoff (#77)
+          # Retry loop with exponential backoff, capped at MAX_RETRY_SLEEP seconds (#77)
           MAX_RETRY=${{ env.MAX_RETRY }}
+          MAX_SLEEP=${{ env.MAX_RETRY_SLEEP }}
           ATTEMPT=0
           HTTP_CODE=""
           while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
@@ -213,13 +227,14 @@ jobs:
                 --arg files "$FILES" \
                 --arg diff "$DIFF" \
                 --arg model "${{ env.SUMMARY_MODEL }}" \
+                --argjson max_tokens ${{ env.MAX_SUMMARY_TOKENS }} \
                 '{
                   model: $model,
                   messages: [
                     {role: "system", content: $system},
                     {role: "user", content: ("Files changed:\n" + $files + "\n\nDiff:\n" + $diff)}
                   ],
-                  max_tokens: 800,
+                  max_tokens: $max_tokens,
                   temperature: 0.3
                 }')")
 
@@ -232,7 +247,8 @@ jobs:
 
             echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
             if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-              SLEEP=$((2 ** ATTEMPT))
+              RAW_SLEEP=$((2 ** ATTEMPT))
+              SLEEP=$(( RAW_SLEEP < MAX_SLEEP ? RAW_SLEEP : MAX_SLEEP ))
               echo "Retrying in ${SLEEP}s..."
               sleep "$SLEEP"
             fi

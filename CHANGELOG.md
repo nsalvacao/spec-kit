@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **P024 (#76, #77): AI Review workflow improvements**
   - Configurable model IDs via `env:` block (`REVIEW_MODEL`, `SUMMARY_MODEL`) — no hardcoded model strings (#77)
-  - Retry loop with exponential backoff (up to 3 attempts, `2^attempt` seconds between retries) for both `code-review` and `pr-summary` jobs (#77)
+  - Configurable token limits via `env:` block (`MAX_REVIEW_TOKENS: 1500`, `MAX_SUMMARY_TOKENS: 800`) (#77)
+  - Retry loop with exponential backoff (up to `MAX_RETRY` attempts, capped at `MAX_RETRY_SLEEP` seconds per sleep, default 30s) for both jobs (#77)
   - Non-empty / markdown-structure validation of model output with warning instead of hard failure (#77)
+  - `::add-mask::` applied to `GH_MODELS_TOKEN` at step start to prevent accidental log exposure (#77)
   - Configurable `MAX_REVIEW_CHARS` (default 8000) and `MAX_SUMMARY_CHARS` (default 6000) via `env:` block (#76)
   - `truncated_at` output exposed — footer now shows exact truncation point and full diff size (#76)
   - `skip-ai-review` label support — add label to any PR to suppress both jobs (#76)
