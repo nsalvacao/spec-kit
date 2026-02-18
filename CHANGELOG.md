@@ -18,8 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.github/agents/speckit.plan.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
   - `.github/agents/speckit.tasks.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
 
-### Added
-
 - **P021 (#27): `--no-banner` flag for `specify init`** - Suppress ASCII art banner for CI/CD pipelines
   - Use `--no-banner` to skip the decorative banner when running in non-interactive environments
   - All init functionality remains intact — only the visual banner is suppressed
