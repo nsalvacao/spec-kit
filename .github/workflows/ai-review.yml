@@ -33,7 +33,7 @@ jobs:
       - name: Get PR diff
         id: diff
         run: |
-          git diff ${{ github.event.pull_request.base.sha }}...${{ github.sha }} > diff_full.txt
+          git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
           DIFF_SIZE=$(wc -c < diff_full.txt)
           echo "full_size=$DIFF_SIZE" >> $GITHUB_OUTPUT
 
@@ -128,9 +128,9 @@ jobs:
       - name: Get PR info
         id: info
         run: |
-          git diff ${{ github.event.pull_request.base.sha }}...${{ github.sha }} > diff_full.txt
+          git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
           head -c 6000 diff_full.txt > diff.txt
-          git diff --name-status ${{ github.event.pull_request.base.sha }}...${{ github.sha }} > files.txt
+          git diff --name-status ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > files.txt
 
           if [ ! -s diff.txt ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -147,7 +147,7 @@ jobs:
           FILES=$(cat files.txt)
           DIFF=$(cat diff.txt)
 
-          curl -s -X POST \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://models.github.ai/inference/chat/completions" \
             -H "Authorization: Bearer $GH_MODELS_TOKEN" \
             -H "Content-Type: application/json" \
@@ -163,7 +163,18 @@ jobs:
                 ],
                 max_tokens: 800,
                 temperature: 0.3
-              }')" | jq -r '.choices[0].message.content' > summary.md
+              }')")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Models API returned HTTP $HTTP_CODE"
+            echo "$BODY" | jq .error 2>/dev/null || echo "$BODY"
+            exit 1
+          fi
+
+          echo "$BODY" | jq -r '.choices[0].message.content' > summary.md
 
       - name: Post summary
         if: steps.info.outputs.skip != 'true'
