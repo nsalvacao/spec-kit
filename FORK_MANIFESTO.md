@@ -10,8 +10,8 @@ This repository is an independent fork of `github/spec-kit` that adds **Phase 0:
 
 ## Compatibility Commitments
 
-- **Default behavior stays upstream**: when `SPECIFY_TEMPLATE_REPO` is unset, `specify init` pulls templates from `github/spec-kit`
-- **Opt-in fork templates**: set `SPECIFY_TEMPLATE_REPO=nsalvacao/spec-kit` or use `--template-repo`
+- **Default behavior uses fork**: when `SPECIFY_TEMPLATE_REPO` is unset, `specify init` pulls templates from `nsalvacao/spec-kit`
+- **Opt-in upstream templates**: set `SPECIFY_TEMPLATE_REPO=github/spec-kit` or use `--template-repo github/spec-kit` to use upstream templates instead
 - **Minimal divergence**: changes are additive and isolated to templates, scripts, and documented overrides
 
 ## Upstream Alignment Strategy
