@@ -31,9 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **CI (`ai-review.yml`)**: kept large-diff review fixes in this PR scope and improved output/debug traceability.
   - Version metadata aligned to `0.0.52` to keep monotonic progression after published release `v0.0.51`.
+  - Review model selection is now configurable via repository variables (`REVIEW_LONG_CONTEXT_MODEL`, `REVIEW_MODEL`, `REVIEW_FALLBACK_MODEL`) instead of fixed IDs.
+  - Added startup validation for `MODELS_PAT` (`GH_MODELS_TOKEN`) to fail fast on missing secret.
+  - Added tenant catalog pre-check (`/catalog/models`) to skip unavailable configured models before attempting inference.
+  - Long-context model fallback now treats `400/401/403/404` as non-retryable per model to avoid wasted retry loops.
   - Full-diff reviews now write `review.md` deterministically before posting the PR comment.
   - Added append-only UTC timeline logging (`review_timeline.md`) for model attempts, HTTP status, retry backoff, rate-limit headers, and chunk progress.
   - Exported the timeline to the workflow run summary for easier incident debugging.
+- **Init hardening (`.specify` symlink mode)**:
+  - Skip bootstrap mutations inside `.specify` (`chmod`, constitution bootstrap, project config bootstrap) when `.specify` is a symlink.
+  - Added regression tests to ensure symlinked `.specify` never receives implicit writes during those bootstrap steps.
 
 ## [0.0.48] - 2026-02-19
 

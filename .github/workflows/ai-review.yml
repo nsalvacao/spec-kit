@@ -12,7 +12,7 @@
 #   MAX_REVIEW_CHARS       — max diff chars for review             (#76)
 #   MAX_SUMMARY_CHARS      — max diff chars for summary            (#76)
 #   MAX_RETRY              — retry attempts per model              (#77)
-#   Model IDs must match https://models.github.ai/catalog/models
+#   Model IDs should match runtime catalog: https://models.github.ai/catalog/models
 #   Review timeline logs are append-only per run (UTC timestamps)
 #   and exported to the workflow summary for easier debugging.
 # =============================================================================
@@ -41,9 +41,9 @@ jobs:
     # Skip review for PRs labelled 'skip-ai-review' (#76)
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
-      REVIEW_LONG_CONTEXT_MODEL: "ai21-labs/ai21-jamba-1.5-large" # prefer long-context model first (free tier; check runtime headers for limits)
-      REVIEW_MODEL: "openai/gpt-4.1"
-      REVIEW_FALLBACK_MODEL: "openai/gpt-4o"
+      REVIEW_LONG_CONTEXT_MODEL: ${{ vars.REVIEW_LONG_CONTEXT_MODEL || '' }} # optional, tenant-specific
+      REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'openai/gpt-4.1' }}
+      REVIEW_FALLBACK_MODEL: ${{ vars.REVIEW_FALLBACK_MODEL || 'openai/gpt-4o' }}
       MAX_REVIEW_CHARS: "50000"
       MAX_REVIEW_TOKENS: "2000"
       CHUNK_SIZE_CHARS: "18000"
@@ -87,6 +87,11 @@ jobs:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
         run: |
           set -euo pipefail
+          if [ -z "${GH_MODELS_TOKEN:-}" ]; then
+            echo "::error::Missing MODELS_PAT secret. Configure it with a GitHub Models token (models:read)."
+            exit 1
+          fi
+
           # Mask token to prevent accidental log exposure
           echo "::add-mask::$GH_MODELS_TOKEN"
 
@@ -101,6 +106,34 @@ jobs:
           }
 
           timeline "AI review started full_diff_chars=${{ steps.diff.outputs.full_size }} chunk_required=$CHUNK_REQUIRED"
+
+          CATALOG_FILE="/tmp/models_catalog.json"
+          CATALOG_OK=0
+          if curl -fsS -H "Authorization: Bearer $GH_MODELS_TOKEN" https://models.github.ai/catalog/models > "$CATALOG_FILE"; then
+            CATALOG_OK=1
+            timeline "catalog_loaded count=$(jq 'length' "$CATALOG_FILE" 2>/dev/null || echo 0)"
+          else
+            timeline "catalog_unavailable continuing_without_precheck"
+          fi
+
+          model_in_catalog() {
+            local MODEL="$1"
+            if [ "$CATALOG_OK" -ne 1 ]; then
+              return 0
+            fi
+            jq -e --arg model "$MODEL" '.[] | select(.id == $model)' "$CATALOG_FILE" >/dev/null 2>&1
+          }
+
+          if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ] && ! model_in_catalog "$REVIEW_LONG_CONTEXT_MODEL"; then
+            timeline "long_context_not_in_catalog model=$REVIEW_LONG_CONTEXT_MODEL"
+            REVIEW_LONG_CONTEXT_MODEL=""
+          fi
+          if [ -n "$REVIEW_MODEL" ] && ! model_in_catalog "$REVIEW_MODEL"; then
+            timeline "primary_not_in_catalog model=$REVIEW_MODEL"
+          fi
+          if [ -n "$REVIEW_FALLBACK_MODEL" ] && ! model_in_catalog "$REVIEW_FALLBACK_MODEL"; then
+            timeline "fallback_not_in_catalog model=$REVIEW_FALLBACK_MODEL"
+          fi
 
           call_model() {
             local MODEL="$1" CONTENT="$2" PURPOSE="$3" CHUNK_ID="$4"
@@ -149,11 +182,34 @@ jobs:
 
           review_with_chain() {
             local CONTENT="$1" PURPOSE="$2" CHUNK_ID="$3"
-            local MODELS=()
+            local CANDIDATES=()
             if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ]; then
-              MODELS+=("$REVIEW_LONG_CONTEXT_MODEL")
+              CANDIDATES+=("$REVIEW_LONG_CONTEXT_MODEL")
             fi
-            MODELS+=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
+            CANDIDATES+=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
+
+            local MODELS=()
+            local CANDIDATE
+            local EXISTING
+            local DUPLICATE
+            for CANDIDATE in "${CANDIDATES[@]}"; do
+              [ -z "$CANDIDATE" ] && continue
+              DUPLICATE=0
+              for EXISTING in "${MODELS[@]}"; do
+                if [ "$EXISTING" = "$CANDIDATE" ]; then
+                  DUPLICATE=1
+                  break
+                fi
+              done
+              if [ "$DUPLICATE" -eq 0 ]; then
+                MODELS+=("$CANDIDATE")
+              fi
+            done
+
+            if [ "${#MODELS[@]}" -eq 0 ]; then
+              timeline "no_models_configured purpose=$PURPOSE chunk=$CHUNK_ID"
+              return 1
+            fi
 
             for MODEL in "${MODELS[@]}"; do
               timeline "trying_model purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL"
@@ -232,7 +288,7 @@ jobs:
           # 2) Chunked path (overlapping chunks for coherence)
           STEP=$((CHUNK_SIZE_CHARS - CHUNK_OVERLAP_CHARS))
           if [ "$STEP" -le 0 ]; then
-            echo "::error::Invalid chunk config: CHUNK_SIZE_CHARS must be greater than CHUNK_OVERLAP_CHARS"
+            echo "::error::Invalid chunk config: CHUNK_SIZE_CHARS must be greater than CHUNK_OVERLAP_CHARS (size=$CHUNK_SIZE_CHARS overlap=$CHUNK_OVERLAP_CHARS)"
             exit 1
           fi
 
