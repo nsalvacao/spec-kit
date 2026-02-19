@@ -273,19 +273,21 @@ When choosing what to work on, apply this order:
 
 ### Known CI Status
 
-All workflows are healthy as of v0.0.26. The following were fixed:
+All workflows are healthy as of v0.0.31. The following were fixed historically:
 
 - `release.yml` — versioning script fixed (47de07e)
 - `test.yml` — added pytest CI (47de07e); `uv.lock` tracked (5845dac)
 - `ai-review.yml` / `ai-triage.yml` — explicit permissions added (0c173ce)
 
+**Pending**: `docs.yml`, `lint.yml`, `release.yml` still use `actions/checkout@v4` — upgrade to `@v6` tracked in PR #67.
+
 ### Release Version Convention
 
-Version format: `vMAJOR.MINOR.PATCH` (e.g., `v0.0.26`, standard SemVer without fork suffix)
+Version format: `vMAJOR.MINOR.PATCH` (e.g., `v0.0.31`, standard SemVer without fork suffix)
 
-Python/PyPI equivalent: `MAJOR.MINOR.PATCH.postN` (e.g., `0.0.23.post2`)
+Python/PyPI equivalent: `MAJOR.MINOR.PATCH` (e.g., `0.0.31`)
 
-When creating a new release tag manually: `git tag v0.0.23-fork.3 && git push origin v0.0.23-fork.3`
+When creating a new release tag manually: `git tag v0.0.31 && git push origin v0.0.31`
 
 ## Development Standards
 
@@ -581,3 +583,50 @@ At the beginning of every work session:
 | `productivity-cockpit` | ✅ Installed | `~/.copilot/installed-plugins/nsalvacao-claude-code-plugins/productivity-cockpit` |
 | `advanced-evaluation` skill | ✅ Installed | `~/.copilot/skills/advanced-evaluation/` |
 | `dev_loop` config in constitution | ❌ Planned | see `.ideas/integrated-pipeline.md §10` |
+
+## Current Work State
+
+> Last updated: 2026-02 | Version: v0.0.31 | Tests: 339 pytest
+
+### Branch State
+
+- **`main`**: Clean, source of truth. All feature work merged.
+- **`baseline/main-sync-2026-02-17`**: Reset to == main (b89a8ce). Exists as staging buffer for intake PRs.
+- **All feature branches**: Deleted after merge/close audit. Only `feat/28-backlinks-selection-to-ideas` kept pending investigation (PR #97 was closed without merge).
+
+### Next Action: Process Intake PRs in Order
+
+14 open upstream intake PRs to process. Each becomes a `feat/<n>-<slug>` branch from `main`:
+
+| Priority | PR | What |
+|----------|----|------|
+| 🔴 1 | #59 | clarify.md: fix "10 questions" → "5" (BUG in main) |
+| 🔴 2 | #55 | create-new-feature.sh: prefix uniqueness validation |
+| 🔴 3 | #61 | create-new-feature.sh: whitespace trim + checkout error |
+| 🟡 4 | #67 | GitHub Actions: checkout@v4 → @v6 |
+| 🟡 5 | #63 | Template headers: blank line fixes (markdownlint) |
+| 🟡 6 | #56 | plan-template: agent-agnostic path note |
+| 🟡 7 | #60 | implement.md: C ignore patterns fix |
+| 🟢 8 | #64 | README: "What is uv?" section |
+| 🟢 9 | #65 | Script type choices: platform labels |
+| 🟢 10 | #68 | Antigravity link + agy example |
+| 🔵 11 | #70 | feat: --local-templates option |
+| 🔵 12 | #71 | feat: --keep-memory flag |
+| 🔵 13 | #72 | feat: smart .specify/ detection |
+| 🔵 14 | #73 | feat: /speckit.amend command template |
+
+After intake PRs: tackle open issues by phase order (#16, #18, #33–#35, #38–#39, #42, #44, #47, then #101+).
+
+### Intake PR Workflow Reminder
+
+```bash
+# For each intake PR (e.g., PR #59):
+git checkout main
+git checkout -b feat/59-clarify-question-limit
+# Apply the change (manually or cherry-pick from intake branch)
+# Run tests + lint
+# git commit -m "fix(clarify): correct question limit 10→5 (closes #59)"
+# gh pr create --base main --title "fix(clarify): correct question limit 10→5"
+```
+
+**Never merge intake branches directly into main.** Always via PR + CI + AI review.
