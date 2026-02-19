@@ -9,10 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **Script type choices now include platform labels**: `sh` → `"POSIX Shell (bash/zsh) [macOS/Linux]"`, `ps` → `"PowerShell [Windows]"` for clarity in interactive prompts (upstream #1379, Angie Byron)
-
 ### Added
 
 - **P007 (#15): Phase 0 scaffolding scripts (ideate, select, structure)**
@@ -74,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extension docs/templates/test suite scaffolding
   - Antigravity (`agy`) agent support in CLI and packaging scripts
   - `constitution-template` initialization flow for new projects
+
+### Changed
+
+- **Script type choices now include platform labels**: `sh` → `"POSIX Shell (bash/zsh) [macOS/Linux]"`, `ps` → `"PowerShell [Windows]"` for clarity in interactive prompts (upstream #1379, Angie Byron)
 
 ### Fixed
 
