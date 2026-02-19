@@ -310,6 +310,7 @@ If `codex` is selected, `init` also prints a `CODEX_HOME` setup hint for project
 | `--no-git` | Skip git init |
 | `--github-token` | Use token for GitHub API operations |
 | `--skip-tls` | Disable TLS verification (local troubleshooting only) |
+| `--local-templates` | Path to local `.genreleases` dir for development testing (bypasses GitHub download) |
 
 ## Extension System
 
