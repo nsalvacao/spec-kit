@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **#101: Adaptive Scope Detection Engine (`feature` / `epic` / `program`)**
   - Added deterministic scope scoring module: `src/specify_cli/scope_detection.py`
   - Implemented score bands `0-34`, `35-64`, `65+` with stable mode recommendation
+  - Added centralized project config loader: `src/specify_cli/project_config.py`
+  - Introduced canonical config files:
+    - `.specify/spec-kit.yml` (shared)
+    - `.specify/spec-kit.local.yml` (local override, gitignored)
+  - `specify init` now bootstraps `.specify/spec-kit.yml` from template when missing
   - Centralized scoring weights, caps, boundaries, and keyword set in configurable `ScopeDetectionConfig`
   - Added versioned output contract payload with:
     - `mode_recommendation`

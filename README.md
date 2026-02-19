@@ -379,6 +379,7 @@ Detailed policy:
 | --- | --- |
 | Getting started | `docs/quickstart.md` |
 | Installation | `docs/installation.md` |
+| Configuration | `docs/configuration.md` |
 | CLI reference | `docs/cli.md` |
 | Agent support | `docs/agents.md` |
 | Methodology | `docs/methodology.md` |

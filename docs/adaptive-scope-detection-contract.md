@@ -9,6 +9,9 @@ detection engine introduced for issue `#101`.
   before decomposition/task generation.
 - Config object: `ScopeDetectionConfig` (all weights/caps/keywords are
   centralized and overridable; not scattered as hardcoded magic numbers).
+- Project config source: `.specify/spec-kit.yml` plus optional
+  `.specify/spec-kit.local.yml` and `SPECIFY_CONFIG__...` env overrides.
+- Global configuration rules and precedence: `docs/configuration.md`.
 
 ## Score Bands
 
@@ -60,6 +63,18 @@ config = ScopeDetectionConfig(
 result = detect_scope(
     ScopeDetectionInput(description="Platform migration for billing"),
     config=config,
+)
+```
+
+Or load from project configuration:
+
+```python
+from pathlib import Path
+from specify_cli.scope_detection import ScopeDetectionInput, detect_scope_for_project
+
+result = detect_scope_for_project(
+    ScopeDetectionInput(description="Platform migration for billing"),
+    project_root=Path("."),
 )
 ```
 

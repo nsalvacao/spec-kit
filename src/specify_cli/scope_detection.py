@@ -6,10 +6,13 @@ scope before task generation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import Enum
+from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Mapping
+
+from .project_config import load_project_config
 
 
 CONTRACT_VERSION = "scope-detection.v1"
@@ -391,6 +394,75 @@ def detect_scope(
         confidence=confidence,
         signals=signals,
     )
+
+
+def scope_detection_config_from_mapping(raw_config: Mapping[str, Any] | None) -> ScopeDetectionConfig:
+    """Build ScopeDetectionConfig from a generic mapping."""
+    if raw_config is None:
+        return ScopeDetectionConfig()
+    if not isinstance(raw_config, Mapping):
+        raise ValueError("scope_detection config must be a mapping")
+
+    allowed_fields = {field_info.name for field_info in fields(ScopeDetectionConfig)}
+    unknown_keys = sorted(set(raw_config.keys()) - allowed_fields)
+    if unknown_keys:
+        unknown = ", ".join(unknown_keys)
+        raise ValueError(f"Unknown scope_detection config keys: {unknown}")
+
+    config_data = dict(raw_config)
+
+    if "complexity_keywords" in config_data:
+        raw_keywords = config_data["complexity_keywords"]
+        if isinstance(raw_keywords, str):
+            keywords = [raw_keywords]
+        elif isinstance(raw_keywords, (list, tuple, set, frozenset)):
+            keywords = list(raw_keywords)
+        else:
+            raise TypeError("scope_detection.complexity_keywords must be a string or list of strings")
+        if not all(isinstance(keyword, str) for keyword in keywords):
+            raise TypeError("scope_detection.complexity_keywords must contain only strings")
+        config_data["complexity_keywords"] = frozenset(
+            keyword.strip().lower() for keyword in keywords if keyword.strip()
+        )
+
+    if "risk_weights" in config_data:
+        raw_weights = config_data["risk_weights"]
+        if not isinstance(raw_weights, Mapping):
+            raise TypeError("scope_detection.risk_weights must be a mapping")
+        normalized_weights: dict[str, int] = {}
+        for key, value in raw_weights.items():
+            if not isinstance(key, str):
+                raise TypeError("scope_detection.risk_weights keys must be strings")
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError("scope_detection.risk_weights values must be integers")
+            normalized_weights[key.strip().lower()] = value
+        config_data["risk_weights"] = normalized_weights
+
+    config = ScopeDetectionConfig(**config_data)
+    config.validate()
+    return config
+
+
+def load_scope_detection_config(
+    project_root: Path | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> ScopeDetectionConfig:
+    """Load ScopeDetectionConfig from merged project configuration files/env."""
+    project_config = load_project_config(project_root=project_root, env=env)
+    raw_scope_config = project_config.get("scope_detection", {})
+    return scope_detection_config_from_mapping(raw_scope_config)
+
+
+def detect_scope_for_project(
+    input_data: ScopeDetectionInput,
+    project_root: Path | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> ScopeDetectionResult:
+    """Detect scope using project configuration from .specify/spec-kit.yml."""
+    config = load_scope_detection_config(project_root=project_root, env=env)
+    return detect_scope(input_data, config=config)
 
 
 def _scaled_score(raw: int, multiplier: int, cap: int) -> int:

@@ -7,7 +7,10 @@ from specify_cli.scope_detection import (
     ScopeDetectionConfig,
     ScopeDetectionInput,
     ScopeMode,
+    detect_scope_for_project,
     detect_scope,
+    load_scope_detection_config,
+    scope_detection_config_from_mapping,
 )
 
 
@@ -270,3 +273,73 @@ def test_custom_config_allows_overriding_default_weights():
     tuned_result = detect_scope(input_data, config=tuned_config)
 
     assert default_result.total_score != tuned_result.total_score
+
+
+def test_scope_detection_config_can_be_loaded_from_project_file(tmp_path):
+    config_file = tmp_path / ".specify" / "spec-kit.yml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        """
+schema_version: 1
+scope_detection:
+  work_items_multiplier: 1
+  dependency_multiplier: 1
+  complexity_keywords:
+    - platform
+    - migration
+""".strip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_scope_detection_config(project_root=tmp_path)
+    assert loaded.work_items_multiplier == 1
+    assert loaded.dependency_multiplier == 1
+    assert loaded.complexity_keywords == frozenset({"platform", "migration"})
+
+
+def test_scope_detection_env_override_changes_loaded_config(tmp_path):
+    (tmp_path / ".specify").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".specify" / "spec-kit.yml").write_text("schema_version: 1\n", encoding="utf-8")
+
+    loaded = load_scope_detection_config(
+        project_root=tmp_path,
+        env={"SPECIFY_CONFIG__SCOPE_DETECTION__WORK_ITEMS_MULTIPLIER": "2"},
+    )
+    assert loaded.work_items_multiplier == 2
+
+
+def test_detect_scope_for_project_uses_project_config(tmp_path):
+    config_file = tmp_path / ".specify" / "spec-kit.yml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        """
+schema_version: 1
+scope_detection:
+  work_items_multiplier: 1
+  dependency_multiplier: 1
+  integration_multiplier: 1
+  domain_multiplier: 5
+  cross_team_multiplier: 2
+""".strip(),
+        encoding="utf-8",
+    )
+
+    input_data = ScopeDetectionInput(
+        description="Platform migration and integration plan for security hardening.",
+        estimated_timeline_weeks=10,
+        expected_work_items=4,
+        dependency_count=4,
+        integration_surface_count=3,
+        domain_count=2,
+        cross_team_count=2,
+        risk_level="high",
+    )
+
+    default_result = detect_scope(input_data)
+    project_result = detect_scope_for_project(input_data, project_root=tmp_path)
+    assert default_result.total_score != project_result.total_score
+
+
+def test_unknown_scope_detection_config_key_raises_error():
+    with pytest.raises(ValueError, match="Unknown scope_detection config keys"):
+        scope_detection_config_from_mapping({"unknown_key": 123})
