@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Antigravity (`agy`) agent support in CLI and packaging scripts
   - `constitution-template` initialization flow for new projects
 
+### Changed
+
+- **Script type choices now include platform labels**: `sh` → `"POSIX Shell (bash/zsh) [macOS/Linux]"`, `ps` → `"PowerShell [Windows]"` for clarity in interactive prompts (upstream #1379, Angie Byron)
+
 ### Fixed
 
 - **P023 (#80): Fix DEFAULT_CATALOG_URL and catalog.json to point to fork nsalvacao/spec-kit**
