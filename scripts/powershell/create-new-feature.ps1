@@ -268,15 +268,17 @@ if ($hasGit) {
     $branchCreated = $false
     try {
         git checkout -b $branchName 2>&1 | Out-Null
-        $branchCreated = $true
+        if ($LASTEXITCODE -eq 0) {
+            $branchCreated = $true
+        }
     } catch {
-        # Exception during git command
+        # Exception during git command (e.g., git not found)
     }
 
     if (-not $branchCreated) {
         try {
             # Check if branch already exists
-            $existingBranch = git branch --list $branchName 2>$null
+            $existingBranch = git branch --list "$branchName" 2>$null
             if ($existingBranch) {
                 Write-Error "Error: Branch '$branchName' already exists. Please use a different feature name or specify a different number with -Number."
             } else {
