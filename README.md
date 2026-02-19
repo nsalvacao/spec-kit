@@ -387,6 +387,7 @@ Detailed policy:
 | Methodology | `docs/methodology.md` |
 | Walkthrough | `docs/walkthrough.md` |
 | Upgrade guidance | `docs/upgrade.md` |
+| Release process | `docs/release.md` |
 | Distribution | `docs/distribution.md` |
 | Compatibility | `docs/compatibility.md` |
 | Upstream sync | `docs/upstream-sync.md` |

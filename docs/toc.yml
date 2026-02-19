@@ -23,3 +23,5 @@
   items:
     - name: Local Development
       href: local-development.md
+    - name: Release Process
+      href: release.md
