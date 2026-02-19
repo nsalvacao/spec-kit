@@ -166,19 +166,19 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 #### Alternative Installation Methods
 
-**macOS (Homebrew):**
+##### macOS (Homebrew)
 
 ```bash
 brew install uv
 ```
 
-**Linux (snap):**
+##### Linux (snap)
 
 ```bash
 sudo snap install astral-uv --classic
 ```
 
-**With pip:**
+##### With pip
 
 ```bash
 pip install uv
