@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Upstream #1386: `--local-templates` option for `specify init`** - Load templates from a local directory instead of GitHub
+  - New `--local-templates <path>` option bypasses GitHub download for offline/contributor development testing
+  - Searches for `spec-kit-template-<agent>-<script>-*.zip` in the provided directory
+  - Shows available templates when no match is found for easier debugging
+  - `[DEV MODE]` label in output makes local mode clearly visible
+  - Local template ZIP files are preserved after extraction (no cleanup)
+
+### Changed
+
 - **P007 (#15): Phase 0 scaffolding scripts (ideate, select, structure)**
   - New `ideate.sh` / `ideate.ps1`: scaffold `.spec-kit/ideas_backlog.md` with SCAMPER + HMW template (#15)
   - New `select.sh` / `select.ps1`: scaffold `.spec-kit/idea_selection.md` with AI-RICE scoring table (#15)
