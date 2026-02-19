@@ -16,6 +16,7 @@ from .project_config import load_project_config
 
 
 CONTRACT_VERSION = "scope-detection.v1"
+SCORING_RUBRIC_VERSION = "scope-scoring-rubric.v1"
 
 DEFAULT_COMPLEXITY_KEYWORDS = frozenset(
     {
@@ -396,6 +397,123 @@ def detect_scope(
     )
 
 
+def scope_scoring_rubric(*, config: ScopeDetectionConfig | None = None) -> dict[str, Any]:
+    """Return a versioned and machine-readable scoring rubric.
+
+    This rubric is the canonical definition for dimension weights, thresholds,
+    tie-break behavior, and rationale generation rules used by `detect_scope`.
+    """
+    resolved_config = config or ScopeDetectionConfig()
+    resolved_config.validate()
+
+    return {
+        "rubric_version": SCORING_RUBRIC_VERSION,
+        "contract_version": CONTRACT_VERSION,
+        "aggregation_formula": "total_score = min(max_total_score, sum(signal_scores))",
+        "score_bands": _score_band_definitions(resolved_config),
+        "tie_break_rule": {
+            "classification": (
+                "Inclusive upper-bound comparison: score <= feature_max_score => feature; "
+                "feature_max_score < score <= epic_max_score => epic; "
+                "score > epic_max_score => program."
+            ),
+            "boundary_proximity_confidence_rule": {
+                "distance_threshold": resolved_config.confidence_boundary_distance_threshold,
+                "penalty": resolved_config.confidence_boundary_penalty,
+                "description": (
+                    "When a score is within threshold distance from classification boundaries, "
+                    "confidence is reduced while mode selection remains deterministic."
+                ),
+            },
+        },
+        "rationale_rule": {
+            "positive_signal_sorting": "score descending, then signal name ascending",
+            "max_primary_reasons": 3,
+            "min_reasons": 2,
+            "fallback_behavior": (
+                "If fewer than two positive signals exist, append mode-specific fallback rationale "
+                "until at least two reasons are returned."
+            ),
+        },
+        "dimensions": [
+            {
+                "name": "timeline_weeks",
+                "input_field": "estimated_timeline_weeks",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, estimated_timeline_weeks - 1)",
+                "weight": resolved_config.timeline_multiplier,
+                "cap": resolved_config.timeline_cap,
+            },
+            {
+                "name": "expected_work_items",
+                "input_field": "expected_work_items",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, expected_work_items - 1)",
+                "weight": resolved_config.work_items_multiplier,
+                "cap": resolved_config.work_items_cap,
+            },
+            {
+                "name": "dependency_count",
+                "input_field": "dependency_count",
+                "scoring_type": "scaled",
+                "raw_formula": "dependency_count",
+                "weight": resolved_config.dependency_multiplier,
+                "cap": resolved_config.dependency_cap,
+            },
+            {
+                "name": "integration_surface_count",
+                "input_field": "integration_surface_count",
+                "scoring_type": "scaled",
+                "raw_formula": "integration_surface_count",
+                "weight": resolved_config.integration_multiplier,
+                "cap": resolved_config.integration_cap,
+            },
+            {
+                "name": "domain_count",
+                "input_field": "domain_count",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, domain_count - 1)",
+                "weight": resolved_config.domain_multiplier,
+                "cap": resolved_config.domain_cap,
+            },
+            {
+                "name": "cross_team_count",
+                "input_field": "cross_team_count",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, cross_team_count - 1)",
+                "weight": resolved_config.cross_team_multiplier,
+                "cap": resolved_config.cross_team_cap,
+            },
+            {
+                "name": "risk_level",
+                "input_field": "risk_level",
+                "scoring_type": "mapped",
+                "weight_map": {key: resolved_config.risk_weights[key] for key in sorted(resolved_config.risk_weights)},
+            },
+            {
+                "name": "requires_compliance_review",
+                "input_field": "requires_compliance_review",
+                "scoring_type": "boolean",
+                "enabled_score": resolved_config.compliance_score,
+            },
+            {
+                "name": "requires_migration",
+                "input_field": "requires_migration",
+                "scoring_type": "boolean",
+                "enabled_score": resolved_config.migration_score,
+            },
+            {
+                "name": "complexity_keywords",
+                "input_field": "description",
+                "scoring_type": "keyword_count",
+                "keyword_source": sorted(resolved_config.complexity_keywords),
+                "weight": 1,
+                "cap": resolved_config.keyword_cap,
+            },
+        ],
+    }
+
+
 def scope_detection_config_from_mapping(raw_config: Mapping[str, Any] | None) -> ScopeDetectionConfig:
     """Build ScopeDetectionConfig from a generic mapping."""
     if raw_config is None:
@@ -557,3 +675,20 @@ def _compute_confidence(
         confidence -= config.confidence_short_description_penalty
 
     return round(min(config.confidence_max, max(config.confidence_min, confidence)), 2)
+
+
+def _score_band_definitions(config: ScopeDetectionConfig) -> list[dict[str, Any]]:
+    """Return machine-readable score band boundaries."""
+    return [
+        {"mode": ScopeMode.FEATURE.value, "min_score": 0, "max_score": config.feature_max_score},
+        {
+            "mode": ScopeMode.EPIC.value,
+            "min_score": config.feature_max_score + 1,
+            "max_score": config.epic_max_score,
+        },
+        {
+            "mode": ScopeMode.PROGRAM.value,
+            "min_score": config.epic_max_score + 1,
+            "max_score": config.max_total_score,
+        },
+    ]

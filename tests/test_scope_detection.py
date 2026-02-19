@@ -4,12 +4,14 @@ import pytest
 
 from specify_cli.scope_detection import (
     CONTRACT_VERSION,
+    SCORING_RUBRIC_VERSION,
     ScopeDetectionConfig,
     ScopeDetectionInput,
     ScopeMode,
     detect_scope_for_project,
     detect_scope,
     load_scope_detection_config,
+    scope_scoring_rubric,
     scope_detection_config_from_mapping,
 )
 
@@ -343,3 +345,52 @@ scope_detection:
 def test_unknown_scope_detection_config_key_raises_error():
     with pytest.raises(ValueError, match="Unknown scope_detection config keys"):
         scope_detection_config_from_mapping({"unknown_key": 123})
+
+
+def test_scope_scoring_rubric_has_expected_defaults():
+    rubric = scope_scoring_rubric()
+
+    assert rubric["rubric_version"] == SCORING_RUBRIC_VERSION
+    assert rubric["contract_version"] == CONTRACT_VERSION
+    assert rubric["aggregation_formula"] == "total_score = min(max_total_score, sum(signal_scores))"
+    assert rubric["score_bands"] == [
+        {"mode": "feature", "min_score": 0, "max_score": 34},
+        {"mode": "epic", "min_score": 35, "max_score": 64},
+        {"mode": "program", "min_score": 65, "max_score": 100},
+    ]
+    assert rubric["rationale_rule"]["min_reasons"] == 2
+    assert rubric["rationale_rule"]["max_primary_reasons"] == 3
+
+
+def test_scope_scoring_rubric_respects_custom_config():
+    rubric = scope_scoring_rubric(
+        config=ScopeDetectionConfig(
+            feature_max_score=20,
+            epic_max_score=50,
+            max_total_score=80,
+            work_items_multiplier=2,
+            keyword_cap=5,
+            risk_weights={"low": 1, "medium": 4, "high": 8, "critical": 12},
+            complexity_keywords=frozenset({"platform", "cutover"}),
+        )
+    )
+
+    assert rubric["score_bands"] == [
+        {"mode": "feature", "min_score": 0, "max_score": 20},
+        {"mode": "epic", "min_score": 21, "max_score": 50},
+        {"mode": "program", "min_score": 51, "max_score": 80},
+    ]
+
+    by_name = {dimension["name"]: dimension for dimension in rubric["dimensions"]}
+    assert by_name["expected_work_items"]["weight"] == 2
+    assert by_name["complexity_keywords"]["cap"] == 5
+    assert by_name["risk_level"]["weight_map"] == {"critical": 12, "high": 8, "low": 1, "medium": 4}
+    assert by_name["complexity_keywords"]["keyword_source"] == ["cutover", "platform"]
+
+
+def test_scope_scoring_rubric_dimensions_match_signal_contract():
+    result = detect_scope(ScopeDetectionInput(description="Simple task."))
+    signal_names = {signal.name for signal in result.signals}
+    rubric_dimension_names = {dimension["name"] for dimension in scope_scoring_rubric()["dimensions"]}
+
+    assert rubric_dimension_names == signal_names

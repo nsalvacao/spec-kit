@@ -380,6 +380,7 @@ Detailed policy:
 | Getting started | `docs/quickstart.md` |
 | Installation | `docs/installation.md` |
 | Configuration | `docs/configuration.md` |
+| Scope scoring rubric | `docs/scope-scoring-rubric.md` |
 | CLI reference | `docs/cli.md` |
 | Agent support | `docs/agents.md` |
 | Methodology | `docs/methodology.md` |

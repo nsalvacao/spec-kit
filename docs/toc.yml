@@ -11,6 +11,8 @@
       href: quickstart.md
     - name: Configuration
       href: configuration.md
+    - name: Scope Scoring Rubric
+      href: scope-scoring-rubric.md
     - name: Upgrade
       href: upgrade.md
 

@@ -9,6 +9,8 @@ detection engine introduced for issue `#101`.
   before decomposition/task generation.
 - Config object: `ScopeDetectionConfig` (all weights/caps/keywords are
   centralized and overridable; not scattered as hardcoded magic numbers).
+- Canonical rubric specification: `docs/scope-scoring-rubric.md`
+  (`scope-scoring-rubric.v1`).
 - Project config source: `.specify/spec-kit.yml` plus optional
   `.specify/spec-kit.local.yml` and `SPECIFY_CONFIG__...` env overrides.
 - Global configuration rules and precedence: `docs/configuration.md`.
@@ -101,6 +103,9 @@ Each signal is emitted in the output `signals` array with:
 - `weight`
 - `score`
 - `rationale`
+
+For the canonical dimension table (weights, formulas, tie-break rules, and
+rationale template), see `docs/scope-scoring-rubric.md`.
 
 ## Output Contract
 
