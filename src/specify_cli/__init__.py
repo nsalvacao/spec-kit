@@ -952,6 +952,21 @@ def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = 
             for f in failures:
                 console.print(f"  - {f}")
 
+
+def detect_existing_specify_state(specify_dir: Path) -> tuple[bool, bool]:
+    """Return `(has_existing_project, is_symlink)` for `.specify` detection."""
+    if not specify_dir.exists():
+        return False, False
+    if specify_dir.is_symlink():
+        return True, True
+    if not specify_dir.is_dir():
+        return False, False
+    try:
+        return any(specify_dir.iterdir()), False
+    except OSError:
+        # Fail-safe: unreadable directories are treated as existing projects.
+        return True, False
+
 @app.command()
 def init(
     project_name: str = typer.Argument(None, help="Name for your new project directory (optional if using --here, or use '.' for current directory)"),
@@ -1103,15 +1118,36 @@ def init(
 
     # Smart detection: Check if .specify/ exists with content
     specify_dir = project_path / ".specify"
-    has_existing_project = False
+    has_existing_project, is_symlink_specify = detect_existing_specify_state(specify_dir)
     preserve_specify = False
 
-    if specify_dir.exists() and specify_dir.is_dir():
-        # Check if .specify/ has actual content (not just empty directory)
-        specify_contents = list(specify_dir.rglob('*'))
-        if specify_contents:
-            has_existing_project = True
+    if has_existing_project:
+        # Never recurse into symlinked .specify directories.
+        if is_symlink_specify:
+            if force:
+                console.print()
+                console.print(Panel(
+                    "[red]Refusing to overwrite a symlinked .specify directory with --force.[/red]\n\n"
+                    "This protects against writing outside the current project path.\n"
+                    "Remove/replace the symlink and run init again.",
+                    title="[red]Unsafe .specify Symlink[/red]",
+                    border_style="red",
+                    padding=(1, 2)
+                ))
+                raise typer.Exit(1)
 
+            console.print()
+            console.print(Panel(
+                "[yellow]Detected symlinked .specify/ directory[/yellow]\n\n"
+                "For safety, existing .specify content will be preserved.\n"
+                "Only new agent-specific directories will be added.",
+                title="[cyan]Adding Agent to Existing Project[/cyan]",
+                border_style="cyan",
+                padding=(1, 2)
+            ))
+            preserve_specify = True
+
+        else:
             if force:
                 # User explicitly wants to reinitialize (overwrite)
                 console.print()
@@ -1421,4 +1457,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

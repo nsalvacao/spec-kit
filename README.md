@@ -184,7 +184,7 @@ The `specify` command supports the following options:
 | `--ignore-agent-tools` | Flag     | Skip checks for AI agent tools like Claude Code                                                                                                                                              |
 | `--no-git`             | Flag     | Skip git repository initialization                                                                                                                                                           |
 | `--here`               | Flag     | Initialize project in the current directory instead of creating a new one                                                                                                                    |
-| `--force`              | Flag     | Force merge/overwrite when initializing in current directory (skip confirmation)                                                                                                             |
+| `--force`              | Flag     | Force reinitialization and overwrite existing `.specify/` content (use with caution)                                                                                                         |
 | `--skip-tls`           | Flag     | Skip SSL/TLS verification (not recommended)                                                                                                                                                  |
 | `--debug`              | Flag     | Enable detailed debug output for troubleshooting                                                                                                                                             |
 | `--github-token`       | Option   | GitHub token for API requests (or set GH_TOKEN/GITHUB_TOKEN env variable)                                                                                                                    |
@@ -232,7 +232,7 @@ specify init . --ai copilot
 # or use the --here flag
 specify init --here --ai copilot
 
-# Force merge into current (non-empty) directory without confirmation
+# Force reinitialize and overwrite existing .specify content
 specify init . --force --ai copilot
 # or
 specify init --here --force --ai copilot
