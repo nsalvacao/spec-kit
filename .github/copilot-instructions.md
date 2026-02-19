@@ -172,7 +172,7 @@ Write **minimal** code to pass the tests:
 
 ```bash
 uv run pytest tests/ --tb=short          # Full test suite
-npx markdownlint-cli2 "**/*.md"          # Markdown lint
+git ls-files -z '*.md' ':!:extensions/**' | xargs -0 npx markdownlint-cli2
 uv run specify check                     # CLI self-check
 ```
 
@@ -296,7 +296,7 @@ When creating a new release tag manually: `git tag v0.0.31 && git push origin v0
 - Run linting to ensure Markdown files follow standards:
 
   ```bash
-  npx markdownlint-cli2 "**/*.md"
+  git ls-files -z '*.md' ':!:extensions/**' | xargs -0 npx markdownlint-cli2
   ```
 
 - Ensure all changes follow the project's coding conventions
@@ -309,7 +309,7 @@ When creating a new release tag manually: `git tag v0.0.31 && git push origin v0
 - **Run CLI**: `uv run specify --help`
 - **Test locally**: `uv run specify init test-project --ai <agent-name>`
 - **Create release packages**: `./.github/workflows/scripts/create-release-packages.sh v1.0.0`
-- **Lint Markdown**: `npx markdownlint-cli2 "**/*.md"`
+- **Lint Markdown (tracked files, CI-aligned)**: `git ls-files -z '*.md' ':!:extensions/**' | xargs -0 npx markdownlint-cli2`
 
 ### Testing Changes Locally
 
@@ -584,49 +584,39 @@ At the beginning of every work session:
 | `advanced-evaluation` skill | ✅ Installed | `~/.copilot/skills/advanced-evaluation/` |
 | `dev_loop` config in constitution | ❌ Planned | see `.ideas/integrated-pipeline.md §10` |
 
-## Current Work State
+## Intake Preflight (Authoritative State)
 
-> Last updated: 2026-02 | Version: v0.0.31 | Tests: 339 pytest
-
-### Branch State
-
-- **`main`**: Clean, source of truth. All feature work merged.
-- **`baseline/main-sync-2026-02-17`**: Reset to == main (b89a8ce). Exists as staging buffer for intake PRs.
-- **All feature branches**: Deleted after merge/close audit. Only `feat/28-backlinks-selection-to-ideas` kept pending investigation (PR #97 was closed without merge).
-
-### Next Action: Process Intake PRs in Order
-
-14 open upstream intake PRs to process. Each becomes a `feat/<n>-<slug>` branch from `main`:
-
-| Priority | PR | What |
-|----------|----|------|
-| 🔴 1 | #59 | clarify.md: fix "10 questions" → "5" (BUG in main) |
-| 🔴 2 | #55 | create-new-feature.sh: prefix uniqueness validation |
-| 🔴 3 | #61 | create-new-feature.sh: whitespace trim + checkout error |
-| 🟡 4 | #67 | GitHub Actions: checkout@v4 → @v6 |
-| 🟡 5 | #63 | Template headers: blank line fixes (markdownlint) |
-| 🟡 6 | #56 | plan-template: agent-agnostic path note |
-| 🟡 7 | #60 | implement.md: C ignore patterns fix |
-| 🟢 8 | #64 | README: "What is uv?" section |
-| 🟢 9 | #65 | Script type choices: platform labels |
-| 🟢 10 | #68 | Antigravity link + agy example |
-| 🔵 11 | #70 | feat: --local-templates option |
-| 🔵 12 | #71 | feat: --keep-memory flag |
-| 🔵 13 | #72 | feat: smart .specify/ detection |
-| 🔵 14 | #73 | feat: /speckit.amend command template |
-
-After intake PRs: tackle open issues by phase order (#16, #18, #33–#35, #38–#39, #42, #44, #47, then #101+).
-
-### Intake PR Workflow Reminder
+Do not trust hardcoded SHAs, versions, or PR counts in notes. At the start of each intake session, run:
 
 ```bash
-# For each intake PR (e.g., PR #59):
-git checkout main
-git checkout -b feat/59-clarify-question-limit
-# Apply the change (manually or cherry-pick from intake branch)
-# Run tests + lint
-# git commit -m "fix(clarify): correct question limit 10→5 (closes #59)"
-# gh pr create --base main --title "fix(clarify): correct question limit 10→5"
+git fetch origin upstream --prune
+git rev-parse --short origin/main
+gh pr list -R nsalvacao/spec-kit --state open --json number,title,headRefName,baseRefName,url
 ```
 
-**Never merge intake branches directly into main.** Always via PR + CI + AI review.
+Use these live results as source of truth for branch/PR planning.
+
+## Intake Lane Policy (Single Flow per Batch)
+
+For selective upstream intake in this fork, use the baseline lane defined in `AGENTS.md`:
+
+- Work branches: `intake/lote-<A|B|C>-pr-<upstream_pr_number>`
+- Review PRs: `intake/... -> baseline/main-sync-YYYY-MM-DD`
+- Promotion PR after batch: `baseline/main-sync-YYYY-MM-DD -> main`
+
+Do not mix intake and feature flows in the same batch (for example `feat/* -> main` for one intake PR and `intake/* -> baseline/*` for another), unless explicitly requested by repository owner.
+
+## Intake PR Workflow Reminder
+
+```bash
+# Per upstream PR (baseline lane)
+git fetch origin upstream --prune
+git checkout baseline/main-sync-YYYY-MM-DD
+git pull --ff-only origin baseline/main-sync-YYYY-MM-DD
+git checkout intake/lote-<A|B|C>-pr-<upstream_pr_number>
+# Apply intake change (prefer: git cherry-pick -x <upstream-sha>)
+# Run tests + lint
+# Push intake branch and wait for AI review + human approval
+```
+
+Never merge intake branches directly into `main`.
