@@ -35,10 +35,10 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
       REVIEW_MODEL: "openai/gpt-4.1"
-      MAX_REVIEW_CHARS: "8000"
-      MAX_REVIEW_TOKENS: "1500"
-      MAX_RETRY: "3"
-      MAX_RETRY_SLEEP: "30"
+      MAX_REVIEW_CHARS: "20000"
+      MAX_REVIEW_TOKENS: "2000"
+      MAX_RETRY: "5"
+      MAX_RETRY_SLEEP: "60"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -117,8 +117,15 @@ jobs:
 
             echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
             if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-              RAW_SLEEP=$((2 ** ATTEMPT))
-              SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
+              RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
+              if [ -n "$RETRY_AFTER" ]; then
+                SLEEP="$RETRY_AFTER"
+              else
+                RAW_SLEEP=$((2 ** ATTEMPT))
+                SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
+              fi
+              JITTER=$((RANDOM % 5))
+              SLEEP=$((SLEEP + JITTER))
               echo "Retrying in ${SLEEP}s..."
               sleep "$SLEEP"
             fi
@@ -173,10 +180,10 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
       SUMMARY_MODEL: "openai/gpt-4.1-mini"
-      MAX_SUMMARY_CHARS: "6000"
-      MAX_SUMMARY_TOKENS: "800"
-      MAX_RETRY: "3"
-      MAX_RETRY_SLEEP: "30"
+      MAX_SUMMARY_CHARS: "12000"
+      MAX_SUMMARY_TOKENS: "1000"
+      MAX_RETRY: "5"
+      MAX_RETRY_SLEEP: "60"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -246,8 +253,15 @@ jobs:
 
             echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
             if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-              RAW_SLEEP=$((2 ** ATTEMPT))
-              SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
+              RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
+              if [ -n "$RETRY_AFTER" ]; then
+                SLEEP="$RETRY_AFTER"
+              else
+                RAW_SLEEP=$((2 ** ATTEMPT))
+                SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
+              fi
+              JITTER=$((RANDOM % 5))
+              SLEEP=$((SLEEP + JITTER))
               echo "Retrying in ${SLEEP}s..."
               sleep "$SLEEP"
             fi
