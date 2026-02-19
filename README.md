@@ -131,7 +131,7 @@ Purpose:
 | `q` | Amazon Q Developer CLI | CLI | `.amazonq/` |
 | `amp` | Amp | CLI | `.agents/` |
 | `shai` | SHAI | CLI | `.shai/` |
-| `agy` | Antigravity | IDE | `.agent/` |
+| `agy` | [Antigravity](https://antigravity.google/) | IDE | `.agent/` |
 | `bob` | IBM Bob | IDE | `.bob/` |
 
 For per-agent details and install links, see `docs/agents.md` and the live `AGENT_CONFIG` in `src/specify_cli/__init__.py`.
@@ -239,6 +239,12 @@ Use current directory mode if needed:
 
 ```bash
 specify init . --ai claude --script sh
+```
+
+Initialize with Antigravity support:
+
+```bash
+specify init my-project --ai agy
 ```
 
 ### 2) Run Phase 0 in your agent chat
