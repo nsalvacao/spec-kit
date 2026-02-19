@@ -860,7 +860,7 @@ def load_template_from_local(ai_assistant: str, local_dir: Path, *, script_type:
         raise typer.Exit(1)
 
     pattern = f"spec-kit-template-{ai_assistant}-{script_type}-*.zip"
-    matches = list(local_dir.glob(pattern))
+    matches = sorted(local_dir.glob(pattern))
 
     if not matches:
         console.print(f"[red]No local template found[/red] matching pattern: [bold]{pattern}[/bold]")
@@ -874,8 +874,8 @@ def load_template_from_local(ai_assistant: str, local_dir: Path, *, script_type:
             ))
         raise typer.Exit(1)
 
-    # Use first match - typically only one version exists per agent/script combo
-    zip_path = matches[0]
+    # Use the last match after sorting — typically the latest version
+    zip_path = matches[-1]
     file_stat = zip_path.stat()
 
     if verbose:
