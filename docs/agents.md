@@ -28,3 +28,7 @@ After `specify init`, slash commands are generated for the agent you select. Use
 
 - CLI-based agents are validated during `specify init` unless you pass `--ignore-agent-tools`.
 - IDE-based agents do not require a CLI tool check.
+- Scope gate consumption: agents or scripts that surface scope decisions must follow
+  `docs/scope-gate-consumption-contract.md` (`scope-gate-consumption.v1`) for stable fields
+  such as `mode_recommendation`, `user_choice`, `override_flag`, `next_action`, and
+  `handoff_owner`.

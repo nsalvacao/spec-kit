@@ -70,6 +70,9 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Independent test criteria for each story
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
+   - If a scope gate decision payload exists (see `docs/scope-gate-consumption-contract.md`):
+     surface `mode_recommendation`, `user_choice`, `override_flag`, `next_action`,
+     and `handoff_owner` in the summary.
 
 Context for task generation: {ARGS}
 
