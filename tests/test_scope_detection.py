@@ -439,3 +439,22 @@ def test_validate_scope_scoring_rubric_payload_allows_different_band_count_for_f
     payload["score_bands"] = payload["score_bands"] + [{"mode": "experimental", "min_score": 101, "max_score": 120}]
 
     validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_invalid_score_band_shape():
+    payload = scope_scoring_rubric()
+    payload["score_bands"][0] = {"mode": "feature", "min_score": 0}
+
+    with pytest.raises(ValueError, match="must include mode, min_score, and max_score"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_duplicate_dimension_names():
+    payload = scope_scoring_rubric()
+    payload["dimensions"] = [
+        {"name": "dimension_a"},
+        {"name": "dimension_a"},
+    ]
+
+    with pytest.raises(ValueError, match="Dimension names must be unique"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)

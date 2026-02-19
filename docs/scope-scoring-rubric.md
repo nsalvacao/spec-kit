@@ -31,6 +31,8 @@ Default values below come from `ScopeDetectionConfig`.
 | `requires_migration` | `requires_migration` | boolean gate | `migration_score = 9` when true, else `0` | N/A |
 | `complexity_keywords` | `description` | matched keyword count | `1 point / keyword` | `keyword_cap = 12` |
 
+Note: machine-readable `keyword_source` is sorted for deterministic output.
+
 ## Aggregation Formula
 
 Score aggregation is deterministic:

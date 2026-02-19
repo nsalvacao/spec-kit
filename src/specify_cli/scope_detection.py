@@ -537,8 +537,9 @@ def validate_scope_scoring_rubric_payload(
     """Validate rubric payload structure for downstream consumers.
 
     This helper allows explicit schema validation for channels that consume the
-    machine-readable rubric. In strict mode, unknown top-level keys are
-    rejected to avoid silent contract drift.
+    machine-readable rubric. Any mapping type is supported (e.g., dict-like
+    objects). In strict mode, unknown top-level keys are rejected to avoid
+    silent contract drift.
     """
     if not isinstance(payload, Mapping):
         raise TypeError("rubric payload must be a mapping")
@@ -558,10 +559,34 @@ def validate_scope_scoring_rubric_payload(
         raise ValueError("Rubric payload score_bands must be a non-empty list")
     if payload.get("rubric_version") == SCORING_RUBRIC_VERSION and len(score_bands) != 3:
         raise ValueError("Rubric payload score_bands must include exactly 3 entries for v1")
+    for band in score_bands:
+        if not isinstance(band, Mapping):
+            raise ValueError("Each score band must be a mapping")
+        if {"mode", "min_score", "max_score"} - set(band.keys()):
+            raise ValueError("Each score band must include mode, min_score, and max_score")
+        if not isinstance(band["mode"], str):
+            raise ValueError("Score band mode must be a string")
+        if isinstance(band["min_score"], bool) or not isinstance(band["min_score"], int):
+            raise ValueError("Score band min_score must be an integer")
+        if isinstance(band["max_score"], bool) or not isinstance(band["max_score"], int):
+            raise ValueError("Score band max_score must be an integer")
+        if band["min_score"] > band["max_score"]:
+            raise ValueError("Score band min_score cannot be greater than max_score")
 
     dimensions = payload.get("dimensions")
     if not isinstance(dimensions, list) or not dimensions:
         raise ValueError("Rubric payload dimensions must be a non-empty list")
+    dimension_names: list[str] = []
+    for dimension in dimensions:
+        if not isinstance(dimension, Mapping):
+            raise ValueError("Each dimension entry must be a mapping")
+        if "name" not in dimension:
+            raise ValueError("Each dimension entry must include a name")
+        if not isinstance(dimension["name"], str) or not dimension["name"].strip():
+            raise ValueError("Dimension name must be a non-empty string")
+        dimension_names.append(dimension["name"].strip())
+    if len(set(dimension_names)) != len(dimension_names):
+        raise ValueError("Dimension names must be unique")
 
 
 def scope_detection_config_from_mapping(raw_config: Mapping[str, Any] | None) -> ScopeDetectionConfig:

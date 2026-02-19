@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added machine-readable rubric export: `scope_scoring_rubric()` in `src/specify_cli/scope_detection.py`
   - Added rubric payload schema validator: `validate_scope_scoring_rubric_payload(...)`
   - Added version-aware score band validation (`v1` enforces exactly 3 bands)
+  - Added deeper rubric shape checks (score band item fields/types, unique dimension names)
   - Formalized deterministic tie-break and rationale-template rules for multi-channel consistency
   - Added rubric conformance tests in `tests/test_scope_detection.py`
 
