@@ -106,4 +106,5 @@ Use this API to avoid duplicating hardcoded rubric values in downstream tooling.
   - `dimensions`
 - Downstream consumers can validate payloads with
   `validate_scope_scoring_rubric_payload(...)`.
+- For `scope-scoring-rubric.v1`, exactly 3 score bands are required.
 - Any breaking shape changes require a rubric version bump.

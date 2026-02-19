@@ -554,8 +554,10 @@ def validate_scope_scoring_rubric_payload(
             raise ValueError(f"Rubric payload contains unknown keys: {', '.join(unknown_keys)}")
 
     score_bands = payload.get("score_bands")
-    if not isinstance(score_bands, list) or len(score_bands) != 3:
-        raise ValueError("Rubric payload score_bands must be a list with 3 entries")
+    if not isinstance(score_bands, list) or not score_bands:
+        raise ValueError("Rubric payload score_bands must be a non-empty list")
+    if payload.get("rubric_version") == SCORING_RUBRIC_VERSION and len(score_bands) != 3:
+        raise ValueError("Rubric payload score_bands must include exactly 3 entries for v1")
 
     dimensions = payload.get("dimensions")
     if not isinstance(dimensions, list) or not dimensions:

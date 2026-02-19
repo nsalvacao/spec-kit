@@ -420,4 +420,22 @@ def test_validate_scope_scoring_rubric_payload_allows_unknown_keys_in_non_strict
     payload = scope_scoring_rubric()
     payload["future_extension"] = {"foo": "bar"}
 
-    validate_scope_scoring_rubric_payload(payload, strict=False)
+    result = validate_scope_scoring_rubric_payload(payload, strict=False)
+    assert result is None
+    assert "future_extension" in payload
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_wrong_band_count_for_v1():
+    payload = scope_scoring_rubric()
+    payload["score_bands"] = payload["score_bands"] + [{"mode": "experimental", "min_score": 101, "max_score": 120}]
+
+    with pytest.raises(ValueError, match="exactly 3 entries for v1"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_allows_different_band_count_for_future_version():
+    payload = scope_scoring_rubric()
+    payload["rubric_version"] = "scope-scoring-rubric.v2"
+    payload["score_bands"] = payload["score_bands"] + [{"mode": "experimental", "min_score": 101, "max_score": 120}]
+
+    validate_scope_scoring_rubric_payload(payload, strict=True)
