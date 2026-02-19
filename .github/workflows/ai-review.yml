@@ -3,13 +3,15 @@
 # Uses GitHub Models free tier — ZERO premium requests consumed
 #
 # Configurable via env block at the top of each job:
-#   REVIEW_MODEL         — primary model for code review       (#77)
-#   REVIEW_FALLBACK_MODEL— fallback model if primary 429s      (#77)
-#   SUMMARY_MODEL        — primary model for PR summary        (#77)
-#   SUMMARY_FALLBACK_MODEL— fallback model if primary 429s     (#77)
-#   MAX_REVIEW_CHARS     — max diff chars for review           (#76)
-#   MAX_SUMMARY_CHARS    — max diff chars for summary          (#76)
-#   MAX_RETRY            — retry attempts per model            (#77)
+#   REVIEW_MODEL           — primary model for code review         (#77)
+#   REVIEW_FALLBACK_MODEL  — fallback model if primary 429s        (#77)
+#   REVIEW_FALLBACK_MODEL_2— 2nd fallback (higher rate limits)     (#77)
+#   SUMMARY_MODEL          — primary model for PR summary          (#77)
+#   SUMMARY_FALLBACK_MODEL — fallback model if primary 429s        (#77)
+#   SUMMARY_FALLBACK_MODEL_2— 2nd fallback (higher rate limits)    (#77)
+#   MAX_REVIEW_CHARS       — max diff chars for review             (#76)
+#   MAX_SUMMARY_CHARS      — max diff chars for summary            (#76)
+#   MAX_RETRY              — retry attempts per model              (#77)
 # =============================================================================
 name: AI Review
 
@@ -38,7 +40,8 @@ jobs:
     env:
       REVIEW_MODEL: "openai/gpt-4.1"
       REVIEW_FALLBACK_MODEL: "openai/gpt-4o"
-      MAX_REVIEW_CHARS: "20000"
+      REVIEW_FALLBACK_MODEL_2: "meta/llama-3.3-70b-instruct"
+      MAX_REVIEW_CHARS: "40000"
       MAX_REVIEW_TOKENS: "2000"
       MAX_RETRY: "5"
       MAX_RETRY_SLEEP: "60"
@@ -85,8 +88,8 @@ jobs:
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
           DIFF_CONTENT=$(cat diff.txt)
 
-          # Model fallback chain: primary → fallback on rate-limit exhaustion (#77)
-          MODELS=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
+          # Model fallback chain: primary → fallback → high-rate-limit fallback (#77)
+          MODELS=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL" "$REVIEW_FALLBACK_MODEL_2")
           HTTP_CODE=""
           BODY=""
           USED_MODEL=""
@@ -197,6 +200,7 @@ jobs:
     env:
       SUMMARY_MODEL: "openai/gpt-4.1-mini"
       SUMMARY_FALLBACK_MODEL: "openai/gpt-4o-mini"
+      SUMMARY_FALLBACK_MODEL_2: "meta/llama-3.3-70b-instruct"
       MAX_SUMMARY_CHARS: "12000"
       MAX_SUMMARY_TOKENS: "1000"
       MAX_RETRY: "5"
@@ -235,8 +239,8 @@ jobs:
           FILES=$(cat files.txt)
           DIFF=$(cat diff.txt)
 
-          # Model fallback chain: primary → fallback on rate-limit exhaustion (#77)
-          MODELS=("$SUMMARY_MODEL" "$SUMMARY_FALLBACK_MODEL")
+          # Model fallback chain: primary → fallback → high-rate-limit fallback (#77)
+          MODELS=("$SUMMARY_MODEL" "$SUMMARY_FALLBACK_MODEL" "$SUMMARY_FALLBACK_MODEL_2")
           HTTP_CODE=""
           BODY=""
           USED_MODEL=""
