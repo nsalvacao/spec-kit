@@ -13,6 +13,8 @@
       href: configuration.md
     - name: Scope Scoring Rubric
       href: scope-scoring-rubric.md
+    - name: Scope Gate Contract
+      href: scope-gate-consumption-contract.md
     - name: Upgrade
       href: upgrade.md
 
@@ -21,3 +23,5 @@
   items:
     - name: Local Development
       href: local-development.md
+    - name: Release Process
+      href: release.md

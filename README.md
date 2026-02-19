@@ -381,11 +381,13 @@ Detailed policy:
 | Installation | `docs/installation.md` |
 | Configuration | `docs/configuration.md` |
 | Scope scoring rubric | `docs/scope-scoring-rubric.md` |
+| Scope gate contract | `docs/scope-gate-consumption-contract.md` |
 | CLI reference | `docs/cli.md` |
 | Agent support | `docs/agents.md` |
 | Methodology | `docs/methodology.md` |
 | Walkthrough | `docs/walkthrough.md` |
 | Upgrade guidance | `docs/upgrade.md` |
+| Release process | `docs/release.md` |
 | Distribution | `docs/distribution.md` |
 | Compatibility | `docs/compatibility.md` |
 | Upstream sync | `docs/upstream-sync.md` |

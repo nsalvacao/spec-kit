@@ -147,3 +147,6 @@ The contract guarantees at least:
 
 Additional fields (`contract_version`, `total_score`, `score_band`) are included
 to support observability and future compatibility checks.
+
+For the stable gate-consumption envelope used by CLI/TTY/API orchestrators, see
+`docs/scope-gate-consumption-contract.md` (`scope-gate-consumption.v1`).

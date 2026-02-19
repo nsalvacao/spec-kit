@@ -11,142 +11,161 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Upstream #1386: `--local-templates` option for `specify init`** - Load templates from a local directory instead of GitHub
-  - New `--local-templates <path>` option bypasses GitHub download for offline/contributor development testing
-  - Searches for `spec-kit-template-<agent>-<script>-*.zip` in the provided directory
-  - Shows available templates when no match is found for easier debugging
-  - `[DEV MODE]` label in output makes local mode clearly visible
-  - Local template ZIP files are preserved after extraction (no cleanup)
-- **Upstream #1480: `--keep-memory` option for `specify init`** - Preserve existing `.specify/memory/constitution.md` when switching AI agents
-  - New `--keep-memory` flag prevents overwriting existing constitution during template merge
-  - Example: `specify init . --ai gemini --keep-memory`
-- **#101: Adaptive Scope Detection Engine (`feature` / `epic` / `program`)**
-  - Added deterministic scope scoring module: `src/specify_cli/scope_detection.py`
-  - Implemented score bands `0-34`, `35-64`, `65+` with stable mode recommendation
-  - Added centralized project config loader: `src/specify_cli/project_config.py`
-  - Introduced canonical config files:
-    - `.specify/spec-kit.yml` (shared)
-    - `.specify/spec-kit.local.yml` (local override, gitignored)
-  - `specify init` now bootstraps `.specify/spec-kit.yml` from template when missing
-  - Centralized scoring weights, caps, boundaries, and keyword set in configurable `ScopeDetectionConfig`
-  - Added versioned output contract payload with:
-    - `mode_recommendation`
-    - `recommendation_reasons`
-    - `confidence`
-    - `signals`
-  - Improved keyword matching to avoid substring false positives
-  - Added contract documentation: `docs/adaptive-scope-detection-contract.md`
-  - Added unit tests for simple/intermediate/large scenarios and boundary regression (`34/35/64/65`)
-- **#102: Scope scoring rubric specification (`scope-scoring-rubric.v1`)**
-  - Added canonical rubric documentation: `docs/scope-scoring-rubric.md`
-  - Added machine-readable rubric export: `scope_scoring_rubric()` in `src/specify_cli/scope_detection.py`
-  - Added rubric payload schema validator: `validate_scope_scoring_rubric_payload(...)`
-  - Added version-aware score band validation (`v1` enforces exactly 3 bands)
-  - Added deeper rubric shape checks (score band item fields/types, unique dimension names)
-  - Formalized deterministic tie-break and rationale-template rules for multi-channel consistency
-  - Added rubric conformance tests in `tests/test_scope_detection.py`
+- **#105: Stable gate consumption contract for CLI/TTY/API (`scope-gate-consumption.v1`)**
+  - Added channel-agnostic contract module: `src/specify_cli/scope_gate_contract.py`
+  - Added typed payload builders/normalizers:
+    - `build_scope_gate_payload(...)`
+    - `normalize_scope_gate_payload(...)`
+    - `validate_scope_gate_payload(...)`
+  - Added explicit error codes, strict validation mode, and deterministic fallback rules
+  - Added contract documentation: `docs/scope-gate-consumption-contract.md`
+  - Added contract test suite: `tests/test_scope_gate_contract.py`
+
+## [0.0.48] - 2026-02-19
+
+### Added
+
+- **Upstream #1386**: `--local-templates` option for local template consumption.
+- **Upstream #1480**: `--keep-memory` flag for preserving constitution during agent switches.
+- **#101**: adaptive scope detection engine with deterministic scoring and structured output.
+- **#102**: canonical scope scoring rubric (`scope-scoring-rubric.v1`) and schema validation helpers.
 
 ### Changed
 
-- **P007 (#15): Phase 0 scaffolding scripts (ideate, select, structure)**
-  - New `ideate.sh` / `ideate.ps1`: scaffold `.spec-kit/ideas_backlog.md` with SCAMPER + HMW template (#15)
-  - New `select.sh` / `select.ps1`: scaffold `.spec-kit/idea_selection.md` with AI-RICE scoring table (#15)
-  - New `structure.sh` / `structure.ps1`: scaffold `.spec-kit/ai_vision_canvas.md` with 18-section canvas (#15)
-  - All three scripts substitute `[PROJECT_NAME]` and `[ISO_8601_TIMESTAMP]` placeholders automatically (#15)
-  - Idempotent: exit non-zero if artifact already exists; `--force` / `-Force` flag allows overwrite (#15)
-  - `--help` / `-Help` prints usage with prerequisites and next-step guidance (#15)
-  - 30 new pytest tests covering creation, idempotency, force, help, timestamp substitution, project name (#15)
+- Release-level updates and process/docs fixes published in this window.
+- Full commit list and artifacts: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.48`
 
-- **P025 (#88): Self-update check and upgrade command for specify CLI**
-  - New `specify update` command: checks for newer release, shows version diff, prompts to upgrade (#88)
-  - `specify update --check`: scriptable flag — exits 0 if up-to-date, 1 if update available (#88)
-  - `specify update --no-upgrade`: show update info without prompting to run upgrade (#88)
-  - Passive notification at end of `specify check` when a newer version is cached (#88)
-  - 24-hour cache (`platformdirs.user_data_dir("specify-cli") / "update_cache.json"`) avoids repeated API calls (#88)
-  - Passive check respects `CI=true` and `SPECIFY_NO_UPDATE_CHECK=1` env vars; explicit `specify update` always proceeds (#88)
-  - Upgrade command shown for both `uv` (primary) and `pip` (fallback) users (#88)
-  - Network failures silently ignored — never crash main commands (#88)
-
-  - Configurable model IDs via `env:` block (`REVIEW_MODEL`, `SUMMARY_MODEL`) — no hardcoded model strings (#77)
-  - Configurable token limits via `env:` block (`MAX_REVIEW_TOKENS: 1500`, `MAX_SUMMARY_TOKENS: 800`) (#77)
-  - Retry loop with exponential backoff (up to `MAX_RETRY` attempts, capped at `MAX_RETRY_SLEEP` seconds per sleep, default 30s) for both jobs (#77)
-  - Non-empty / markdown-structure validation of model output with warning instead of hard failure (#77)
-  - `::add-mask::` applied to `GH_MODELS_TOKEN` at step start to prevent accidental log exposure (#77)
-  - Configurable `MAX_REVIEW_CHARS` (default 8000) and `MAX_SUMMARY_CHARS` (default 6000) via `env:` block (#76)
-  - `truncated_at` output exposed — footer now shows exact truncation point and full diff size (#76)
-  - `skip-ai-review` label support — add label to any PR to suppress both jobs (#76)
-  - Model name shown dynamically in review/summary footer comments (#77)
-
-- **P022 (#11, #12): Phase 0 + Strategy Toolkit integration in constitution template and SDD agent docs**
-  - `templates/constitution-template.md`: Added `PHASE 0 INTEGRATION CHECK` comment block guiding derivation of principles from `.spec-kit/` (Phase 0) and `.ideas/` (Strategy Toolkit) artifacts
-  - `.github/agents/speckit.constitution.agent.md`: Step 2 now discovers Phase 0 artifacts (`.spec-kit/`) and Strategy Toolkit artifacts (`.ideas/`) before falling back to README; added Execution Model clarification ("You are the executor")
-  - `.github/agents/speckit.specify.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
-  - `.github/agents/speckit.plan.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
-  - `.github/agents/speckit.tasks.agent.md`: Phase 0 context block referencing `.spec-kit/` and `.ideas/`
-
-- **P021 (#27): `--no-banner` flag for `specify init`** - Suppress ASCII art banner for CI/CD pipelines
-  - Use `--no-banner` to skip the decorative banner when running in non-interactive environments
-  - All init functionality remains intact — only the visual banner is suppressed
-  - Works with `--dry-run`, `--here`, and all other flags
-
-- **P020 (#26): `--dry-run` flag for `specify init`** - Preview what would be done without writing any files
-  - Shows project name, target path, AI assistant, script type, template repo, and git init plan
-  - Validates all inputs (agent, script type) before showing preview — invalid flags still error correctly
-  - Works with `--here` flag for current-directory initialization
-  - Does not download templates, create directories, or modify the filesystem
-
-- **P015: Phase 0 onboarding integration** - Updated welcome message to show complete Phase 0 → SDD workflow
-  - Phase 0 commands (`/speckit.ideate`, `/speckit.select`, `/speckit.structure`) now displayed in onboarding
-  - Moved quality commands (`/speckit.clarify`, `/speckit.analyze`, `/speckit.checklist`) from "Enhancement Commands" to "Core SDD Workflow"
-  - Auto-create `.gitignore` with security patterns for agent credentials:
-    - `.github/agents/*.credentials.md`
-    - `.specify/memory/*.sensitive.md`
-  - Updated security notice to confirm automatic `.gitignore` protection
-- **Upstream sync (2026-02-17)** - Integrated extension-system foundations from upstream:
-  - `specify extension` command group and extension manager module
-  - Extension docs/templates/test suite scaffolding
-  - Antigravity (`agy`) agent support in CLI and packaging scripts
-  - `constitution-template` initialization flow for new projects
+## [0.0.47] - 2026-02-19
 
 ### Changed
 
-- **Script type choices now include platform labels**: `sh` → `"POSIX Shell (bash/zsh) [macOS/Linux]"`, `ps` → `"PowerShell [Windows]"` for clarity in interactive prompts (upstream #1379, Angie Byron)
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.47`
 
-### Fixed
-
-- **P023 (#80): Fix DEFAULT_CATALOG_URL and catalog.json to point to fork nsalvacao/spec-kit**
-  - `src/specify_cli/extensions.py`: `DEFAULT_CATALOG_URL` updated from `github/spec-kit` to `nsalvacao/spec-kit`
-  - `extensions/catalog.json`: `catalog_url` field updated from `github/spec-kit` to `nsalvacao/spec-kit`
-  - Ensures `specify extension search` fetches the fork's catalog by default
-
-- **P004 (#25): Multi-agent `--ai` support** - `specify init --ai copilot,claude` now works correctly
-  - Accepts comma-separated list of agents (e.g. `--ai copilot,claude,gemini`)
-  - Validates all agents before starting; exits with clear error if any is invalid
-  - Primary agent creates the project; extra agents overlay their templates into the same directory
-  - Extra agent downloads are isolated — a failure does not abort the overall init
-  - `precheck` and `ai-select` tracker steps now show all selected agents
-  - Tests: 10 new unit/integration tests in `tests/test_multi_agent_init.py`
-  - Created `scripts/python/state-update.py` for atomic YAML updates
-  - Updated `state-log-violation.sh/ps1`, `state-reconstruct.sh/ps1`, and `state-check.sh/ps1` to use Python backend
-  - Eliminates yq v3/v4 syntax breaking changes
-  - Provides atomic, safe YAML updates without external dependency on yq
-- **P002: state-init yq hard-dependency** - Removed spurious `yq` hard-dependency from `state-init.sh` and `state-init.ps1`
-  - Both scripts only write static YAML via heredoc/Set-Content; yq was never invoked
-  - Fixes init failure on systems without yq installed
-- **P003 (#19): ripgrep not enforced at init** - `specify init` now checks for `rg` (ripgrep) and shows a
-  prominent yellow warning panel when it is not installed.
-  - Warning includes install instructions for Linux/macOS/Windows/Cargo
-  - Initialisation continues (rg is not required for `init` itself, only for validator scripts)
-  - `precheck` tracker step now reflects `rg` availability
-  - Security hardening for extension installation/registration:
-  - Validate command file paths remain inside extension directory
-  - Validate command aliases/identifiers before writing generated files
-  - Validate extension IDs used by catalog downloads
-  - Use generated temporary ZIP filenames for `specify extension add --from`
+## [0.0.46] - 2026-02-19
 
 ### Changed
 
-- **Dependencies**: yq is no longer required for state management (Python 3 with PyYAML is used instead)
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.46`
+
+## [0.0.45] - 2026-02-19
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.45`
+
+## [0.0.44] - 2026-02-19
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.44`
+
+## [0.0.43] - 2026-02-19
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.43`
+
+## [0.0.42] - 2026-02-19
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.42`
+
+## [0.0.41] - 2026-02-19
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.41`
+
+## [0.0.40] - 2026-02-19
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.40`
+
+## [0.0.39] - 2026-02-19
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.39`
+
+## [0.0.38] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.38`
+
+## [0.0.37] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.37`
+
+## [0.0.36] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.36`
+
+## [0.0.35] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.35`
+
+## [0.0.34] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.34`
+
+## [0.0.33] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.33`
+
+## [0.0.32] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.32`
+
+## [0.0.31] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.31`
+
+## [0.0.30] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.30`
+
+## [0.0.29] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.29`
+
+## [0.0.28] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.28`
+
+## [0.0.27] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.27`
+
+## [0.0.26] - 2026-02-18
+
+### Changed
+
+- Release notes: `https://github.com/nsalvacao/spec-kit/releases/tag/v0.0.26`
 
 ## [0.0.25] - 2026-02-18
 

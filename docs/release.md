@@ -1,45 +1,55 @@
-# Fork Release Process
+# Release Process
 
-This guide describes how to publish a release for the fork.
+This guide describes how releases are published for this fork.
 
-## 1) Update Version + Changelog
+## 1) Versioning Rules
 
-- Update version in `pyproject.toml`
-- Add a changelog entry in `CHANGELOG.md`
+- Use SemVer in `pyproject.toml` (for example: `0.0.35`).
+- Keep release tags aligned with published template bundles (`vX.Y.Z`).
+- Do not use the legacy `-fork.N` suffix for new releases.
 
-**Versioning scheme:** use upstream base version with a fork suffix, e.g. `0.0.23-fork.1`.
+## 2) Changelog Rules (Keep a Changelog)
 
-Optional helper script (if used by upstream):
+Before publishing a release:
 
-```bash
-./.github/workflows/scripts/update-version.sh
+1. Keep active work only under `## [Unreleased]`.
+2. Create a new version heading:
+   - `## [X.Y.Z] - YYYY-MM-DD`
+3. Move relevant entries from `Unreleased` into that version.
+4. Use standard sections when applicable:
+   - `### Added`
+   - `### Changed`
+   - `### Fixed`
+   - `### Security`
 
-```text
+If a tag was published without detailed curated notes, add the version heading
+and include at least a release-notes link to keep the changelog version-indexed.
 
-## 2) Build Release Packages
+## 3) Build Release Packages
 
 ```bash
 ./.github/workflows/scripts/create-release-packages.sh
 ```
 
-This should generate zip assets under `.genreleases/`.
+This generates zip assets under `.genreleases/`.
 
-## 3) Create GitHub Release (Fork)
+## 4) Create GitHub Release
 
 ```bash
 ./.github/workflows/scripts/create-github-release.sh
+```
 
-```text
+Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 
-Confirm the release tag and assets are published to `nsalvacao/spec-kit`.
+## 5) Validate
 
-## 4) Validate
+- Install from the release tag.
+- Run `specify init` with `--template-repo nsalvacao/spec-kit`.
+- Confirm generated templates/scripts match fork expectations.
 
-- Install from the release tag
-- Run `specify init` with `--template-repo nsalvacao/spec-kit`
-- Confirm generated templates/scripts match fork expectations
+## 6) Post-Release Hygiene
 
-## 5) Announce
-
-- Update `README.md` badges if needed
-- Reference the release in notes or documentation
+- Ensure `CHANGELOG.md` has the new version title.
+- Ensure `## [Unreleased]` is reset for the next cycle.
+- If needed, backfill missing headings for any tags created outside the normal
+  release flow.
