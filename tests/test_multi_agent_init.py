@@ -142,3 +142,19 @@ class TestMultiAgentDownload:
             result = _run_init("--ai", "copilot,claude")
         # Primary agent succeeded; extra failed but init should not crash
         assert result.exit_code == 0
+
+    def test_keep_memory_propagates_to_all_download_calls(self):
+        """--keep-memory should pass preserve_constitution=True to all download calls."""
+        with patch("specify_cli.download_and_extract_template") as mock_dl, \
+             patch("specify_cli.ensure_executable_scripts"), \
+             patch("specify_cli.ensure_constitution_from_template"), \
+             patch("specify_cli.ensure_gitignore_security", return_value="updated"):
+            mock_dl.return_value = MagicMock()
+            result = _run_init("--ai", "copilot,claude", "--keep-memory")
+
+        assert result.exit_code == 0, result.output
+        assert mock_dl.call_count == 2
+        assert all(
+            call.kwargs.get("preserve_constitution") is True
+            for call in mock_dl.call_args_list
+        )
