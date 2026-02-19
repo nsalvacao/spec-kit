@@ -220,6 +220,23 @@ if ($Number -eq 0) {
 $featureNum = ('{0:000}' -f $Number)
 $branchName = "$featureNum-$branchSuffix"
 
+# Validate that the prefix number is not already in use by another spec
+# This prevents collisions when --number option is explicitly provided
+if ($Number -ne 0) {
+    foreach ($existingDir in Get-ChildItem -Path $specsDir -Directory -ErrorAction SilentlyContinue) {
+        $existingName = $existingDir.Name
+        if ($existingName -match '^(\d{3})-(.+)$') {
+            $existingPrefix = $matches[1]
+            $existingSuffix = $matches[2]
+            if ($existingPrefix -eq $featureNum -and $existingSuffix -ne $branchSuffix) {
+                Write-Error "Error: Prefix $featureNum is already used by '$existingName'"
+                Write-Error "Hint: Remove --number option to auto-detect the next available number"
+                exit 1
+            }
+        }
+    }
+}
+
 # GitHub enforces a 244-byte limit on branch names
 # Validate and truncate if necessary
 $maxBranchLength = 244
