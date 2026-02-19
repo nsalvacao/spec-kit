@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI (`ai-review.yml`)**: kept large-diff review fixes in this PR scope and improved output/debug traceability.
   - Version metadata aligned to `0.0.52` to keep monotonic progression after published release `v0.0.51`.
   - Review model selection is now configurable via repository variables (`REVIEW_LONG_CONTEXT_MODEL`, `REVIEW_MODEL`, `REVIEW_FALLBACK_MODEL`) instead of fixed IDs.
+  - Added A/B model selection via repository variables (`REVIEW_AB_MODE=parity`, `REVIEW_AB_MODELS=modelA,modelB,...`) with deterministic PR-based bucketing.
   - Added startup validation for `MODELS_PAT` (`GH_MODELS_TOKEN`) to fail fast on missing secret.
   - Added tenant catalog pre-check (`/catalog/models`) to skip unavailable configured models before attempting inference.
   - Long-context model fallback now treats `400/401/403/404` as non-retryable per model to avoid wasted retry loops.
