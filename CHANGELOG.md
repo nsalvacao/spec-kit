@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.0.49] - 2026-02-19
+## [0.0.52] - 2026-02-19
 
 ### Added
 
@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **CI (`ai-review.yml`)**: kept large-diff review fixes in this PR scope and improved output/debug traceability.
+  - Version metadata aligned to `0.0.52` to keep monotonic progression after published release `v0.0.51`.
   - Full-diff reviews now write `review.md` deterministically before posting the PR comment.
   - Added append-only UTC timeline logging (`review_timeline.md`) for model attempts, HTTP status, retry backoff, rate-limit headers, and chunk progress.
   - Exported the timeline to the workflow run summary for easier incident debugging.

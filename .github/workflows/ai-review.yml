@@ -12,6 +12,7 @@
 #   MAX_REVIEW_CHARS       — max diff chars for review             (#76)
 #   MAX_SUMMARY_CHARS      — max diff chars for summary            (#76)
 #   MAX_RETRY              — retry attempts per model              (#77)
+#   Model IDs must match https://models.github.ai/catalog/models
 #   Review timeline logs are append-only per run (UTC timestamps)
 #   and exported to the workflow summary for easier debugging.
 # =============================================================================
@@ -40,7 +41,7 @@ jobs:
     # Skip review for PRs labelled 'skip-ai-review' (#76)
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
-      REVIEW_LONG_CONTEXT_MODEL: "google/gemini-2.0-flash" # prefer long-context model first (free tier; check runtime headers for limits)
+      REVIEW_LONG_CONTEXT_MODEL: "ai21-labs/ai21-jamba-1.5-large" # prefer long-context model first (free tier; check runtime headers for limits)
       REVIEW_MODEL: "openai/gpt-4.1"
       REVIEW_FALLBACK_MODEL: "openai/gpt-4o"
       MAX_REVIEW_CHARS: "50000"
@@ -175,6 +176,14 @@ jobs:
                   timeline "tokens_limit purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
                   echo "::warning::Received tokens_limit_reached/413 from $MODEL; will fallback to chunking"
                   return 413
+                fi
+
+                if [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
+                  ERROR_CODE=$(echo "$BODY" | jq -r '.error.code // "unknown"' 2>/dev/null || echo "unknown")
+                  ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // empty' 2>/dev/null | tr '\n' ' ' | cut -c1-180)
+                  timeline "non_retryable purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE error_code=$ERROR_CODE error_msg=$ERROR_MSG"
+                  echo "::warning::Non-retryable HTTP $HTTP_CODE from $MODEL (error: $ERROR_CODE). Trying next model..."
+                  break
                 fi
 
                 timeline "attempt_failed purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"

@@ -1196,6 +1196,11 @@ def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = 
     """Ensure POSIX .sh scripts under .specify/scripts (recursively) have execute bits (no-op on Windows)."""
     if os.name == "nt":
         return  # Windows: skip silently
+    specify_root = project_path / ".specify"
+    if specify_root.is_symlink():
+        if tracker:
+            tracker.skip("chmod", "skipped for symlinked .specify")
+        return
     scripts_root = project_path / ".specify" / "scripts"
     if not scripts_root.is_dir():
         return
@@ -1254,6 +1259,13 @@ def detect_existing_specify_state(specify_dir: Path) -> tuple[bool, bool]:
 
 def ensure_constitution_from_template(project_path: Path, tracker: StepTracker | None = None) -> None:
     """Copy constitution template to memory if it doesn't exist (preserves existing constitution on reinitialization)."""
+    specify_root = project_path / ".specify"
+    if specify_root.is_symlink():
+        if tracker:
+            tracker.add("constitution", "Constitution setup")
+            tracker.skip("constitution", "skipped for symlinked .specify")
+        return
+
     memory_constitution = project_path / MEMORY_CONSTITUTION_REL_PATH
     template_constitution = project_path / ".specify" / "templates" / "constitution-template.md"
 
@@ -1290,6 +1302,13 @@ def ensure_constitution_from_template(project_path: Path, tracker: StepTracker |
 
 def ensure_project_config_from_template(project_path: Path, tracker: StepTracker | None = None) -> None:
     """Copy project config template to .specify/spec-kit.yml if it doesn't exist."""
+    specify_root = project_path / ".specify"
+    if specify_root.is_symlink():
+        if tracker:
+            tracker.add("project-config", "Project config setup")
+            tracker.skip("project-config", "skipped for symlinked .specify")
+        return
+
     project_config = project_path / ".specify" / "spec-kit.yml"
     template_config = project_path / ".specify" / "templates" / "spec-kit-config-template.yml"
 
@@ -1536,6 +1555,7 @@ def init(
             console.print(Panel(
                 "[yellow]Detected symlinked .specify/ directory[/yellow]\n\n"
                 "For safety, existing .specify content will be preserved.\n"
+                "Bootstrap steps inside .specify are skipped.\n"
                 "Only agent-specific files outside .specify will be updated.",
                 title="[cyan]Adding Agent to Existing Project[/cyan]",
                 border_style="cyan",
