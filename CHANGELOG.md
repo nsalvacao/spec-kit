@@ -20,6 +20,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Upstream #1480: `--keep-memory` option for `specify init`** - Preserve existing `.specify/memory/constitution.md` when switching AI agents
   - New `--keep-memory` flag prevents overwriting existing constitution during template merge
   - Example: `specify init . --ai gemini --keep-memory`
+- **#101: Adaptive Scope Detection Engine (`feature` / `epic` / `program`)**
+  - Added deterministic scope scoring module: `src/specify_cli/scope_detection.py`
+  - Implemented score bands `0-34`, `35-64`, `65+` with stable mode recommendation
+  - Added centralized project config loader: `src/specify_cli/project_config.py`
+  - Introduced canonical config files:
+    - `.specify/spec-kit.yml` (shared)
+    - `.specify/spec-kit.local.yml` (local override, gitignored)
+  - `specify init` now bootstraps `.specify/spec-kit.yml` from template when missing
+  - Centralized scoring weights, caps, boundaries, and keyword set in configurable `ScopeDetectionConfig`
+  - Added versioned output contract payload with:
+    - `mode_recommendation`
+    - `recommendation_reasons`
+    - `confidence`
+    - `signals`
+  - Improved keyword matching to avoid substring false positives
+  - Added contract documentation: `docs/adaptive-scope-detection-contract.md`
+  - Added unit tests for simple/intermediate/large scenarios and boundary regression (`34/35/64/65`)
 
 ### Changed
 

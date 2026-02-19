@@ -1,0 +1,30 @@
+# Spec-Kit Project Configuration
+# Location: .specify/spec-kit.yml
+# Optional local overrides: .specify/spec-kit.local.yml (recommended gitignored)
+#
+# Precedence (lowest -> highest):
+# 1) Built-in defaults
+# 2) .specify/spec-kit.yml
+# 3) .specify/spec-kit.local.yml
+# 4) SPECIFY_CONFIG__... environment variables
+
+schema_version: 1
+
+scope_detection:
+  # Score boundaries:
+  # feature_max_score: 34
+  # epic_max_score: 64
+  # max_total_score: 100
+
+  # Example signal tuning:
+  # work_items_multiplier: 5
+  # dependency_multiplier: 3
+  # integration_multiplier: 3
+  # domain_multiplier: 10
+  # cross_team_multiplier: 6
+
+  # Example keyword overrides:
+  # complexity_keywords:
+  #   - platform
+  #   - migration
+  #   - compliance
