@@ -12,6 +12,8 @@
 #   MAX_REVIEW_CHARS       — max diff chars for review             (#76)
 #   MAX_SUMMARY_CHARS      — max diff chars for summary            (#76)
 #   MAX_RETRY              — retry attempts per model              (#77)
+#   Review timeline logs are append-only per run (UTC timestamps)
+#   and exported to the workflow summary for easier debugging.
 # =============================================================================
 name: AI Review
 
@@ -89,10 +91,22 @@ jobs:
 
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
           CHUNK_REQUIRED=${{ steps.diff.outputs.chunk_required == 'true' && '1' || '0' }}
+          TIMELINE_FILE="review_timeline.md"
+          : > "$TIMELINE_FILE"
+
+          timeline() {
+            local MESSAGE="$1"
+            printf '%s | %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$MESSAGE" | tee -a "$TIMELINE_FILE" >&2
+          }
+
+          timeline "AI review started full_diff_chars=${{ steps.diff.outputs.full_size }} chunk_required=$CHUNK_REQUIRED"
 
           call_model() {
             local MODEL="$1" CONTENT="$2" PURPOSE="$3" CHUNK_ID="$4"
             local HEADERS_FILE="/tmp/headers-$CHUNK_ID.txt"
+            local INPUT_CHARS=${#CONTENT}
+            timeline "request purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL input_chars=$INPUT_CHARS"
+
             RESPONSE=$(curl -s -D "$HEADERS_FILE" -w "\n%{http_code}" -X POST \
               "https://models.github.ai/inference/chat/completions" \
               -H "Authorization: Bearer $GH_MODELS_TOKEN" \
@@ -114,13 +128,20 @@ jobs:
 
             HTTP_CODE=$(echo "$RESPONSE" | tail -1)
             BODY=$(echo "$RESPONSE" | sed '$d')
+            RETRY_AFTER_HINT=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
+            if [ -n "$RETRY_AFTER_HINT" ]; then
+              timeline "response purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE retry_after=$RETRY_AFTER_HINT"
+            else
+              timeline "response purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
+            fi
 
             # Log rate-limit headers when present (free tier variability)
             if [ -f "$HEADERS_FILE" ]; then
-              RATE_HEADERS=$(grep -iE 'x-ratelimit|retry-after' "$HEADERS_FILE" || true)
+              RATE_HEADERS=$(grep -iE 'x-ratelimit|retry-after' "$HEADERS_FILE" | tr -d '\r' || true)
               if [ -n "$RATE_HEADERS" ]; then
-                echo "Rate-limit headers for $MODEL (chunk $CHUNK_ID):" >&2
-                echo "$RATE_HEADERS" >&2
+                while IFS= read -r HEADER_LINE; do
+                  timeline "header purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL $HEADER_LINE"
+                done <<< "$RATE_HEADERS"
               fi
             fi
           }
@@ -134,25 +155,29 @@ jobs:
             MODELS+=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
 
             for MODEL in "${MODELS[@]}"; do
-              echo "Trying model: $MODEL for $PURPOSE"
+              timeline "trying_model purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL"
               ATTEMPT=0
               while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
                 ATTEMPT=$((ATTEMPT + 1))
-                echo "Attempt $ATTEMPT/$MAX_RETRY with $MODEL..."
+                timeline "attempt purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL value=$ATTEMPT/$MAX_RETRY"
                 call_model "$MODEL" "$CONTENT" "$PURPOSE" "$CHUNK_ID"
 
                 if [ "$HTTP_CODE" = "200" ]; then
                   USED_MODEL="$MODEL"
                   echo "$BODY" | jq -r '.choices[0].message.content' > "review_$CHUNK_ID.md"
-                  echo "$BODY" | jq '.usage.total_tokens' > "tokens_$CHUNK_ID.txt"
+                  TOKENS=$(echo "$BODY" | jq '.usage.total_tokens // 0')
+                  echo "$TOKENS" > "tokens_$CHUNK_ID.txt"
+                  timeline "success purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL tokens=$TOKENS"
                   return 0
                 fi
 
                 if echo "$BODY" | jq -e '.error.code == "tokens_limit_reached"' >/dev/null 2>&1 || [ "$HTTP_CODE" = "413" ]; then
+                  timeline "tokens_limit purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
                   echo "::warning::Received tokens_limit_reached/413 from $MODEL; will fallback to chunking"
                   return 413
                 fi
 
+                timeline "attempt_failed purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
                 echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
                 if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
                   RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
@@ -164,10 +189,12 @@ jobs:
                   fi
                   JITTER=$((RANDOM % 5))
                   SLEEP=$((SLEEP + JITTER))
+                  timeline "backoff purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL sleep=${SLEEP}s"
                   echo "Retrying in ${SLEEP}s..."
                   sleep "$SLEEP"
                 fi
               done
+              timeline "model_exhausted purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL last_http=$HTTP_CODE"
               echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
             done
             return 1
@@ -177,14 +204,19 @@ jobs:
           if [ "$CHUNK_REQUIRED" -eq 0 ]; then
             DIFF_CONTENT=$(cat diff_full.txt)
             if review_with_chain "$DIFF_CONTENT" "full-diff" "full"; then
-              cp review_full.md review.md
+              echo "### Full diff review" > review.md
+              cat review_full.md >> review.md
+              echo >> review.md
               echo "tokens=$(cat tokens_full.txt)" >> "$GITHUB_OUTPUT"
               echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
               echo "chunked=false" >> "$GITHUB_OUTPUT"
+              timeline "full_diff_completed model=$USED_MODEL tokens=$(cat tokens_full.txt)"
               exit 0
             fi
+            timeline "full_diff_fallback_to_chunking"
             echo "::warning::Full diff path failed or hit 413; switching to chunked review"
           else
+            timeline "chunking_enabled_due_to_size full_diff_chars=${{ steps.diff.outputs.full_size }} max_review_chars=$MAX_REVIEW_CHARS"
             echo "Diff size exceeds MAX_REVIEW_CHARS; using chunked review"
           fi
 
@@ -196,12 +228,14 @@ jobs:
           fi
 
           DIFF_LEN=$(wc -c < diff_full.txt)
+          timeline "chunking_config diff_len=$DIFF_LEN chunk_size=$CHUNK_SIZE_CHARS chunk_overlap=$CHUNK_OVERLAP_CHARS step=$STEP"
           CHUNK_COUNT=0
           OFFSET=0
           while [ "$OFFSET" -lt "$DIFF_LEN" ]; do
             CHUNK_COUNT=$((CHUNK_COUNT + 1))
             FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
             dd if=diff_full.txt of="$FILE" bs=1 skip="$OFFSET" count="$CHUNK_SIZE_CHARS" status=none
+            timeline "chunk_created id=$(printf '%02d' "$CHUNK_COUNT") offset=$OFFSET"
             OFFSET=$((OFFSET + STEP))
           done
 
@@ -210,6 +244,7 @@ jobs:
             exit 1
           fi
 
+          timeline "chunking_started chunk_count=$CHUNK_COUNT"
           TOTAL_TOKENS=0
           > review.md
           for FILE in diff_chunk_*.txt; do
@@ -223,11 +258,24 @@ jobs:
             echo >> review.md
             TOK=$(cat "tokens_${CID}.txt")
             TOTAL_TOKENS=$((TOTAL_TOKENS + TOK))
+            timeline "chunk_completed id=$CID tokens=$TOK total_tokens=$TOTAL_TOKENS"
           done
 
           echo "tokens=$TOTAL_TOKENS" >> "$GITHUB_OUTPUT"
           echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
           echo "chunked=true" >> "$GITHUB_OUTPUT"
+          timeline "chunked_review_completed model=$USED_MODEL total_tokens=$TOTAL_TOKENS"
+
+      - name: Append AI review timeline to workflow summary
+        if: steps.diff.outputs.skip != 'true'
+        run: |
+          {
+            echo "## AI Review Timeline"
+            echo
+            echo '```text'
+            cat review_timeline.md
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post review comment
         if: steps.diff.outputs.skip != 'true'

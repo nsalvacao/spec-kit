@@ -22,10 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added explicit error codes, strict validation mode, and deterministic fallback rules
   - Added contract documentation: `docs/scope-gate-consumption-contract.md`
   - Added contract test suite: `tests/test_scope_gate_contract.py`
-- **Upstream #1506 hardening**: smart `.specify` detection now preserves existing project state by default when re-running `specify init` in current directory.
+- **Upstream #1506 hardening (credit: Daniel Hashmi, @DanielHashmi)**: smart `.specify` detection now preserves existing project state by default when re-running `specify init` in current directory.
   - Added safe `.specify` detection helper (`detect_existing_specify_state`) with symlink-aware behavior.
   - Added explicit guard: `--force` refuses to overwrite symlinked `.specify` directories.
   - Added regression tests: `tests/test_specify_detection.py`.
+
+### Changed
+
+- **CI (`ai-review.yml`)**: kept large-diff review fixes in this PR scope and improved output/debug traceability.
+  - Full-diff reviews now write `review.md` deterministically before posting the PR comment.
+  - Added append-only UTC timeline logging (`review_timeline.md`) for model attempts, HTTP status, retry backoff, rate-limit headers, and chunk progress.
+  - Exported the timeline to the workflow run summary for easier incident debugging.
 
 ## [0.0.48] - 2026-02-19
 
