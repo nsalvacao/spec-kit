@@ -381,6 +381,7 @@ Detailed policy:
 | Installation | `docs/installation.md` |
 | Configuration | `docs/configuration.md` |
 | Scope scoring rubric | `docs/scope-scoring-rubric.md` |
+| Scope gate contract | `docs/scope-gate-consumption-contract.md` |
 | CLI reference | `docs/cli.md` |
 | Agent support | `docs/agents.md` |
 | Methodology | `docs/methodology.md` |

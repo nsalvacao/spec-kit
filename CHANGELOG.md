@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added deeper rubric shape checks (score band item fields/types, unique dimension names)
   - Formalized deterministic tie-break and rationale-template rules for multi-channel consistency
   - Added rubric conformance tests in `tests/test_scope_detection.py`
+- **#105: Stable gate consumption contract for CLI/TTY/API (`scope-gate-consumption.v1`)**
+  - Added channel-agnostic contract module: `src/specify_cli/scope_gate_contract.py`
+  - Added typed payload builders/normalizers:
+    - `build_scope_gate_payload(...)`
+    - `normalize_scope_gate_payload(...)`
+    - `validate_scope_gate_payload(...)`
+  - Added explicit error codes, strict validation mode, and deterministic fallback rules
+  - Added contract documentation: `docs/scope-gate-consumption-contract.md`
+  - Added contract test suite: `tests/test_scope_gate_contract.py`
 
 ### Changed
 
