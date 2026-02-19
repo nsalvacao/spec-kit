@@ -243,6 +243,7 @@ CLAUDE_LOCAL_PATH = Path.home() / ".claude" / "local" / "claude"
 FORK_NAME = "Nexo Spec Kit"
 DEFAULT_TEMPLATE_REPO = "nsalvacao/spec-kit"
 UPSTREAM_TEMPLATE_REPO = "github/spec-kit"
+MEMORY_CONSTITUTION_REL_PATH = Path(".specify/memory/constitution.md")
 
 BANNER = """
 ███╗   ██╗███████╗██╗  ██╗ ██████╗
@@ -1101,10 +1102,16 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, script_
                                     if sub_item.is_file():
                                         rel_path = sub_item.relative_to(item)
                                         dest_file = dest_path / rel_path
-                                        # Skip constitution.md if preserve_constitution is True and file exists
-                                        if preserve_constitution and dest_file.exists() and rel_path == Path("constitution.md") and item.name == "memory":
+                                        # Preserve the canonical memory constitution when requested.
+                                        if (
+                                            preserve_constitution
+                                            and dest_file.exists()
+                                            and dest_file.relative_to(project_path) == MEMORY_CONSTITUTION_REL_PATH
+                                        ):
                                             if verbose and not tracker:
-                                                console.print(f"[cyan]Preserving existing:[/cyan] memory/constitution.md")
+                                                console.print(
+                                                    f"[cyan]Preserving existing:[/cyan] {MEMORY_CONSTITUTION_REL_PATH.as_posix()}"
+                                                )
                                             continue
                                         dest_file.parent.mkdir(parents=True, exist_ok=True)
                                         # Special handling for .vscode/settings.json - merge instead of overwrite
@@ -1226,7 +1233,7 @@ def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = 
 
 def ensure_constitution_from_template(project_path: Path, tracker: StepTracker | None = None) -> None:
     """Copy constitution template to memory if it doesn't exist (preserves existing constitution on reinitialization)."""
-    memory_constitution = project_path / ".specify" / "memory" / "constitution.md"
+    memory_constitution = project_path / MEMORY_CONSTITUTION_REL_PATH
     template_constitution = project_path / ".specify" / "templates" / "constitution-template.md"
 
     # If constitution already exists in memory, preserve it
@@ -1515,6 +1522,15 @@ def init(
             verify = not skip_tls
             local_ssl_context = ssl_context if verify else False
             local_client = httpx.Client(verify=local_ssl_context)
+            local_templates_path = Path(local_templates) if local_templates else None
+            download_kwargs = {
+                "client": local_client,
+                "debug": debug,
+                "github_token": github_token,
+                "preserve_constitution": keep_memory,
+                "repo_owner": repo_owner,
+                "repo_name": repo_name,
+            }
 
             download_and_extract_template(
                 project_path,
@@ -1523,13 +1539,8 @@ def init(
                 here,
                 verbose=False,
                 tracker=tracker,
-                client=local_client,
-                debug=debug,
-                github_token=github_token,
-                preserve_constitution=keep_memory,
-                repo_owner=repo_owner,
-                repo_name=repo_name,
-                local_dir=Path(local_templates) if local_templates else None,
+                local_dir=local_templates_path,
+                **download_kwargs,
             )
 
             # Install extra agents (multi-agent: --ai copilot,claude)
@@ -1550,12 +1561,7 @@ def init(
                         is_current_dir=True,  # always overlay into existing dir
                         verbose=False,
                         tracker=extra_tracker,
-                        client=local_client,
-                        debug=debug,
-                        github_token=github_token,
-                        preserve_constitution=keep_memory,
-                        repo_owner=repo_owner,
-                        repo_name=repo_name,
+                        **download_kwargs,
                     )
                     tracker.complete(f"fetch-{extra}", "done")
                     tracker.complete(f"extract-{extra}", "overlaid")
