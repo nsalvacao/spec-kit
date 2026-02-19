@@ -241,6 +241,18 @@ Use current directory mode if needed:
 specify init . --ai claude --script sh
 ```
 
+When `.specify/` already exists, init preserves it by default:
+
+```bash
+specify init . --ai gemini
+```
+
+Use `--force` only when you explicitly want to reinitialize and overwrite `.specify`:
+
+```bash
+specify init . --ai gemini --force
+```
+
 Initialize with Antigravity support:
 
 ```bash
@@ -303,7 +315,7 @@ If `codex` is selected, `init` also prints a `CODEX_HOME` setup hint for project
 | `--script sh\|ps` | Force POSIX or PowerShell script variant |
 | `--template-repo` | Override template source repo (`owner/name`) |
 | `--here` / `.` | Initialize in current directory |
-| `--force` | Skip confirmation for non-empty current directory |
+| `--force` | Skip prompts and overwrite existing `.specify` content when reinitializing |
 | `--ignore-agent-tools` | Skip CLI tool checks for selected agents |
 | `--dry-run` | Preview without writing files |
 | `--no-banner` | Suppress ASCII banner (CI-friendly) |

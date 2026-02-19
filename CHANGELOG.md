@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.52] - 2026-02-19
+
 ### Added
 
 - **#105: Stable gate consumption contract for CLI/TTY/API (`scope-gate-consumption.v1`)**
@@ -20,6 +22,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added explicit error codes, strict validation mode, and deterministic fallback rules
   - Added contract documentation: `docs/scope-gate-consumption-contract.md`
   - Added contract test suite: `tests/test_scope_gate_contract.py`
+- **Upstream #1506 hardening (credit: Daniel Hashmi, @DanielHashmi)**: smart `.specify` detection now preserves existing project state by default when re-running `specify init` in current directory.
+  - Added safe `.specify` detection helper (`detect_existing_specify_state`) with symlink-aware behavior.
+  - Added explicit guard: `--force` refuses to overwrite symlinked `.specify` directories.
+  - Added regression tests: `tests/test_specify_detection.py`.
+
+### Changed
+
+- **CI (`ai-review.yml`)**: kept large-diff review fixes in this PR scope and improved output/debug traceability.
+  - Version metadata aligned to `0.0.52` to keep monotonic progression after published release `v0.0.51`.
+  - Review model selection is now configurable via repository variables (`REVIEW_LONG_CONTEXT_MODEL`, `REVIEW_MODEL`, `REVIEW_FALLBACK_MODEL`) instead of fixed IDs.
+  - Added A/B model selection via repository variables (`REVIEW_AB_MODE=parity`, `REVIEW_AB_MODELS=modelA,modelB,...`) with deterministic PR-based bucketing.
+  - Added startup validation for `MODELS_PAT` (`GH_MODELS_TOKEN`) to fail fast on missing secret.
+  - Added tenant catalog pre-check (`/catalog/models`) to skip unavailable configured models before attempting inference.
+  - Long-context model fallback now treats `400/401/403/404` as non-retryable per model to avoid wasted retry loops.
+  - Full-diff reviews now write `review.md` deterministically before posting the PR comment.
+  - Added append-only UTC timeline logging (`review_timeline.md`) for model attempts, HTTP status, retry backoff, rate-limit headers, and chunk progress.
+  - Exported the timeline to the workflow run summary for easier incident debugging.
+- **Init hardening (`.specify` symlink mode)**:
+  - Skip bootstrap mutations inside `.specify` (`chmod`, constitution bootstrap, project config bootstrap) when `.specify` is a symlink.
+  - Added regression tests to ensure symlinked `.specify` never receives implicit writes during those bootstrap steps.
 
 ## [0.0.48] - 2026-02-19
 

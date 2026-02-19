@@ -1006,7 +1006,7 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, scri
     }
     return zip_path, metadata
 
-def download_and_extract_template(project_path: Path, ai_assistant: str, script_type: str, is_current_dir: bool = False, *, verbose: bool = True, tracker: StepTracker | None = None, client: httpx.Client = None, debug: bool = False, github_token: str = None, preserve_constitution: bool = False, repo_owner: str = "github", repo_name: str = "spec-kit", local_dir: Path | None = None) -> Path:
+def download_and_extract_template(project_path: Path, ai_assistant: str, script_type: str, is_current_dir: bool = False, *, verbose: bool = True, tracker: StepTracker | None = None, client: httpx.Client = None, debug: bool = False, github_token: str = None, preserve_constitution: bool = False, preserve_specify: bool = False, repo_owner: str = "github", repo_name: str = "spec-kit", local_dir: Path | None = None) -> Path:
     """Download the latest release and extract it to create a new project.
     Returns project_path. Uses tracker if provided (with keys: fetch, download, extract, cleanup)
 
@@ -1095,6 +1095,10 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, script_
 
                     for item in source_dir.iterdir():
                         dest_path = project_path / item.name
+                        if preserve_specify and item.name == ".specify":
+                            if verbose and not tracker:
+                                console.print("[cyan]Preserving existing:[/cyan] .specify/")
+                            continue
                         if item.is_dir():
                             if dest_path.exists():
                                 if verbose and not tracker:
@@ -1192,6 +1196,11 @@ def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = 
     """Ensure POSIX .sh scripts under .specify/scripts (recursively) have execute bits (no-op on Windows)."""
     if os.name == "nt":
         return  # Windows: skip silently
+    specify_root = project_path / ".specify"
+    if specify_root.is_symlink():
+        if tracker:
+            tracker.skip("chmod", "skipped for symlinked .specify")
+        return
     scripts_root = project_path / ".specify" / "scripts"
     if not scripts_root.is_dir():
         return
@@ -1232,8 +1241,31 @@ def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = 
             for f in failures:
                 console.print(f"  - {f}")
 
+
+def detect_existing_specify_state(specify_dir: Path) -> tuple[bool, bool]:
+    """Return `(has_existing_project, is_symlink)` for `.specify` detection."""
+    if not specify_dir.exists():
+        return False, False
+    if specify_dir.is_symlink():
+        return True, True
+    if not specify_dir.is_dir():
+        return False, False
+    try:
+        return any(specify_dir.iterdir()), False
+    except OSError:
+        # Fail-safe: unreadable directories are treated as existing projects.
+        return True, False
+
+
 def ensure_constitution_from_template(project_path: Path, tracker: StepTracker | None = None) -> None:
     """Copy constitution template to memory if it doesn't exist (preserves existing constitution on reinitialization)."""
+    specify_root = project_path / ".specify"
+    if specify_root.is_symlink():
+        if tracker:
+            tracker.add("constitution", "Constitution setup")
+            tracker.skip("constitution", "skipped for symlinked .specify")
+        return
+
     memory_constitution = project_path / MEMORY_CONSTITUTION_REL_PATH
     template_constitution = project_path / ".specify" / "templates" / "constitution-template.md"
 
@@ -1270,6 +1302,13 @@ def ensure_constitution_from_template(project_path: Path, tracker: StepTracker |
 
 def ensure_project_config_from_template(project_path: Path, tracker: StepTracker | None = None) -> None:
     """Copy project config template to .specify/spec-kit.yml if it doesn't exist."""
+    specify_root = project_path / ".specify"
+    if specify_root.is_symlink():
+        if tracker:
+            tracker.add("project-config", "Project config setup")
+            tracker.skip("project-config", "skipped for symlinked .specify")
+        return
+
     project_config = project_path / ".specify" / "spec-kit.yml"
     template_config = project_path / ".specify" / "templates" / "spec-kit-config-template.yml"
 
@@ -1309,7 +1348,7 @@ def init(
     ignore_agent_tools: bool = typer.Option(False, "--ignore-agent-tools", help="Skip checks for AI agent tools like Claude Code"),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git repository initialization"),
     here: bool = typer.Option(False, "--here", help="Initialize project in the current directory instead of creating a new one"),
-    force: bool = typer.Option(False, "--force", help="Force merge/overwrite when using --here (skip confirmation)"),
+    force: bool = typer.Option(False, "--force", help="Skip prompts and overwrite existing .specify content when reinitializing in current directory"),
     keep_memory: bool = typer.Option(False, "--keep-memory", help="Switch AI agent without overwriting memory/constitution.md (preserves existing constitution)"),
     skip_tls: bool = typer.Option(False, "--skip-tls", help="Skip SSL/TLS verification (not recommended)"),
     debug: bool = typer.Option(False, "--debug", help="Show verbose diagnostic output for network and extraction failures"),
@@ -1340,7 +1379,7 @@ def init(
         specify init --here --ai codex
         specify init --here --ai codebuddy
         specify init --here
-        specify init --here --force  # Skip confirmation when current directory not empty
+        specify init --here --force  # Skip prompts and overwrite existing .specify content
         specify init . --ai gemini --keep-memory  # Switch to Gemini without overwriting constitution
         specify init . --template-repo my-org/spec-kit
         specify init my-project --dry-run --ai claude  # Preview without writing files
@@ -1494,6 +1533,50 @@ def init(
     console.print(f"[cyan]Selected AI assistant:[/cyan] {all_agents_display}")
     console.print(f"[cyan]Selected script type:[/cyan] {selected_script}")
 
+    # Smart detection: preserve existing .specify work unless --force is explicit.
+    specify_dir = project_path / ".specify"
+    has_existing_project, is_symlink_specify = detect_existing_specify_state(specify_dir)
+    preserve_specify = False
+    if has_existing_project:
+        if is_symlink_specify:
+            if force:
+                console.print()
+                console.print(Panel(
+                    "[red]Refusing to overwrite a symlinked .specify directory with --force.[/red]\n\n"
+                    "This protects against writing outside the current project path.\n"
+                    "Remove or replace the symlink and run init again.",
+                    title="[red]Unsafe .specify Symlink[/red]",
+                    border_style="red",
+                    padding=(1, 2),
+                ))
+                raise typer.Exit(1)
+
+            console.print()
+            console.print(Panel(
+                "[yellow]Detected symlinked .specify/ directory[/yellow]\n\n"
+                "For safety, existing .specify content will be preserved.\n"
+                "Bootstrap steps inside .specify are skipped.\n"
+                "Only agent-specific files outside .specify will be updated.",
+                title="[cyan]Adding Agent to Existing Project[/cyan]",
+                border_style="cyan",
+                padding=(1, 2),
+            ))
+            preserve_specify = True
+        elif not force:
+            console.print()
+            console.print(Panel(
+                "[green]Existing .specify project detected[/green]\n\n"
+                "Your .specify directory will be preserved by default, including:\n"
+                "  • Constitution and project principles\n"
+                "  • Specifications and requirements\n"
+                "  • Implementation plans and tasks\n\n"
+                "Use [cyan]--force[/cyan] to reinitialize and overwrite .specify content.",
+                title="[cyan]Adding Agent to Existing Project[/cyan]",
+                border_style="cyan",
+                padding=(1, 2),
+            ))
+            preserve_specify = True
+
     if dry_run:
         target = "current directory" if here else str(project_path)
         preview_lines = [
@@ -1505,6 +1588,7 @@ def init(
             f"{'Script type':<18} [cyan]{selected_script}[/cyan]",
             f"{'Template repo':<18} [dim]{template_repo_value}[/dim]",
             f"{'Git init':<18} [dim]{'skipped (--no-git)' if no_git else 'yes'}[/dim]",
+            f"{'.specify mode':<18} [dim]{'preserve existing' if preserve_specify else 'overwrite template content'}[/dim]",
             "",
             "[dim]Re-run without --dry-run to apply these changes.[/dim]",
         ]
@@ -1563,6 +1647,7 @@ def init(
                 "debug": debug,
                 "github_token": github_token,
                 "preserve_constitution": keep_memory,
+                "preserve_specify": preserve_specify,
                 "repo_owner": repo_owner,
                 "repo_name": repo_name,
             }

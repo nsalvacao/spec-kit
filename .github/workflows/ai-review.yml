@@ -12,6 +12,11 @@
 #   MAX_REVIEW_CHARS       — max diff chars for review             (#76)
 #   MAX_SUMMARY_CHARS      — max diff chars for summary            (#76)
 #   MAX_RETRY              — retry attempts per model              (#77)
+#   REVIEW_AB_MODE         — off|parity (A/B selector mode)
+#   REVIEW_AB_MODELS       — comma-separated model IDs for A/B pool
+#   Model IDs should match runtime catalog: https://models.github.ai/catalog/models
+#   Review timeline logs are append-only per run (UTC timestamps)
+#   and exported to the workflow summary for easier debugging.
 # =============================================================================
 name: AI Review
 
@@ -38,9 +43,11 @@ jobs:
     # Skip review for PRs labelled 'skip-ai-review' (#76)
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
-      REVIEW_LONG_CONTEXT_MODEL: "google/gemini-2.0-flash" # prefer long-context model first (free tier; check runtime headers for limits)
-      REVIEW_MODEL: "openai/gpt-4.1"
-      REVIEW_FALLBACK_MODEL: "openai/gpt-4o"
+      REVIEW_LONG_CONTEXT_MODEL: ${{ vars.REVIEW_LONG_CONTEXT_MODEL || '' }} # optional, tenant-specific
+      REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'openai/gpt-4.1' }}
+      REVIEW_FALLBACK_MODEL: ${{ vars.REVIEW_FALLBACK_MODEL || 'openai/gpt-4o' }}
+      REVIEW_AB_MODE: ${{ vars.REVIEW_AB_MODE || 'off' }}
+      REVIEW_AB_MODELS: ${{ vars.REVIEW_AB_MODELS || '' }}
       MAX_REVIEW_CHARS: "50000"
       MAX_REVIEW_TOKENS: "2000"
       CHUNK_SIZE_CHARS: "18000"
@@ -82,17 +89,88 @@ jobs:
         id: review
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+          if [ -z "${GH_MODELS_TOKEN:-}" ]; then
+            echo "::error::Missing MODELS_PAT secret. Configure it with a GitHub Models token (models:read)."
+            exit 1
+          fi
+
           # Mask token to prevent accidental log exposure
           echo "::add-mask::$GH_MODELS_TOKEN"
 
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
           CHUNK_REQUIRED=${{ steps.diff.outputs.chunk_required == 'true' && '1' || '0' }}
+          TIMELINE_FILE="review_timeline.md"
+          : > "$TIMELINE_FILE"
+
+          timeline() {
+            local MESSAGE="$1"
+            printf '%s | %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$MESSAGE" | tee -a "$TIMELINE_FILE" >&2
+          }
+
+          timeline "AI review started full_diff_chars=${{ steps.diff.outputs.full_size }} chunk_required=$CHUNK_REQUIRED"
+
+          CATALOG_FILE="/tmp/models_catalog.json"
+          CATALOG_OK=0
+          if curl -fsS -H "Authorization: Bearer $GH_MODELS_TOKEN" https://models.github.ai/catalog/models > "$CATALOG_FILE"; then
+            CATALOG_OK=1
+            timeline "catalog_loaded count=$(jq 'length' "$CATALOG_FILE" 2>/dev/null || echo 0)"
+          else
+            timeline "catalog_unavailable continuing_without_precheck"
+          fi
+
+          model_in_catalog() {
+            local MODEL="$1"
+            if [ "$CATALOG_OK" -ne 1 ]; then
+              return 0
+            fi
+            jq -e --arg model "$MODEL" '.[] | select(.id == $model)' "$CATALOG_FILE" >/dev/null 2>&1
+          }
+
+          if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ] && ! model_in_catalog "$REVIEW_LONG_CONTEXT_MODEL"; then
+            timeline "long_context_not_in_catalog model=$REVIEW_LONG_CONTEXT_MODEL"
+            REVIEW_LONG_CONTEXT_MODEL=""
+          fi
+          if [ -n "$REVIEW_MODEL" ] && ! model_in_catalog "$REVIEW_MODEL"; then
+            timeline "primary_not_in_catalog model=$REVIEW_MODEL"
+          fi
+          if [ -n "$REVIEW_FALLBACK_MODEL" ] && ! model_in_catalog "$REVIEW_FALLBACK_MODEL"; then
+            timeline "fallback_not_in_catalog model=$REVIEW_FALLBACK_MODEL"
+          fi
+
+          # Optional A/B selector: choose long-context model from REVIEW_AB_MODELS by PR parity.
+          if [ "${REVIEW_AB_MODE:-off}" != "off" ] && [ -n "${REVIEW_AB_MODELS:-}" ]; then
+            mapfile -t AB_MODELS_RAW < <(echo "$REVIEW_AB_MODELS" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed '/^$/d')
+            AB_MODELS=()
+            for MODEL in "${AB_MODELS_RAW[@]}"; do
+              if model_in_catalog "$MODEL"; then
+                AB_MODELS+=("$MODEL")
+              else
+                timeline "ab_model_not_in_catalog model=$MODEL"
+              fi
+            done
+
+            if [ "${#AB_MODELS[@]}" -gt 0 ]; then
+              if [ "$REVIEW_AB_MODE" = "parity" ]; then
+                INDEX=$((PR_NUMBER % ${#AB_MODELS[@]}))
+                REVIEW_LONG_CONTEXT_MODEL="${AB_MODELS[$INDEX]}"
+                timeline "ab_selected mode=parity pr=$PR_NUMBER index=$INDEX model=$REVIEW_LONG_CONTEXT_MODEL pool=${#AB_MODELS[@]}"
+              else
+                timeline "ab_unknown_mode mode=$REVIEW_AB_MODE (supported: off, parity)"
+              fi
+            else
+              timeline "ab_no_available_models mode=$REVIEW_AB_MODE"
+            fi
+          fi
 
           call_model() {
             local MODEL="$1" CONTENT="$2" PURPOSE="$3" CHUNK_ID="$4"
             local HEADERS_FILE="/tmp/headers-$CHUNK_ID.txt"
+            local INPUT_CHARS=${#CONTENT}
+            timeline "request purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL input_chars=$INPUT_CHARS"
+
             RESPONSE=$(curl -s -D "$HEADERS_FILE" -w "\n%{http_code}" -X POST \
               "https://models.github.ai/inference/chat/completions" \
               -H "Authorization: Bearer $GH_MODELS_TOKEN" \
@@ -114,45 +192,87 @@ jobs:
 
             HTTP_CODE=$(echo "$RESPONSE" | tail -1)
             BODY=$(echo "$RESPONSE" | sed '$d')
+            RETRY_AFTER_HINT=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
+            if [ -n "$RETRY_AFTER_HINT" ]; then
+              timeline "response purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE retry_after=$RETRY_AFTER_HINT"
+            else
+              timeline "response purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
+            fi
 
             # Log rate-limit headers when present (free tier variability)
             if [ -f "$HEADERS_FILE" ]; then
-              RATE_HEADERS=$(grep -iE 'x-ratelimit|retry-after' "$HEADERS_FILE" || true)
+              RATE_HEADERS=$(grep -iE 'x-ratelimit|retry-after' "$HEADERS_FILE" | tr -d '\r' || true)
               if [ -n "$RATE_HEADERS" ]; then
-                echo "Rate-limit headers for $MODEL (chunk $CHUNK_ID):" >&2
-                echo "$RATE_HEADERS" >&2
+                while IFS= read -r HEADER_LINE; do
+                  timeline "header purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL $HEADER_LINE"
+                done <<< "$RATE_HEADERS"
               fi
             fi
           }
 
           review_with_chain() {
             local CONTENT="$1" PURPOSE="$2" CHUNK_ID="$3"
-            local MODELS=()
+            local CANDIDATES=()
             if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ]; then
-              MODELS+=("$REVIEW_LONG_CONTEXT_MODEL")
+              CANDIDATES+=("$REVIEW_LONG_CONTEXT_MODEL")
             fi
-            MODELS+=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
+            CANDIDATES+=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
+
+            local MODELS=()
+            local CANDIDATE
+            local EXISTING
+            local DUPLICATE
+            for CANDIDATE in "${CANDIDATES[@]}"; do
+              [ -z "$CANDIDATE" ] && continue
+              DUPLICATE=0
+              for EXISTING in "${MODELS[@]}"; do
+                if [ "$EXISTING" = "$CANDIDATE" ]; then
+                  DUPLICATE=1
+                  break
+                fi
+              done
+              if [ "$DUPLICATE" -eq 0 ]; then
+                MODELS+=("$CANDIDATE")
+              fi
+            done
+
+            if [ "${#MODELS[@]}" -eq 0 ]; then
+              timeline "no_models_configured purpose=$PURPOSE chunk=$CHUNK_ID"
+              return 1
+            fi
 
             for MODEL in "${MODELS[@]}"; do
-              echo "Trying model: $MODEL for $PURPOSE"
+              timeline "trying_model purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL"
               ATTEMPT=0
               while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
                 ATTEMPT=$((ATTEMPT + 1))
-                echo "Attempt $ATTEMPT/$MAX_RETRY with $MODEL..."
+                timeline "attempt purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL value=$ATTEMPT/$MAX_RETRY"
                 call_model "$MODEL" "$CONTENT" "$PURPOSE" "$CHUNK_ID"
 
                 if [ "$HTTP_CODE" = "200" ]; then
                   USED_MODEL="$MODEL"
                   echo "$BODY" | jq -r '.choices[0].message.content' > "review_$CHUNK_ID.md"
-                  echo "$BODY" | jq '.usage.total_tokens' > "tokens_$CHUNK_ID.txt"
+                  TOKENS=$(echo "$BODY" | jq '.usage.total_tokens // 0')
+                  echo "$TOKENS" > "tokens_$CHUNK_ID.txt"
+                  timeline "success purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL tokens=$TOKENS"
                   return 0
                 fi
 
                 if echo "$BODY" | jq -e '.error.code == "tokens_limit_reached"' >/dev/null 2>&1 || [ "$HTTP_CODE" = "413" ]; then
+                  timeline "tokens_limit purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
                   echo "::warning::Received tokens_limit_reached/413 from $MODEL; will fallback to chunking"
                   return 413
                 fi
 
+                if [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
+                  ERROR_CODE=$(echo "$BODY" | jq -r '.error.code // "unknown"' 2>/dev/null || echo "unknown")
+                  ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // empty' 2>/dev/null | tr '\n' ' ' | cut -c1-180)
+                  timeline "non_retryable purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE error_code=$ERROR_CODE error_msg=$ERROR_MSG"
+                  echo "::warning::Non-retryable HTTP $HTTP_CODE from $MODEL (error: $ERROR_CODE). Trying next model..."
+                  break
+                fi
+
+                timeline "attempt_failed purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
                 echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
                 if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
                   RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
@@ -164,10 +284,12 @@ jobs:
                   fi
                   JITTER=$((RANDOM % 5))
                   SLEEP=$((SLEEP + JITTER))
+                  timeline "backoff purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL sleep=${SLEEP}s"
                   echo "Retrying in ${SLEEP}s..."
                   sleep "$SLEEP"
                 fi
               done
+              timeline "model_exhausted purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL last_http=$HTTP_CODE"
               echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
             done
             return 1
@@ -177,45 +299,47 @@ jobs:
           if [ "$CHUNK_REQUIRED" -eq 0 ]; then
             DIFF_CONTENT=$(cat diff_full.txt)
             if review_with_chain "$DIFF_CONTENT" "full-diff" "full"; then
+              echo "### Full diff review" > review.md
+              cat review_full.md >> review.md
+              echo >> review.md
               echo "tokens=$(cat tokens_full.txt)" >> "$GITHUB_OUTPUT"
               echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
               echo "chunked=false" >> "$GITHUB_OUTPUT"
+              timeline "full_diff_completed model=$USED_MODEL tokens=$(cat tokens_full.txt)"
               exit 0
             fi
+            timeline "full_diff_fallback_to_chunking"
             echo "::warning::Full diff path failed or hit 413; switching to chunked review"
           else
+            timeline "chunking_enabled_due_to_size full_diff_chars=${{ steps.diff.outputs.full_size }} max_review_chars=$MAX_REVIEW_CHARS"
             echo "Diff size exceeds MAX_REVIEW_CHARS; using chunked review"
           fi
 
           # 2) Chunked path (overlapping chunks for coherence)
-          python3 - <<'PY'
-import math, pathlib, sys
-CHUNK=int("${CHUNK_SIZE_CHARS}")
-OVERLAP=int("${CHUNK_OVERLAP_CHARS}")
-data=pathlib.Path('diff_full.txt').read_text()
-out_dir=pathlib.Path('.')
-if CHUNK <= OVERLAP:
-    print("Invalid chunk/overlap config", file=sys.stderr)
-    sys.exit(1)
-start=0
-idx=1
-count=0
-while start < len(data):
-    end = start + CHUNK
-    chunk = data[start:end]
-    out_dir.joinpath(f"diff_chunk_{idx:02d}.txt").write_text(chunk)
-    start = end - OVERLAP
-    idx += 1
-    count += 1
-print(count)
-PY
-          CHUNK_COUNT=$?
+          STEP=$((CHUNK_SIZE_CHARS - CHUNK_OVERLAP_CHARS))
+          if [ "$STEP" -le 0 ]; then
+            echo "::error::Invalid chunk config: CHUNK_SIZE_CHARS must be greater than CHUNK_OVERLAP_CHARS (size=$CHUNK_SIZE_CHARS overlap=$CHUNK_OVERLAP_CHARS)"
+            exit 1
+          fi
+
+          DIFF_LEN=$(wc -c < diff_full.txt)
+          timeline "chunking_config diff_len=$DIFF_LEN chunk_size=$CHUNK_SIZE_CHARS chunk_overlap=$CHUNK_OVERLAP_CHARS step=$STEP"
+          CHUNK_COUNT=0
+          OFFSET=0
+          while [ "$OFFSET" -lt "$DIFF_LEN" ]; do
+            CHUNK_COUNT=$((CHUNK_COUNT + 1))
+            FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
+            dd if=diff_full.txt of="$FILE" bs=1 skip="$OFFSET" count="$CHUNK_SIZE_CHARS" status=none
+            timeline "chunk_created id=$(printf '%02d' "$CHUNK_COUNT") offset=$OFFSET"
+            OFFSET=$((OFFSET + STEP))
+          done
 
           if [ "$CHUNK_COUNT" -le 0 ]; then
             echo "::error::Chunking failed"
             exit 1
           fi
 
+          timeline "chunking_started chunk_count=$CHUNK_COUNT"
           TOTAL_TOKENS=0
           > review.md
           for FILE in diff_chunk_*.txt; do
@@ -229,11 +353,24 @@ PY
             echo >> review.md
             TOK=$(cat "tokens_${CID}.txt")
             TOTAL_TOKENS=$((TOTAL_TOKENS + TOK))
+            timeline "chunk_completed id=$CID tokens=$TOK total_tokens=$TOTAL_TOKENS"
           done
 
           echo "tokens=$TOTAL_TOKENS" >> "$GITHUB_OUTPUT"
           echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
           echo "chunked=true" >> "$GITHUB_OUTPUT"
+          timeline "chunked_review_completed model=$USED_MODEL total_tokens=$TOTAL_TOKENS"
+
+      - name: Append AI review timeline to workflow summary
+        if: steps.diff.outputs.skip != 'true'
+        run: |
+          {
+            echo "## AI Review Timeline"
+            echo
+            echo '```text'
+            cat review_timeline.md
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post review comment
         if: steps.diff.outputs.skip != 'true'
