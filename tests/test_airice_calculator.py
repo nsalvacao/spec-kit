@@ -34,9 +34,13 @@ def run_ps1(args, cwd=None):
 
 
 def _make_selection_md(tmp_path, rows, breakdown_ok=True):
-    """Create a minimal idea_selection.md with given scoring rows."""
+    """Create a minimal idea_selection.md with given scoring rows.
+
+    Idea ID uses markdown link format [ID](url) to match the real template,
+    ensuring the validators correctly parse numeric columns without link stripping.
+    """
     rows_text = "\n".join(
-        f"| {r['id']} | {r['reach']} | {r['impact']} | {r['conf']}% "
+        f"| [{r['id']}](../ideas.md#{r['id'].lower()}) | {r['reach']} | {r['impact']} | {r['conf']}% "
         f"| {r['dr']}% | {r['effort']} | {r['risk']} | {r['score']:.2f} | {r.get('norm', 100.0)} |"
         for r in rows
     )

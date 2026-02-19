@@ -159,7 +159,7 @@ function Get-PctClass([int]$p, [string]$label) {
 function Get-EffortClass([double]$e) {
     if ($e -ge 12)    { "HIGH (>=12 weeks - quarter)" }
     elseif ($e -ge 6) { "MEDIUM (6-11 weeks)" }
-    elseif ($e -ge 2) { "MEDIUM (2-5 weeks)" }
+    elseif ($e -ge 2) { "MODERATE (2-5 weeks)" }
     else              { "LOW (<2 weeks)" }
 }
 
@@ -170,27 +170,33 @@ function Get-RiskClass([int]$r) {
 }
 
 function Build-Rationale([int]$r, [double]$i, [int]$c, [int]$dr, [double]$e, [int]$risk) {
-    $drivers  = [System.Collections.Generic.List[string]]::new()
-    $limiters = [System.Collections.Generic.List[string]]::new()
+    $drivers   = [System.Collections.Generic.List[string]]::new()
+    $limiters  = [System.Collections.Generic.List[string]]::new()
+    $moderators= [System.Collections.Generic.List[string]]::new()
 
     # Reach
     if ($r -ge 10000)    { $drivers.Add("very high Reach ($r)") }
     elseif ($r -ge 1000) { $drivers.Add("strong Reach ($r)") }
+    elseif ($r -ge 100)  { $moderators.Add("moderate Reach ($r)") }
 
     # Impact
     if ($i -ge 2.0) { $drivers.Add("$(Get-ImpactClass $i) Impact ($i)") }
 
     # Confidence
     if ($c -ge 85)      { $drivers.Add("high Confidence (${c}%)") }
+    elseif ($c -ge 40)  { $moderators.Add("moderate Confidence (${c}%)") }
     elseif ($c -lt 40)  { $limiters.Add("low Confidence (${c}%)") }
 
     # Data Readiness
     if ($dr -ge 85)     { $drivers.Add("high Data_Readiness (${dr}%)") }
+    elseif ($dr -ge 40) { $moderators.Add("moderate Data_Readiness (${dr}%)") }
     elseif ($dr -lt 40) { $limiters.Add("low Data_Readiness (${dr}%)") }
 
     # Effort
     if ($e -ge 12)    { $limiters.Add("high Effort ($e weeks)") }
     elseif ($e -ge 6) { $limiters.Add("medium Effort ($e weeks)") }
+    elseif ($e -ge 2) { $moderators.Add("moderate Effort ($e weeks)") }
+    else              { $moderators.Add("low Effort ($e weeks)") }
 
     # Risk
     if ($risk -ge 7)     { $limiters.Add("high Risk ($risk/10)") }

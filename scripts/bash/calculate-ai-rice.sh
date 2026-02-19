@@ -64,6 +64,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --name)
             shift
+            if [[ -z "${1:-}" || "${1:-}" == --* ]]; then
+                echo "Error: --name requires a value (e.g., --name \"My Idea\")" >&2
+                exit 1
+            fi
             IDEA_NAME="$1"
             ;;
         --*)
@@ -120,8 +124,8 @@ if ! [[ "$DATA_READINESS" =~ ^[0-9]+$ ]] || [[ "$DATA_READINESS" -gt 100 ]]; the
     exit 1
 fi
 
-# Effort: positive number
-if ! echo "$EFFORT" | awk '{exit ($1 > 0) ? 0 : 1}'; then
+# Effort: positive number (must be numeric)
+if ! [[ "$EFFORT" =~ ^[0-9]+(\.[0-9]+)?$ ]] || ! echo "$EFFORT" | awk '{exit ($1 > 0) ? 0 : 1}'; then
     echo "Error: EFFORT must be a positive number (got: $EFFORT)" >&2
     exit 1
 fi
@@ -173,7 +177,7 @@ classify_effort() {
     awk -v e="$e" 'BEGIN {
         if (e >= 12)     print "HIGH (≥12 weeks — quarter)"
         else if (e >= 6) print "MEDIUM (6–11 weeks — months)"
-        else if (e >= 2) print "MEDIUM (2–5 weeks)"
+        else if (e >= 2) print "MODERATE (2–5 weeks)"
         else             print "LOW (<2 weeks)"
     }'
 }

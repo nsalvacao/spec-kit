@@ -50,10 +50,10 @@ foreach ($row in $dataRows) {
     $cols = $row -split '\|' | ForEach-Object { $_.Trim() }
     # cols[0] is empty (before first |), cols[1]=IdeaID, [2]=Reach, [3]=Impact,
     # [4]=Conf, [5]=DR, [6]=Effort, [7]=Risk, [8]=AI-RICE Score, [9]=Norm_Score
+    # Idea ID (cols[1]) may contain link syntax [text](url) — numeric columns need no stripping.
     if ($cols.Count -lt 9) { continue }
 
-    # Strip link markup and percent sign
-    $rawReach  = ($cols[2] -replace '\[.*?\]\(.*?\)', '$1' -replace '\[|\]|\(.*?\)', '') -replace '[^\d.]', ''
+    $rawReach  = $cols[2] -replace '[^\d.]', ''
     $rawImpact = $cols[3] -replace '[^\d.]', ''
     $rawConf   = $cols[4] -replace '[^\d.]', ''
     $rawDr     = $cols[5] -replace '[^\d.]', ''

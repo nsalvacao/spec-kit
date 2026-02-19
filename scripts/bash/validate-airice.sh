@@ -62,8 +62,10 @@ while IFS= read -r line; do
   [[ "$line" =~ ^\|[[:space:]]*[-:]+[[:space:]]*\| ]] && continue
   [[ "$line" =~ Reach ]] && continue
 
-  # Extract columns (strip leading/trailing spaces and link syntax)
-  raw_reach=$(echo "$line"    | awk -F'|' '{print $3}' | sed 's/\[.*\]([^)]*)/\0/;s/\[//;s/\]([^)]*)//;s/[[:space:]]//g')
+  # Extract columns (strip leading/trailing spaces).
+  # Column $2 is Idea ID and may contain link syntax [text](url) — strip for display only.
+  # Numeric columns start at $3 (Reach) — simple whitespace strip suffices.
+  raw_reach=$(echo "$line"    | awk -F'|' '{print $3}' | tr -d ' ')
   raw_impact=$(echo "$line"   | awk -F'|' '{print $4}' | tr -d ' ')
   raw_conf=$(echo "$line"     | awk -F'|' '{print $5}' | tr -d ' %')
   raw_dr=$(echo "$line"       | awk -F'|' '{print $6}' | tr -d ' %')
