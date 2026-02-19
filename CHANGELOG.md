@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added explicit error codes, strict validation mode, and deterministic fallback rules
   - Added contract documentation: `docs/scope-gate-consumption-contract.md`
   - Added contract test suite: `tests/test_scope_gate_contract.py`
+- **Upstream #1506 hardening**: smart `.specify` detection now preserves existing project state by default when re-running `specify init` in current directory.
+  - Added safe `.specify` detection helper (`detect_existing_specify_state`) with symlink-aware behavior.
+  - Added explicit guard: `--force` refuses to overwrite symlinked `.specify` directories.
+  - Added regression tests: `tests/test_specify_detection.py`.
 
 ## [0.0.48] - 2026-02-19
 
