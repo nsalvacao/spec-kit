@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
+from pathlib import PurePosixPath
 
 from .scope_detection import ScopeDetectionResult, ScopeMode
 
@@ -543,7 +544,18 @@ def _normalize_artifacts(
                 )
             )
             continue
-        normalized.append(trimmed)
+        path_obj = PurePosixPath(trimmed)
+        if path_obj.is_absolute() or any(part == ".." for part in path_obj.parts):
+            issues.append(
+                ScopeGateContractIssue(
+                    code=ScopeGateErrorCode.INVALID_ARTIFACT_PATH,
+                    field="artifacts_created",
+                    message="Dropped unsafe artifact path (absolute or traversal).",
+                    severity=ScopeGateIssueSeverity.ERROR,
+                )
+            )
+            continue
+        normalized.append(str(path_obj))
     return normalized
 
 

@@ -110,6 +110,16 @@ def test_normalize_scope_gate_payload_drops_invalid_artifact_entries():
     assert any(issue.code == ScopeGateErrorCode.INVALID_ARTIFACT_PATH for issue in normalized.contract_issues)
 
 
+def test_normalize_scope_gate_payload_rejects_traversal_and_absolute_artifacts():
+    payload = build_scope_gate_payload(_sample_epic_detection_result()).to_dict()
+    payload["artifacts_created"] = ["../secrets.txt", "/abs/path", "ok/path.md"]
+
+    normalized = normalize_scope_gate_payload(payload, strict=False)
+    assert normalized.artifacts_created == ["ok/path.md"]
+    errors = [issue for issue in normalized.contract_issues if issue.code == ScopeGateErrorCode.INVALID_ARTIFACT_PATH]
+    assert errors
+
+
 def test_normalize_scope_gate_payload_includes_required_contract_fields():
     payload = build_scope_gate_payload(_sample_epic_detection_result())
     serialized = payload.to_dict()

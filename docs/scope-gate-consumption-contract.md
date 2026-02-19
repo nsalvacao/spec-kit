@@ -70,6 +70,8 @@ Examples:
 - Missing `next_action` -> derived from selected mode
 - Missing `handoff_owner` -> derived from selected mode
 - Missing/invalid `validation_status` -> derived from collected issues
+- `artifacts_created` must be relative paths (no absolute paths or `..` traversal);
+  unsafe entries are dropped and reported as `invalid_artifact_path`.
 
 ## API Surface
 
