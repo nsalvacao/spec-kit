@@ -3,11 +3,13 @@
 # Uses GitHub Models free tier — ZERO premium requests consumed
 #
 # Configurable via env block at the top of each job:
-#   REVIEW_MODEL       — model used for code review  (#77)
-#   SUMMARY_MODEL      — model used for PR summary   (#77)
-#   MAX_REVIEW_CHARS   — max diff chars for review   (#76)
-#   MAX_SUMMARY_CHARS  — max diff chars for summary  (#76)
-#   MAX_RETRY          — number of retry attempts    (#77)
+#   REVIEW_MODEL         — primary model for code review       (#77)
+#   REVIEW_FALLBACK_MODEL— fallback model if primary 429s      (#77)
+#   SUMMARY_MODEL        — primary model for PR summary        (#77)
+#   SUMMARY_FALLBACK_MODEL— fallback model if primary 429s     (#77)
+#   MAX_REVIEW_CHARS     — max diff chars for review           (#76)
+#   MAX_SUMMARY_CHARS    — max diff chars for summary          (#76)
+#   MAX_RETRY            — retry attempts per model            (#77)
 # =============================================================================
 name: AI Review
 
@@ -35,10 +37,11 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
       REVIEW_MODEL: "openai/gpt-4.1"
-      MAX_REVIEW_CHARS: "8000"
-      MAX_REVIEW_TOKENS: "1500"
-      MAX_RETRY: "3"
-      MAX_RETRY_SLEEP: "30"
+      REVIEW_FALLBACK_MODEL: "openai/gpt-4o"
+      MAX_REVIEW_CHARS: "20000"
+      MAX_REVIEW_TOKENS: "2000"
+      MAX_RETRY: "5"
+      MAX_RETRY_SLEEP: "60"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,50 +85,69 @@ jobs:
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
           DIFF_CONTENT=$(cat diff.txt)
 
-          # Retry loop with exponential backoff, capped at MAX_RETRY_SLEEP seconds (#77)
-          ATTEMPT=0
+          # Model fallback chain: primary → fallback on rate-limit exhaustion (#77)
+          MODELS=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
           HTTP_CODE=""
-          while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "Attempt $ATTEMPT/$MAX_RETRY..."
+          BODY=""
+          USED_MODEL=""
 
-            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              "https://models.github.ai/inference/chat/completions" \
-              -H "Authorization: Bearer $GH_MODELS_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$(jq -n \
-                --arg system "$SYSTEM_PROMPT" \
-                --arg diff "$DIFF_CONTENT" \
-                --arg model "$REVIEW_MODEL" \
-                --argjson max_tokens "$MAX_REVIEW_TOKENS" \
-                '{
-                  model: $model,
-                  messages: [
-                    {role: "system", content: $system},
-                    {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
-                  ],
-                  max_tokens: $max_tokens,
-                  temperature: 0.2
-                }')")
+          for MODEL in "${MODELS[@]}"; do
+            echo "Trying model: $MODEL"
+            ATTEMPT=0
+            while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+              echo "Attempt $ATTEMPT/$MAX_RETRY with $MODEL..."
 
-            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                "https://models.github.ai/inference/chat/completions" \
+                -H "Authorization: Bearer $GH_MODELS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$(jq -n \
+                  --arg system "$SYSTEM_PROMPT" \
+                  --arg diff "$DIFF_CONTENT" \
+                  --arg model "$MODEL" \
+                  --argjson max_tokens "$MAX_REVIEW_TOKENS" \
+                  '{
+                    model: $model,
+                    messages: [
+                      {role: "system", content: $system},
+                      {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
+                    ],
+                    max_tokens: $max_tokens,
+                    temperature: 0.2
+                  }')")
 
-            if [ "$HTTP_CODE" = "200" ]; then
-              break
-            fi
+              HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+              BODY=$(echo "$RESPONSE" | sed '$d')
 
-            echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
-            if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-              RAW_SLEEP=$((2 ** ATTEMPT))
-              SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
-              echo "Retrying in ${SLEEP}s..."
-              sleep "$SLEEP"
+              if [ "$HTTP_CODE" = "200" ]; then
+                USED_MODEL="$MODEL"
+                break 2
+              fi
+
+              echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
+              if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
+                RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
+                if [ -n "$RETRY_AFTER" ]; then
+                  SLEEP="$RETRY_AFTER"
+                else
+                  RAW_SLEEP=$((2 ** ATTEMPT))
+                  SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
+                fi
+                JITTER=$((RANDOM % 5))
+                SLEEP=$((SLEEP + JITTER))
+                echo "Retrying in ${SLEEP}s..."
+                sleep "$SLEEP"
+              fi
+            done
+
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
             fi
           done
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Models API returned HTTP $HTTP_CODE after $MAX_RETRY attempts"
+            echo "::error::All models failed after exhausting retries. Last HTTP $HTTP_CODE"
             echo "$BODY" | jq .error 2>/dev/null || true
             exit 1
           fi
@@ -138,6 +160,7 @@ jobs:
 
           echo "$REVIEW_TEXT" > review.md
           echo "tokens=$(echo "$BODY" | jq '.usage.total_tokens')" >> "$GITHUB_OUTPUT"
+          echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
 
       - name: Post review comment
         if: steps.diff.outputs.skip != 'true'
@@ -150,7 +173,7 @@ jobs:
             const truncated = '${{ steps.diff.outputs.truncated }}' === 'true';
             const truncatedAt = '${{ steps.diff.outputs.truncated_at }}';
             const tokens = '${{ steps.review.outputs.tokens }}';
-            const model = '${{ env.REVIEW_MODEL }}';
+            const model = '${{ steps.review.outputs.model }}';
 
             let footer = `\n\n---\n*🤖 AI Review · ${model} · ${tokens} tokens · GitHub Models free tier · 0 premium requests*`;
             if (truncated) {
@@ -173,10 +196,11 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
       SUMMARY_MODEL: "openai/gpt-4.1-mini"
-      MAX_SUMMARY_CHARS: "6000"
-      MAX_SUMMARY_TOKENS: "800"
-      MAX_RETRY: "3"
-      MAX_RETRY_SLEEP: "30"
+      SUMMARY_FALLBACK_MODEL: "openai/gpt-4o-mini"
+      MAX_SUMMARY_CHARS: "12000"
+      MAX_SUMMARY_TOKENS: "1000"
+      MAX_RETRY: "5"
+      MAX_RETRY_SLEEP: "60"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -199,6 +223,7 @@ jobs:
 
       - name: Generate summary (with retry)
         if: steps.info.outputs.skip != 'true'
+        id: summary
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
         run: |
@@ -210,56 +235,76 @@ jobs:
           FILES=$(cat files.txt)
           DIFF=$(cat diff.txt)
 
-          # Retry loop with exponential backoff, capped at MAX_RETRY_SLEEP seconds (#77)
-          ATTEMPT=0
+          # Model fallback chain: primary → fallback on rate-limit exhaustion (#77)
+          MODELS=("$SUMMARY_MODEL" "$SUMMARY_FALLBACK_MODEL")
           HTTP_CODE=""
-          while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "Attempt $ATTEMPT/$MAX_RETRY..."
+          BODY=""
+          USED_MODEL=""
 
-            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              "https://models.github.ai/inference/chat/completions" \
-              -H "Authorization: Bearer $GH_MODELS_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$(jq -n \
-                --arg system "$SYSTEM" \
-                --arg files "$FILES" \
-                --arg diff "$DIFF" \
-                --arg model "$SUMMARY_MODEL" \
-                --argjson max_tokens "$MAX_SUMMARY_TOKENS" \
-                '{
-                  model: $model,
-                  messages: [
-                    {role: "system", content: $system},
-                    {role: "user", content: ("Files changed:\n" + $files + "\n\nDiff:\n" + $diff)}
-                  ],
-                  max_tokens: $max_tokens,
-                  temperature: 0.3
-                }')")
+          for MODEL in "${MODELS[@]}"; do
+            echo "Trying model: $MODEL"
+            ATTEMPT=0
+            while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+              echo "Attempt $ATTEMPT/$MAX_RETRY with $MODEL..."
 
-            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                "https://models.github.ai/inference/chat/completions" \
+                -H "Authorization: Bearer $GH_MODELS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$(jq -n \
+                  --arg system "$SYSTEM" \
+                  --arg files "$FILES" \
+                  --arg diff "$DIFF" \
+                  --arg model "$MODEL" \
+                  --argjson max_tokens "$MAX_SUMMARY_TOKENS" \
+                  '{
+                    model: $model,
+                    messages: [
+                      {role: "system", content: $system},
+                      {role: "user", content: ("Files changed:\n" + $files + "\n\nDiff:\n" + $diff)}
+                    ],
+                    max_tokens: $max_tokens,
+                    temperature: 0.3
+                  }')")
 
-            if [ "$HTTP_CODE" = "200" ]; then
-              break
-            fi
+              HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+              BODY=$(echo "$RESPONSE" | sed '$d')
 
-            echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
-            if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-              RAW_SLEEP=$((2 ** ATTEMPT))
-              SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
-              echo "Retrying in ${SLEEP}s..."
-              sleep "$SLEEP"
+              if [ "$HTTP_CODE" = "200" ]; then
+                USED_MODEL="$MODEL"
+                break 2
+              fi
+
+              echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
+              if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
+                RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
+                if [ -n "$RETRY_AFTER" ]; then
+                  SLEEP="$RETRY_AFTER"
+                else
+                  RAW_SLEEP=$((2 ** ATTEMPT))
+                  SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
+                fi
+                JITTER=$((RANDOM % 5))
+                SLEEP=$((SLEEP + JITTER))
+                echo "Retrying in ${SLEEP}s..."
+                sleep "$SLEEP"
+              fi
+            done
+
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
             fi
           done
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Models API returned HTTP $HTTP_CODE after $MAX_RETRY attempts"
+            echo "::error::All models failed after exhausting retries. Last HTTP $HTTP_CODE"
             echo "$BODY" | jq .error 2>/dev/null || true
             exit 1
           fi
 
           echo "$BODY" | jq -r '.choices[0].message.content' > summary.md
+          echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
 
       - name: Post summary
         if: steps.info.outputs.skip != 'true'
@@ -269,7 +314,7 @@ jobs:
           script: |
             const fs = require('fs');
             const summary = fs.readFileSync('summary.md', 'utf8');
-            const model = '${{ env.SUMMARY_MODEL }}';
+            const model = '${{ steps.summary.outputs.model }}';
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: context.issue.number,
