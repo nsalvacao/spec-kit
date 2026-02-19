@@ -268,23 +268,24 @@ if ($hasGit) {
     $branchCreated = $false
     try {
         git checkout -b $branchName 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            $branchCreated = $true
-        }
+        $branchCreated = $true
     } catch {
         # Exception during git command
     }
 
     if (-not $branchCreated) {
-        # Check if branch already exists
-        $existingBranch = git branch --list $branchName 2>$null
-        if ($existingBranch) {
-            Write-Error "Error: Branch '$branchName' already exists. Please use a different feature name or specify a different number with -Number."
-            exit 1
-        } else {
-            Write-Error "Error: Failed to create git branch '$branchName'. Please check your git configuration and try again."
-            exit 1
+        try {
+            # Check if branch already exists
+            $existingBranch = git branch --list $branchName 2>$null
+            if ($existingBranch) {
+                Write-Error "Error: Branch '$branchName' already exists. Please use a different feature name or specify a different number with -Number."
+            } else {
+                Write-Error "Error: Failed to create git branch '$branchName'. Please check your git configuration and try again."
+            }
+        } catch {
+            Write-Error "Error: Failed to create git branch '$branchName'. Could not determine cause. Please check your git configuration and repository state."
         }
+        exit 1
     }
 } else {
     Write-Warning "[specify] Warning: Git repository not detected; skipped branch creation for $branchName"
