@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.49] - 2026-02-19
+
 ### Added
 
 - **#105: Stable gate consumption contract for CLI/TTY/API (`scope-gate-consumption.v1`)**

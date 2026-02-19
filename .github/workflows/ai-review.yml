@@ -177,6 +177,7 @@ jobs:
           if [ "$CHUNK_REQUIRED" -eq 0 ]; then
             DIFF_CONTENT=$(cat diff_full.txt)
             if review_with_chain "$DIFF_CONTENT" "full-diff" "full"; then
+              cp review_full.md review.md
               echo "tokens=$(cat tokens_full.txt)" >> "$GITHUB_OUTPUT"
               echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
               echo "chunked=false" >> "$GITHUB_OUTPUT"
