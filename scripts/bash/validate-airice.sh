@@ -49,4 +49,84 @@ for item in "${required_breakdown[@]}"; do
   fi
 done
 
+# --- Semantic validation: verify formula and value ranges (issue #21) ---
+# Parse table data rows, compute expected AI-RICE score, compare with stored.
+# Table format: | Idea ID | Reach | Impact | Confidence | Data_Readiness | Effort | Risk | AI-RICE Score | Norm_Score |
+# Confidence and Data_Readiness stored as integers 0-100 (e.g. "70%").
+
+semantic_errors=0
+
+while IFS= read -r line; do
+  # Skip blank lines, header row, separator row
+  [[ -z "$line" ]] && continue
+  [[ "$line" =~ ^\|[[:space:]]*[-:]+[[:space:]]*\| ]] && continue
+  [[ "$line" =~ Reach ]] && continue
+
+  # Extract columns (strip leading/trailing spaces).
+  # Column $2 is Idea ID and may contain link syntax [text](url) — strip for display only.
+  # Numeric columns start at $3 (Reach) — simple whitespace strip suffices.
+  raw_reach=$(echo "$line"    | awk -F'|' '{print $3}' | tr -d ' ')
+  raw_impact=$(echo "$line"   | awk -F'|' '{print $4}' | tr -d ' ')
+  raw_conf=$(echo "$line"     | awk -F'|' '{print $5}' | tr -d ' %')
+  raw_dr=$(echo "$line"       | awk -F'|' '{print $6}' | tr -d ' %')
+  raw_effort=$(echo "$line"   | awk -F'|' '{print $7}' | tr -d ' ')
+  raw_risk=$(echo "$line"     | awk -F'|' '{print $8}' | tr -d ' ')
+  stored_score=$(echo "$line" | awk -F'|' '{print $9}' | tr -d ' ')
+
+  # Skip rows where columns are not all numeric (e.g. template placeholders)
+  for val in "$raw_reach" "$raw_impact" "$raw_conf" "$raw_dr" "$raw_effort" "$raw_risk" "$stored_score"; do
+    if ! echo "$val" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+      continue 2
+    fi
+  done
+
+  # Validate ranges
+  if ! awk -v c="$raw_conf" 'BEGIN { exit (c >= 0 && c <= 100) ? 0 : 1 }'; then
+    echo "Error: CONFIDENCE out of range (0-100): $raw_conf in row: $line"
+    semantic_errors=$((semantic_errors + 1))
+    continue
+  fi
+  if ! awk -v dr="$raw_dr" 'BEGIN { exit (dr >= 0 && dr <= 100) ? 0 : 1 }'; then
+    echo "Error: DATA_READINESS out of range (0-100): $raw_dr in row: $line"
+    semantic_errors=$((semantic_errors + 1))
+    continue
+  fi
+  if ! awk -v r="$raw_risk" 'BEGIN { exit (r >= 1 && r <= 10) ? 0 : 1 }'; then
+    echo "Error: RISK out of range (1-10): $raw_risk in row: $line"
+    semantic_errors=$((semantic_errors + 1))
+    continue
+  fi
+  if ! awk -v e="$raw_effort" 'BEGIN { exit (e > 0) ? 0 : 1 }'; then
+    echo "Error: EFFORT must be positive: $raw_effort in row: $line"
+    semantic_errors=$((semantic_errors + 1))
+    continue
+  fi
+
+  # Verify formula: expected = (R * I * C * DR) / (E * Risk)
+  result=$(awk -v r="$raw_reach" -v i="$raw_impact" -v c="$raw_conf" \
+    -v dr="$raw_dr" -v e="$raw_effort" -v risk="$raw_risk" -v stored="$stored_score" \
+    'BEGIN {
+      expected = (r * i * c * dr) / (e * risk)
+      diff = expected - stored
+      if (diff < 0) diff = -diff
+      if (diff > 0.5) {
+        printf "MISMATCH: expected=%.2f stored=%s\n", expected, stored
+      } else {
+        print "OK"
+      }
+    }')
+
+  if [[ "$result" != "OK" ]]; then
+    echo "Error: AI-RICE formula $result for row (Reach=$raw_reach Impact=$raw_impact Conf=$raw_conf% DR=$raw_dr% Effort=$raw_effort Risk=$raw_risk)"
+    semantic_errors=$((semantic_errors + 1))
+  fi
+done < <(grep "^\|" "$FILE_PATH" | tail -n +3)
+
+if [ "$semantic_errors" -gt 0 ]; then
+  if [ -x "$STATE_LOG" ]; then
+    "$STATE_LOG" "select" "Framework-Driven Development" "AI-RICE semantic validation failed ($semantic_errors errors)" "high" "validate-airice"
+  fi
+  exit 1
+fi
+
 echo "AI-RICE validation passed"
