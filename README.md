@@ -23,6 +23,7 @@
 - [Core Capabilities](#core-capabilities)
 - [Workflow at a Glance](#workflow-at-a-glance)
 - [Supported AI Agents](#supported-ai-agents)
+- [What is `uv`?](#what-is-uv)
 - [Install](#install)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
@@ -134,6 +135,64 @@ Purpose:
 | `bob` | IBM Bob | IDE | `.bob/` |
 
 For per-agent details and install links, see `docs/agents.md` and the live `AGENT_CONFIG` in `src/specify_cli/__init__.py`.
+
+## What is `uv`?
+
+**[`uv`](https://docs.astral.sh/uv/)** is an extremely fast Python package and project manager, written in Rust. It's a modern replacement for tools like `pip`, `pip-tools`, `pipx`, `poetry`, `pyenv`, and `virtualenv` — all in a single, blazingly fast tool.
+
+### Why Spec Kit Uses `uv`
+
+Spec Kit uses `uv` because it:
+
+- **Installs and manages Python versions** automatically
+- **Installs Python packages 10-100x faster** than pip
+- **Provides a built-in tool manager** (replacing `pipx`) for CLI tools like `specify`
+- **Works consistently** across macOS, Linux, and Windows
+- **Requires zero configuration** to get started
+
+### Installing `uv`
+
+#### macOS and Linux
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### Windows
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+#### Alternative Installation Methods
+
+**macOS (Homebrew):**
+
+```bash
+brew install uv
+```
+
+**Linux (snap):**
+
+```bash
+sudo snap install astral-uv --classic
+```
+
+**With pip:**
+
+```bash
+pip install uv
+```
+
+For more installation options and troubleshooting, see the [official uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).
+
+### Verifying Installation
+
+After installation, verify that `uv` is available:
+
+```bash
+uv --version
+```
 
 ## Install
 
