@@ -106,6 +106,8 @@ Each signal is emitted in the output `signals` array with:
 
 For the canonical dimension table (weights, formulas, tie-break rules, and
 rationale template), see `docs/scope-scoring-rubric.md`.
+Downstream consumers can validate rubric payload structure via
+`validate_scope_scoring_rubric_payload(...)`.
 
 ## Output Contract
 

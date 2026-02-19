@@ -17,6 +17,23 @@ from .project_config import load_project_config
 
 CONTRACT_VERSION = "scope-detection.v1"
 SCORING_RUBRIC_VERSION = "scope-scoring-rubric.v1"
+SCORING_RUBRIC_AGGREGATION_FORMULA = "total_score = min(max_total_score, sum(signal_scores))"
+SCORING_RUBRIC_TIE_BREAK_RULE = (
+    "Inclusive upper-bound comparison: score <= feature_max_score => feature; "
+    "feature_max_score < score <= epic_max_score => epic; "
+    "score > epic_max_score => program."
+)
+SCORING_RUBRIC_REQUIRED_KEYS = frozenset(
+    {
+        "rubric_version",
+        "contract_version",
+        "aggregation_formula",
+        "score_bands",
+        "tie_break_rule",
+        "rationale_rule",
+        "dimensions",
+    }
+)
 
 DEFAULT_COMPLEXITY_KEYWORDS = frozenset(
     {
@@ -406,17 +423,13 @@ def scope_scoring_rubric(*, config: ScopeDetectionConfig | None = None) -> dict[
     resolved_config = config or ScopeDetectionConfig()
     resolved_config.validate()
 
-    return {
+    rubric_payload = {
         "rubric_version": SCORING_RUBRIC_VERSION,
         "contract_version": CONTRACT_VERSION,
-        "aggregation_formula": "total_score = min(max_total_score, sum(signal_scores))",
+        "aggregation_formula": SCORING_RUBRIC_AGGREGATION_FORMULA,
         "score_bands": _score_band_definitions(resolved_config),
         "tie_break_rule": {
-            "classification": (
-                "Inclusive upper-bound comparison: score <= feature_max_score => feature; "
-                "feature_max_score < score <= epic_max_score => epic; "
-                "score > epic_max_score => program."
-            ),
+            "classification": SCORING_RUBRIC_TIE_BREAK_RULE,
             "boundary_proximity_confidence_rule": {
                 "distance_threshold": resolved_config.confidence_boundary_distance_threshold,
                 "penalty": resolved_config.confidence_boundary_penalty,
@@ -512,6 +525,41 @@ def scope_scoring_rubric(*, config: ScopeDetectionConfig | None = None) -> dict[
             },
         ],
     }
+    validate_scope_scoring_rubric_payload(rubric_payload, strict=True)
+    return rubric_payload
+
+
+def validate_scope_scoring_rubric_payload(
+    payload: Mapping[str, Any],
+    *,
+    strict: bool = True,
+) -> None:
+    """Validate rubric payload structure for downstream consumers.
+
+    This helper allows explicit schema validation for channels that consume the
+    machine-readable rubric. In strict mode, unknown top-level keys are
+    rejected to avoid silent contract drift.
+    """
+    if not isinstance(payload, Mapping):
+        raise TypeError("rubric payload must be a mapping")
+
+    payload_keys = set(payload.keys())
+    missing_keys = sorted(SCORING_RUBRIC_REQUIRED_KEYS - payload_keys)
+    if missing_keys:
+        raise ValueError(f"Rubric payload missing required keys: {', '.join(missing_keys)}")
+
+    if strict:
+        unknown_keys = sorted(payload_keys - SCORING_RUBRIC_REQUIRED_KEYS)
+        if unknown_keys:
+            raise ValueError(f"Rubric payload contains unknown keys: {', '.join(unknown_keys)}")
+
+    score_bands = payload.get("score_bands")
+    if not isinstance(score_bands, list) or len(score_bands) != 3:
+        raise ValueError("Rubric payload score_bands must be a list with 3 entries")
+
+    dimensions = payload.get("dimensions")
+    if not isinstance(dimensions, list) or not dimensions:
+        raise ValueError("Rubric payload dimensions must be a non-empty list")
 
 
 def scope_detection_config_from_mapping(raw_config: Mapping[str, Any] | None) -> ScopeDetectionConfig:

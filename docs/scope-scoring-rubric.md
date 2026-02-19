@@ -82,10 +82,28 @@ This guarantees reproducible rationale generation across agents/channels.
 ## Machine-Readable Rubric API
 
 ```python
-from specify_cli.scope_detection import scope_scoring_rubric
+from specify_cli.scope_detection import (
+    scope_scoring_rubric,
+    validate_scope_scoring_rubric_payload,
+)
 
 rubric = scope_scoring_rubric()
+validate_scope_scoring_rubric_payload(rubric, strict=True)
 print(rubric["score_bands"])
 ```
 
 Use this API to avoid duplicating hardcoded rubric values in downstream tooling.
+
+## Schema Stability Policy
+
+- `scope_scoring_rubric()` always emits the required top-level keys:
+  - `rubric_version`
+  - `contract_version`
+  - `aggregation_formula`
+  - `score_bands`
+  - `tie_break_rule`
+  - `rationale_rule`
+  - `dimensions`
+- Downstream consumers can validate payloads with
+  `validate_scope_scoring_rubric_payload(...)`.
+- Any breaking shape changes require a rubric version bump.

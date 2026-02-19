@@ -4,6 +4,7 @@ import pytest
 
 from specify_cli.scope_detection import (
     CONTRACT_VERSION,
+    SCORING_RUBRIC_AGGREGATION_FORMULA,
     SCORING_RUBRIC_VERSION,
     ScopeDetectionConfig,
     ScopeDetectionInput,
@@ -13,6 +14,7 @@ from specify_cli.scope_detection import (
     load_scope_detection_config,
     scope_scoring_rubric,
     scope_detection_config_from_mapping,
+    validate_scope_scoring_rubric_payload,
 )
 
 
@@ -348,18 +350,20 @@ def test_unknown_scope_detection_config_key_raises_error():
 
 
 def test_scope_scoring_rubric_has_expected_defaults():
+    defaults = ScopeDetectionConfig()
     rubric = scope_scoring_rubric()
 
     assert rubric["rubric_version"] == SCORING_RUBRIC_VERSION
     assert rubric["contract_version"] == CONTRACT_VERSION
-    assert rubric["aggregation_formula"] == "total_score = min(max_total_score, sum(signal_scores))"
+    assert rubric["aggregation_formula"] == SCORING_RUBRIC_AGGREGATION_FORMULA
     assert rubric["score_bands"] == [
-        {"mode": "feature", "min_score": 0, "max_score": 34},
-        {"mode": "epic", "min_score": 35, "max_score": 64},
-        {"mode": "program", "min_score": 65, "max_score": 100},
+        {"mode": "feature", "min_score": 0, "max_score": defaults.feature_max_score},
+        {"mode": "epic", "min_score": defaults.feature_max_score + 1, "max_score": defaults.epic_max_score},
+        {"mode": "program", "min_score": defaults.epic_max_score + 1, "max_score": defaults.max_total_score},
     ]
     assert rubric["rationale_rule"]["min_reasons"] == 2
     assert rubric["rationale_rule"]["max_primary_reasons"] == 3
+    validate_scope_scoring_rubric_payload(rubric, strict=True)
 
 
 def test_scope_scoring_rubric_respects_custom_config():
@@ -394,3 +398,26 @@ def test_scope_scoring_rubric_dimensions_match_signal_contract():
     rubric_dimension_names = {dimension["name"] for dimension in scope_scoring_rubric()["dimensions"]}
 
     assert rubric_dimension_names == signal_names
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_missing_required_keys():
+    payload = scope_scoring_rubric()
+    payload.pop("dimensions")
+
+    with pytest.raises(ValueError, match="missing required keys"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_unknown_keys_in_strict_mode():
+    payload = scope_scoring_rubric()
+    payload["unknown_key"] = "value"
+
+    with pytest.raises(ValueError, match="unknown keys"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_allows_unknown_keys_in_non_strict_mode():
+    payload = scope_scoring_rubric()
+    payload["future_extension"] = {"foo": "bar"}
+
+    validate_scope_scoring_rubric_payload(payload, strict=False)
