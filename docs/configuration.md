@@ -48,6 +48,7 @@ The adaptive scope engine currently consumes:
 See full contract and examples in:
 
 - `docs/adaptive-scope-detection-contract.md`
+- `docs/scope-scoring-rubric.md`
 
 ## Reuse Guidance for Future Features
 

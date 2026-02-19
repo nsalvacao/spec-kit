@@ -4,13 +4,17 @@ import pytest
 
 from specify_cli.scope_detection import (
     CONTRACT_VERSION,
+    SCORING_RUBRIC_AGGREGATION_FORMULA,
+    SCORING_RUBRIC_VERSION,
     ScopeDetectionConfig,
     ScopeDetectionInput,
     ScopeMode,
     detect_scope_for_project,
     detect_scope,
     load_scope_detection_config,
+    scope_scoring_rubric,
     scope_detection_config_from_mapping,
+    validate_scope_scoring_rubric_payload,
 )
 
 
@@ -343,3 +347,114 @@ scope_detection:
 def test_unknown_scope_detection_config_key_raises_error():
     with pytest.raises(ValueError, match="Unknown scope_detection config keys"):
         scope_detection_config_from_mapping({"unknown_key": 123})
+
+
+def test_scope_scoring_rubric_has_expected_defaults():
+    defaults = ScopeDetectionConfig()
+    rubric = scope_scoring_rubric()
+
+    assert rubric["rubric_version"] == SCORING_RUBRIC_VERSION
+    assert rubric["contract_version"] == CONTRACT_VERSION
+    assert rubric["aggregation_formula"] == SCORING_RUBRIC_AGGREGATION_FORMULA
+    assert rubric["score_bands"] == [
+        {"mode": "feature", "min_score": 0, "max_score": defaults.feature_max_score},
+        {"mode": "epic", "min_score": defaults.feature_max_score + 1, "max_score": defaults.epic_max_score},
+        {"mode": "program", "min_score": defaults.epic_max_score + 1, "max_score": defaults.max_total_score},
+    ]
+    assert rubric["rationale_rule"]["min_reasons"] == 2
+    assert rubric["rationale_rule"]["max_primary_reasons"] == 3
+    validate_scope_scoring_rubric_payload(rubric, strict=True)
+
+
+def test_scope_scoring_rubric_respects_custom_config():
+    rubric = scope_scoring_rubric(
+        config=ScopeDetectionConfig(
+            feature_max_score=20,
+            epic_max_score=50,
+            max_total_score=80,
+            work_items_multiplier=2,
+            keyword_cap=5,
+            risk_weights={"low": 1, "medium": 4, "high": 8, "critical": 12},
+            complexity_keywords=frozenset({"platform", "cutover"}),
+        )
+    )
+
+    assert rubric["score_bands"] == [
+        {"mode": "feature", "min_score": 0, "max_score": 20},
+        {"mode": "epic", "min_score": 21, "max_score": 50},
+        {"mode": "program", "min_score": 51, "max_score": 80},
+    ]
+
+    by_name = {dimension["name"]: dimension for dimension in rubric["dimensions"]}
+    assert by_name["expected_work_items"]["weight"] == 2
+    assert by_name["complexity_keywords"]["cap"] == 5
+    assert by_name["risk_level"]["weight_map"] == {"critical": 12, "high": 8, "low": 1, "medium": 4}
+    assert by_name["complexity_keywords"]["keyword_source"] == ["cutover", "platform"]
+
+
+def test_scope_scoring_rubric_dimensions_match_signal_contract():
+    result = detect_scope(ScopeDetectionInput(description="Simple task."))
+    signal_names = {signal.name for signal in result.signals}
+    rubric_dimension_names = {dimension["name"] for dimension in scope_scoring_rubric()["dimensions"]}
+
+    assert rubric_dimension_names == signal_names
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_missing_required_keys():
+    payload = scope_scoring_rubric()
+    payload.pop("dimensions")
+
+    with pytest.raises(ValueError, match="missing required keys"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_unknown_keys_in_strict_mode():
+    payload = scope_scoring_rubric()
+    payload["unknown_key"] = "value"
+
+    with pytest.raises(ValueError, match="unknown keys"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_allows_unknown_keys_in_non_strict_mode():
+    payload = scope_scoring_rubric()
+    payload["future_extension"] = {"foo": "bar"}
+
+    result = validate_scope_scoring_rubric_payload(payload, strict=False)
+    assert result is None
+    assert "future_extension" in payload
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_wrong_band_count_for_v1():
+    payload = scope_scoring_rubric()
+    payload["score_bands"] = payload["score_bands"] + [{"mode": "experimental", "min_score": 101, "max_score": 120}]
+
+    with pytest.raises(ValueError, match="exactly 3 entries for v1"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_allows_different_band_count_for_future_version():
+    payload = scope_scoring_rubric()
+    payload["rubric_version"] = "scope-scoring-rubric.v2"
+    payload["score_bands"] = payload["score_bands"] + [{"mode": "experimental", "min_score": 101, "max_score": 120}]
+
+    validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_invalid_score_band_shape():
+    payload = scope_scoring_rubric()
+    payload["score_bands"][0] = {"mode": "feature", "min_score": 0}
+
+    with pytest.raises(ValueError, match="must include mode, min_score, and max_score"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_validate_scope_scoring_rubric_payload_rejects_duplicate_dimension_names():
+    payload = scope_scoring_rubric()
+    payload["dimensions"] = [
+        {"name": "dimension_a"},
+        {"name": "dimension_a"},
+    ]
+
+    with pytest.raises(ValueError, match="Dimension names must be unique"):
+        validate_scope_scoring_rubric_payload(payload, strict=True)

@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved keyword matching to avoid substring false positives
   - Added contract documentation: `docs/adaptive-scope-detection-contract.md`
   - Added unit tests for simple/intermediate/large scenarios and boundary regression (`34/35/64/65`)
+- **#102: Scope scoring rubric specification (`scope-scoring-rubric.v1`)**
+  - Added canonical rubric documentation: `docs/scope-scoring-rubric.md`
+  - Added machine-readable rubric export: `scope_scoring_rubric()` in `src/specify_cli/scope_detection.py`
+  - Added rubric payload schema validator: `validate_scope_scoring_rubric_payload(...)`
+  - Added version-aware score band validation (`v1` enforces exactly 3 bands)
+  - Added deeper rubric shape checks (score band item fields/types, unique dimension names)
+  - Formalized deterministic tie-break and rationale-template rules for multi-channel consistency
+  - Added rubric conformance tests in `tests/test_scope_detection.py`
 
 ### Changed
 

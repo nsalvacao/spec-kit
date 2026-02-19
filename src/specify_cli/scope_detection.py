@@ -16,6 +16,24 @@ from .project_config import load_project_config
 
 
 CONTRACT_VERSION = "scope-detection.v1"
+SCORING_RUBRIC_VERSION = "scope-scoring-rubric.v1"
+SCORING_RUBRIC_AGGREGATION_FORMULA = "total_score = min(max_total_score, sum(signal_scores))"
+SCORING_RUBRIC_TIE_BREAK_RULE = (
+    "Inclusive upper-bound comparison: score <= feature_max_score => feature; "
+    "feature_max_score < score <= epic_max_score => epic; "
+    "score > epic_max_score => program."
+)
+SCORING_RUBRIC_REQUIRED_KEYS = frozenset(
+    {
+        "rubric_version",
+        "contract_version",
+        "aggregation_formula",
+        "score_bands",
+        "tie_break_rule",
+        "rationale_rule",
+        "dimensions",
+    }
+)
 
 DEFAULT_COMPLEXITY_KEYWORDS = frozenset(
     {
@@ -396,6 +414,181 @@ def detect_scope(
     )
 
 
+def scope_scoring_rubric(*, config: ScopeDetectionConfig | None = None) -> dict[str, Any]:
+    """Return a versioned and machine-readable scoring rubric.
+
+    This rubric is the canonical definition for dimension weights, thresholds,
+    tie-break behavior, and rationale generation rules used by `detect_scope`.
+    """
+    resolved_config = config or ScopeDetectionConfig()
+    resolved_config.validate()
+
+    rubric_payload = {
+        "rubric_version": SCORING_RUBRIC_VERSION,
+        "contract_version": CONTRACT_VERSION,
+        "aggregation_formula": SCORING_RUBRIC_AGGREGATION_FORMULA,
+        "score_bands": _score_band_definitions(resolved_config),
+        "tie_break_rule": {
+            "classification": SCORING_RUBRIC_TIE_BREAK_RULE,
+            "boundary_proximity_confidence_rule": {
+                "distance_threshold": resolved_config.confidence_boundary_distance_threshold,
+                "penalty": resolved_config.confidence_boundary_penalty,
+                "description": (
+                    "When a score is within threshold distance from classification boundaries, "
+                    "confidence is reduced while mode selection remains deterministic."
+                ),
+            },
+        },
+        "rationale_rule": {
+            "positive_signal_sorting": "score descending, then signal name ascending",
+            "max_primary_reasons": 3,
+            "min_reasons": 2,
+            "fallback_behavior": (
+                "If fewer than two positive signals exist, append mode-specific fallback rationale "
+                "until at least two reasons are returned."
+            ),
+        },
+        "dimensions": [
+            {
+                "name": "timeline_weeks",
+                "input_field": "estimated_timeline_weeks",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, estimated_timeline_weeks - 1)",
+                "weight": resolved_config.timeline_multiplier,
+                "cap": resolved_config.timeline_cap,
+            },
+            {
+                "name": "expected_work_items",
+                "input_field": "expected_work_items",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, expected_work_items - 1)",
+                "weight": resolved_config.work_items_multiplier,
+                "cap": resolved_config.work_items_cap,
+            },
+            {
+                "name": "dependency_count",
+                "input_field": "dependency_count",
+                "scoring_type": "scaled",
+                "raw_formula": "dependency_count",
+                "weight": resolved_config.dependency_multiplier,
+                "cap": resolved_config.dependency_cap,
+            },
+            {
+                "name": "integration_surface_count",
+                "input_field": "integration_surface_count",
+                "scoring_type": "scaled",
+                "raw_formula": "integration_surface_count",
+                "weight": resolved_config.integration_multiplier,
+                "cap": resolved_config.integration_cap,
+            },
+            {
+                "name": "domain_count",
+                "input_field": "domain_count",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, domain_count - 1)",
+                "weight": resolved_config.domain_multiplier,
+                "cap": resolved_config.domain_cap,
+            },
+            {
+                "name": "cross_team_count",
+                "input_field": "cross_team_count",
+                "scoring_type": "scaled",
+                "raw_formula": "max(0, cross_team_count - 1)",
+                "weight": resolved_config.cross_team_multiplier,
+                "cap": resolved_config.cross_team_cap,
+            },
+            {
+                "name": "risk_level",
+                "input_field": "risk_level",
+                "scoring_type": "mapped",
+                "weight_map": {key: resolved_config.risk_weights[key] for key in sorted(resolved_config.risk_weights)},
+            },
+            {
+                "name": "requires_compliance_review",
+                "input_field": "requires_compliance_review",
+                "scoring_type": "boolean",
+                "enabled_score": resolved_config.compliance_score,
+            },
+            {
+                "name": "requires_migration",
+                "input_field": "requires_migration",
+                "scoring_type": "boolean",
+                "enabled_score": resolved_config.migration_score,
+            },
+            {
+                "name": "complexity_keywords",
+                "input_field": "description",
+                "scoring_type": "keyword_count",
+                "keyword_source": sorted(resolved_config.complexity_keywords),
+                "weight": 1,
+                "cap": resolved_config.keyword_cap,
+            },
+        ],
+    }
+    validate_scope_scoring_rubric_payload(rubric_payload, strict=True)
+    return rubric_payload
+
+
+def validate_scope_scoring_rubric_payload(
+    payload: Mapping[str, Any],
+    *,
+    strict: bool = True,
+) -> None:
+    """Validate rubric payload structure for downstream consumers.
+
+    This helper allows explicit schema validation for channels that consume the
+    machine-readable rubric. Any mapping type is supported (e.g., dict-like
+    objects). In strict mode, unknown top-level keys are rejected to avoid
+    silent contract drift.
+    """
+    if not isinstance(payload, Mapping):
+        raise TypeError("rubric payload must be a mapping")
+
+    payload_keys = set(payload.keys())
+    missing_keys = sorted(SCORING_RUBRIC_REQUIRED_KEYS - payload_keys)
+    if missing_keys:
+        raise ValueError(f"Rubric payload missing required keys: {', '.join(missing_keys)}")
+
+    if strict:
+        unknown_keys = sorted(payload_keys - SCORING_RUBRIC_REQUIRED_KEYS)
+        if unknown_keys:
+            raise ValueError(f"Rubric payload contains unknown keys: {', '.join(unknown_keys)}")
+
+    score_bands = payload.get("score_bands")
+    if not isinstance(score_bands, list) or not score_bands:
+        raise ValueError("Rubric payload score_bands must be a non-empty list")
+    if payload.get("rubric_version") == SCORING_RUBRIC_VERSION and len(score_bands) != 3:
+        raise ValueError("Rubric payload score_bands must include exactly 3 entries for v1")
+    for band in score_bands:
+        if not isinstance(band, Mapping):
+            raise ValueError("Each score band must be a mapping")
+        if {"mode", "min_score", "max_score"} - set(band.keys()):
+            raise ValueError("Each score band must include mode, min_score, and max_score")
+        if not isinstance(band["mode"], str):
+            raise ValueError("Score band mode must be a string")
+        if isinstance(band["min_score"], bool) or not isinstance(band["min_score"], int):
+            raise ValueError("Score band min_score must be an integer")
+        if isinstance(band["max_score"], bool) or not isinstance(band["max_score"], int):
+            raise ValueError("Score band max_score must be an integer")
+        if band["min_score"] > band["max_score"]:
+            raise ValueError("Score band min_score cannot be greater than max_score")
+
+    dimensions = payload.get("dimensions")
+    if not isinstance(dimensions, list) or not dimensions:
+        raise ValueError("Rubric payload dimensions must be a non-empty list")
+    dimension_names: list[str] = []
+    for dimension in dimensions:
+        if not isinstance(dimension, Mapping):
+            raise ValueError("Each dimension entry must be a mapping")
+        if "name" not in dimension:
+            raise ValueError("Each dimension entry must include a name")
+        if not isinstance(dimension["name"], str) or not dimension["name"].strip():
+            raise ValueError("Dimension name must be a non-empty string")
+        dimension_names.append(dimension["name"].strip())
+    if len(set(dimension_names)) != len(dimension_names):
+        raise ValueError("Dimension names must be unique")
+
+
 def scope_detection_config_from_mapping(raw_config: Mapping[str, Any] | None) -> ScopeDetectionConfig:
     """Build ScopeDetectionConfig from a generic mapping."""
     if raw_config is None:
@@ -557,3 +750,20 @@ def _compute_confidence(
         confidence -= config.confidence_short_description_penalty
 
     return round(min(config.confidence_max, max(config.confidence_min, confidence)), 2)
+
+
+def _score_band_definitions(config: ScopeDetectionConfig) -> list[dict[str, Any]]:
+    """Return machine-readable score band boundaries."""
+    return [
+        {"mode": ScopeMode.FEATURE.value, "min_score": 0, "max_score": config.feature_max_score},
+        {
+            "mode": ScopeMode.EPIC.value,
+            "min_score": config.feature_max_score + 1,
+            "max_score": config.epic_max_score,
+        },
+        {
+            "mode": ScopeMode.PROGRAM.value,
+            "min_score": config.epic_max_score + 1,
+            "max_score": config.max_total_score,
+        },
+    ]
