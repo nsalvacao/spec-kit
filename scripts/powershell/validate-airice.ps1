@@ -32,7 +32,7 @@ if ($lines.Count -lt 3) {
 
 $required = @('Reach','Impact','Confidence','Data_Readiness','Effort','Risk')
 foreach ($item in $required) {
-    if (-not (Select-String -Path $FilePath -Pattern "\*\*$item\*\*:" -SimpleMatch)) {
+    if (-not (Select-String -Path $FilePath -Pattern "\*\*$item\*\*:")) {
         Write-Error "Missing dimensional breakdown for $item"
         if (Test-Path $stateLog) { & $stateLog 'select' 'Traceability First' "Missing dimensional breakdown: $item" 'high' 'validate-airice' }
         exit 1
