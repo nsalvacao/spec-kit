@@ -38,11 +38,13 @@ jobs:
     # Skip review for PRs labelled 'skip-ai-review' (#76)
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
+      REVIEW_LONG_CONTEXT_MODEL: "google/gemini-2.0-flash" # prefer long-context model first (free tier; check runtime headers for limits)
       REVIEW_MODEL: "openai/gpt-4.1"
       REVIEW_FALLBACK_MODEL: "openai/gpt-4o"
-      REVIEW_FALLBACK_MODEL_2: "meta/llama-3.3-70b-instruct"
-      MAX_REVIEW_CHARS: "40000"
+      MAX_REVIEW_CHARS: "50000"
       MAX_REVIEW_TOKENS: "2000"
+      CHUNK_SIZE_CHARS: "18000"
+      CHUNK_OVERLAP_CHARS: "1200"
       MAX_RETRY: "5"
       MAX_RETRY_SLEEP: "60"
     steps:
@@ -60,16 +62,16 @@ jobs:
           echo "full_size=$DIFF_SIZE" >> "$GITHUB_OUTPUT"
 
           if [ "$DIFF_SIZE" -gt "$MAX_REVIEW_CHARS" ]; then
-            head -c "$MAX_REVIEW_CHARS" diff_full.txt > diff.txt
-            echo "truncated=true" >> "$GITHUB_OUTPUT"
-            echo "truncated_at=$MAX_REVIEW_CHARS" >> "$GITHUB_OUTPUT"
+            echo "chunk_required=true" >> "$GITHUB_OUTPUT"
           else
-            cp diff_full.txt diff.txt
-            echo "truncated=false" >> "$GITHUB_OUTPUT"
-            echo "truncated_at=0" >> "$GITHUB_OUTPUT"
+            echo "chunk_required=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if [ ! -s diff.txt ]; then
+          # no truncation; chunking later if required
+          echo "truncated=false" >> "$GITHUB_OUTPUT"
+          echo "truncated_at=0" >> "$GITHUB_OUTPUT"
+
+          if [ ! -s diff_full.txt ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -86,84 +88,152 @@ jobs:
           echo "::add-mask::$GH_MODELS_TOKEN"
 
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
-          DIFF_CONTENT=$(cat diff.txt)
+          CHUNK_REQUIRED=${{ steps.diff.outputs.chunk_required == 'true' && '1' || '0' }}
 
-          # Model fallback chain: primary → fallback → high-rate-limit fallback (#77)
-          MODELS=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL" "$REVIEW_FALLBACK_MODEL_2")
-          HTTP_CODE=""
-          BODY=""
-          USED_MODEL=""
+          call_model() {
+            local MODEL="$1" CONTENT="$2" PURPOSE="$3" CHUNK_ID="$4"
+            local HEADERS_FILE="/tmp/headers-$CHUNK_ID.txt"
+            RESPONSE=$(curl -s -D "$HEADERS_FILE" -w "\n%{http_code}" -X POST \
+              "https://models.github.ai/inference/chat/completions" \
+              -H "Authorization: Bearer $GH_MODELS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n \
+                --arg system "$SYSTEM_PROMPT" \
+                --arg diff "$CONTENT" \
+                --arg model "$MODEL" \
+                --argjson max_tokens "$MAX_REVIEW_TOKENS" \
+                '{
+                  model: $model,
+                  messages: [
+                    {role: "system", content: $system},
+                    {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
+                  ],
+                  max_tokens: $max_tokens,
+                  temperature: 0.2
+                }')")
 
-          for MODEL in "${MODELS[@]}"; do
-            echo "Trying model: $MODEL"
-            ATTEMPT=0
-            while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
-              ATTEMPT=$((ATTEMPT + 1))
-              echo "Attempt $ATTEMPT/$MAX_RETRY with $MODEL..."
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
 
-              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-                "https://models.github.ai/inference/chat/completions" \
-                -H "Authorization: Bearer $GH_MODELS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$(jq -n \
-                  --arg system "$SYSTEM_PROMPT" \
-                  --arg diff "$DIFF_CONTENT" \
-                  --arg model "$MODEL" \
-                  --argjson max_tokens "$MAX_REVIEW_TOKENS" \
-                  '{
-                    model: $model,
-                    messages: [
-                      {role: "system", content: $system},
-                      {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
-                    ],
-                    max_tokens: $max_tokens,
-                    temperature: 0.2
-                  }')")
-
-              HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-              BODY=$(echo "$RESPONSE" | sed '$d')
-
-              if [ "$HTTP_CODE" = "200" ]; then
-                USED_MODEL="$MODEL"
-                break 2
+            # Log rate-limit headers when present (free tier variability)
+            if [ -f "$HEADERS_FILE" ]; then
+              RATE_HEADERS=$(grep -iE 'x-ratelimit|retry-after' "$HEADERS_FILE" || true)
+              if [ -n "$RATE_HEADERS" ]; then
+                echo "Rate-limit headers for $MODEL (chunk $CHUNK_ID):" >&2
+                echo "$RATE_HEADERS" >&2
               fi
-
-              echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
-              if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-                RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
-                if [ -n "$RETRY_AFTER" ]; then
-                  SLEEP="$RETRY_AFTER"
-                else
-                  RAW_SLEEP=$((2 ** ATTEMPT))
-                  SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
-                fi
-                JITTER=$((RANDOM % 5))
-                SLEEP=$((SLEEP + JITTER))
-                echo "Retrying in ${SLEEP}s..."
-                sleep "$SLEEP"
-              fi
-            done
-
-            if [ "$HTTP_CODE" != "200" ]; then
-              echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
             fi
-          done
+          }
 
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::All models failed after exhausting retries. Last HTTP $HTTP_CODE"
-            echo "$BODY" | jq .error 2>/dev/null || true
+          review_with_chain() {
+            local CONTENT="$1" PURPOSE="$2" CHUNK_ID="$3"
+            local MODELS=()
+            if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ]; then
+              MODELS+=("$REVIEW_LONG_CONTEXT_MODEL")
+            fi
+            MODELS+=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
+
+            for MODEL in "${MODELS[@]}"; do
+              echo "Trying model: $MODEL for $PURPOSE"
+              ATTEMPT=0
+              while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
+                ATTEMPT=$((ATTEMPT + 1))
+                echo "Attempt $ATTEMPT/$MAX_RETRY with $MODEL..."
+                call_model "$MODEL" "$CONTENT" "$PURPOSE" "$CHUNK_ID"
+
+                if [ "$HTTP_CODE" = "200" ]; then
+                  USED_MODEL="$MODEL"
+                  echo "$BODY" | jq -r '.choices[0].message.content' > "review_$CHUNK_ID.md"
+                  echo "$BODY" | jq '.usage.total_tokens' > "tokens_$CHUNK_ID.txt"
+                  return 0
+                fi
+
+                if echo "$BODY" | jq -e '.error.code == "tokens_limit_reached"' >/dev/null 2>&1 || [ "$HTTP_CODE" = "413" ]; then
+                  echo "::warning::Received tokens_limit_reached/413 from $MODEL; will fallback to chunking"
+                  return 413
+                fi
+
+                echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
+                if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
+                  RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
+                  if [ -n "$RETRY_AFTER" ]; then
+                    SLEEP="$RETRY_AFTER"
+                  else
+                    RAW_SLEEP=$((2 ** ATTEMPT))
+                    SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
+                  fi
+                  JITTER=$((RANDOM % 5))
+                  SLEEP=$((SLEEP + JITTER))
+                  echo "Retrying in ${SLEEP}s..."
+                  sleep "$SLEEP"
+                fi
+              done
+              echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
+            done
+            return 1
+          }
+
+          # 1) Try full diff if within soft limit
+          if [ "$CHUNK_REQUIRED" -eq 0 ]; then
+            DIFF_CONTENT=$(cat diff_full.txt)
+            if review_with_chain "$DIFF_CONTENT" "full-diff" "full"; then
+              echo "tokens=$(cat tokens_full.txt)" >> "$GITHUB_OUTPUT"
+              echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
+              echo "chunked=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::warning::Full diff path failed or hit 413; switching to chunked review"
+          else
+            echo "Diff size exceeds MAX_REVIEW_CHARS; using chunked review"
+          fi
+
+          # 2) Chunked path (overlapping chunks for coherence)
+          python3 - <<'PY'
+import math, pathlib, sys
+CHUNK=int("${CHUNK_SIZE_CHARS}")
+OVERLAP=int("${CHUNK_OVERLAP_CHARS}")
+data=pathlib.Path('diff_full.txt').read_text()
+out_dir=pathlib.Path('.')
+if CHUNK <= OVERLAP:
+    print("Invalid chunk/overlap config", file=sys.stderr)
+    sys.exit(1)
+start=0
+idx=1
+count=0
+while start < len(data):
+    end = start + CHUNK
+    chunk = data[start:end]
+    out_dir.joinpath(f"diff_chunk_{idx:02d}.txt").write_text(chunk)
+    start = end - OVERLAP
+    idx += 1
+    count += 1
+print(count)
+PY
+          CHUNK_COUNT=$?
+
+          if [ "$CHUNK_COUNT" -le 0 ]; then
+            echo "::error::Chunking failed"
             exit 1
           fi
 
-          # Validate output is non-empty and starts with a markdown heading (#77)
-          REVIEW_TEXT=$(echo "$BODY" | jq -r '.choices[0].message.content')
-          if [ -z "$REVIEW_TEXT" ] || ! echo "$REVIEW_TEXT" | grep -qE '^#|^\*\*|^##'; then
-            echo "::warning::Model returned empty or non-markdown response; posting raw output"
-          fi
+          TOTAL_TOKENS=0
+          > review.md
+          for FILE in diff_chunk_*.txt; do
+            CID=$(echo "$FILE" | sed 's/[^0-9]//g')
+            CONTENT=$(cat "$FILE")
+            if ! review_with_chain "$CONTENT" "chunk-$CID" "$CID"; then
+              echo "::error::Chunk $CID failed"; exit 1
+            fi
+            echo "### Chunk $CID" >> review.md
+            cat "review_${CID}.md" >> review.md
+            echo >> review.md
+            TOK=$(cat "tokens_${CID}.txt")
+            TOTAL_TOKENS=$((TOTAL_TOKENS + TOK))
+          done
 
-          echo "$REVIEW_TEXT" > review.md
-          echo "tokens=$(echo "$BODY" | jq '.usage.total_tokens')" >> "$GITHUB_OUTPUT"
+          echo "tokens=$TOTAL_TOKENS" >> "$GITHUB_OUTPUT"
           echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
+          echo "chunked=true" >> "$GITHUB_OUTPUT"
 
       - name: Post review comment
         if: steps.diff.outputs.skip != 'true'
