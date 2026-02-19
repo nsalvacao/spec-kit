@@ -4,6 +4,7 @@ import pytest
 
 from specify_cli.scope_detection import (
     CONTRACT_VERSION,
+    ScopeDetectionConfig,
     ScopeDetectionInput,
     ScopeMode,
     detect_scope,
@@ -13,7 +14,7 @@ from specify_cli.scope_detection import (
 def test_feature_mode_for_simple_request():
     result = detect_scope(
         ScopeDetectionInput(
-            description="Adicionar filtro por estado na listagem de clientes.",
+            description="Add status filter to customer listing.",
             estimated_timeline_weeks=2,
             expected_work_items=1,
             dependency_count=0,
@@ -34,7 +35,7 @@ def test_feature_mode_for_simple_request():
 def test_epic_mode_for_intermediate_request():
     result = detect_scope(
         ScopeDetectionInput(
-            description="Criar capability de onboarding com várias integrações internas.",
+            description="Create onboarding capability with several internal integrations.",
             estimated_timeline_weeks=8,
             expected_work_items=3,
             dependency_count=3,
@@ -55,8 +56,8 @@ def test_program_mode_for_large_request():
     result = detect_scope(
         ScopeDetectionInput(
             description=(
-                "Plataforma multi-tenant com migration, security e rollout cross-team "
-                "para billing, observability e compliance."
+                "Build a multi-tenant platform with migration, security, and cross-team rollout "
+                "for billing, observability, and compliance."
             ),
             estimated_timeline_weeks=14,
             expected_work_items=5,
@@ -80,7 +81,7 @@ def test_program_mode_for_large_request():
     [
         (
             ScopeDetectionInput(
-                description="Melhorar busca por estado com filtros simples.",
+                description="Improve search with simple state filters.",
                 estimated_timeline_weeks=5,
                 expected_work_items=2,
                 dependency_count=3,
@@ -95,7 +96,7 @@ def test_program_mode_for_large_request():
         ),
         (
             ScopeDetectionInput(
-                description="Melhorar busca por estado com filtros simples.",
+                description="Improve search with simple state filters.",
                 estimated_timeline_weeks=6,
                 expected_work_items=2,
                 dependency_count=3,
@@ -149,7 +150,7 @@ def test_score_band_boundaries(input_data, expected_score, expected_mode, expect
 
 def test_result_contract_payload_is_stable():
     input_data = ScopeDetectionInput(
-        description="Integração moderada com dependências de equipas internas.",
+        description="Moderate integration with internal team dependencies.",
         estimated_timeline_weeks=7,
         expected_work_items=2,
         dependency_count=2,
@@ -173,7 +174,7 @@ def test_result_contract_payload_is_stable():
 def test_result_includes_expected_signal_names():
     result = detect_scope(
         ScopeDetectionInput(
-            description="Atualizar dashboard operacional com pouca mudança estrutural.",
+            description="Update operational dashboard with minimal structural changes.",
             estimated_timeline_weeks=2,
             expected_work_items=1,
             dependency_count=0,
@@ -202,7 +203,70 @@ def test_invalid_risk_level_raises_error():
     with pytest.raises(ValueError, match="risk_level must be one of"):
         detect_scope(
             ScopeDetectionInput(
-                description="Pedido de teste.",
+                description="Validation test request.",
                 risk_level="unknown",
             )
         )
+
+
+def test_invalid_description_type_raises_error():
+    with pytest.raises(TypeError, match="description must be a string"):
+        detect_scope(
+            ScopeDetectionInput(  # type: ignore[arg-type]
+                description=123,
+            )
+        )
+
+
+def test_invalid_boolean_flag_type_raises_error():
+    with pytest.raises(TypeError, match="requires_migration must be a boolean"):
+        detect_scope(
+            ScopeDetectionInput(  # type: ignore[arg-type]
+                description="Run migration orchestration.",
+                requires_migration="yes",
+            )
+        )
+
+
+def test_keyword_matching_avoids_substring_false_positive():
+    result = detect_scope(
+        ScopeDetectionInput(
+            description="Improve blossom analytics dashboard for retention.",
+            estimated_timeline_weeks=2,
+            expected_work_items=1,
+            dependency_count=0,
+            integration_surface_count=0,
+            domain_count=1,
+            cross_team_count=1,
+            risk_level="low",
+        )
+    )
+
+    keyword_signal = next(signal for signal in result.signals if signal.name == "complexity_keywords")
+    assert "sso" not in keyword_signal.value
+
+
+def test_custom_config_allows_overriding_default_weights():
+    input_data = ScopeDetectionInput(
+        description="Prepare a platform migration with integration and security checks.",
+        estimated_timeline_weeks=10,
+        expected_work_items=4,
+        dependency_count=4,
+        integration_surface_count=3,
+        domain_count=2,
+        cross_team_count=2,
+        risk_level="high",
+    )
+    default_result = detect_scope(input_data)
+
+    tuned_config = ScopeDetectionConfig(
+        work_items_multiplier=2,
+        dependency_multiplier=1,
+        integration_multiplier=1,
+        domain_multiplier=6,
+        cross_team_multiplier=2,
+        complexity_keywords=frozenset({"platform", "migration"}),
+    )
+    tuned_result = detect_scope(input_data, config=tuned_config)
+
+    assert default_result.total_score != tuned_result.total_score

@@ -7,6 +7,8 @@ detection engine introduced for issue `#101`.
 - Contract version: `scope-detection.v1`
 - Purpose: deterministically recommend `feature`, `epic`, or `program` mode
   before decomposition/task generation.
+- Config object: `ScopeDetectionConfig` (all weights/caps/keywords are
+  centralized and overridable; not scattered as hardcoded magic numbers).
 
 ## Score Bands
 
@@ -32,6 +34,34 @@ detection engine introduced for issue `#101`.
 - `requires_migration: bool`
 
 Validation errors are raised as `ValueError` for invalid inputs.
+Type errors are raised as `TypeError` for invalid runtime types.
+
+## Configuration Model
+
+`ScopeDetectionConfig` controls:
+
+- score boundaries (`feature_max_score`, `epic_max_score`)
+- per-signal multipliers/caps (timeline, work items, dependencies, etc.)
+- risk weights map (`risk_weights`)
+- keyword set (`complexity_keywords`)
+- confidence heuristics and clamping
+
+You can pass a custom config at call time:
+
+```python
+from specify_cli.scope_detection import ScopeDetectionConfig, ScopeDetectionInput, detect_scope
+
+config = ScopeDetectionConfig(
+    work_items_multiplier=2,
+    dependency_multiplier=1,
+    complexity_keywords=frozenset({"platform", "migration"}),
+)
+
+result = detect_scope(
+    ScopeDetectionInput(description="Platform migration for billing"),
+    config=config,
+)
+```
 
 ## Scoring Signals (Deterministic)
 
@@ -46,7 +76,8 @@ The engine calculates score contributions from these signals:
 - declared risk level
 - compliance requirement
 - migration/cutover requirement
-- complexity keywords detected in description
+- complexity keywords detected in description (whole-keyword matching, not
+  naive substring matching)
 
 Each signal is emitted in the output `signals` array with:
 

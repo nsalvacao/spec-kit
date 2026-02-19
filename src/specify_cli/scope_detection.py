@@ -6,15 +6,43 @@ scope before task generation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import StrEnum
+from dataclasses import dataclass, field
+from enum import Enum
+import re
 from typing import Any
 
 
 CONTRACT_VERSION = "scope-detection.v1"
 
+DEFAULT_COMPLEXITY_KEYWORDS = frozenset(
+    {
+        "platform",
+        "migration",
+        "rollout",
+        "integration",
+        "compliance",
+        "audit",
+        "multi-tenant",
+        "legacy",
+        "cross-team",
+        "multi-region",
+        "portfolio",
+        "sso",
+        "billing",
+        "observability",
+        "security",
+    }
+)
 
-class ScopeMode(StrEnum):
+DEFAULT_RISK_WEIGHTS = {
+    "low": 0,
+    "medium": 6,
+    "high": 12,
+    "critical": 18,
+}
+
+
+class ScopeMode(str, Enum):
     """Supported orchestration modes."""
 
     FEATURE = "feature"
@@ -22,30 +50,72 @@ class ScopeMode(StrEnum):
     PROGRAM = "program"
 
 
-RISK_WEIGHTS = {
-    "low": 0,
-    "medium": 6,
-    "high": 12,
-    "critical": 18,
-}
+class ScopeRiskLevel(str, Enum):
+    """Supported risk levels for scoring."""
 
-COMPLEXITY_KEYWORDS = {
-    "platform",
-    "migration",
-    "rollout",
-    "integration",
-    "compliance",
-    "audit",
-    "multi-tenant",
-    "legacy",
-    "cross-team",
-    "multi-region",
-    "portfolio",
-    "sso",
-    "billing",
-    "observability",
-    "security",
-}
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+@dataclass(frozen=True)
+class ScopeDetectionConfig:
+    """Configurable weights, caps, boundaries, and confidence heuristics."""
+
+    feature_max_score: int = 34
+    epic_max_score: int = 64
+    max_total_score: int = 100
+
+    timeline_cap: int = 10
+    timeline_multiplier: int = 1
+
+    work_items_cap: int = 20
+    work_items_multiplier: int = 5
+
+    dependency_cap: int = 15
+    dependency_multiplier: int = 3
+
+    integration_cap: int = 12
+    integration_multiplier: int = 3
+
+    domain_cap: int = 20
+    domain_multiplier: int = 10
+
+    cross_team_cap: int = 12
+    cross_team_multiplier: int = 6
+
+    compliance_score: int = 7
+    migration_score: int = 9
+    keyword_cap: int = 12
+
+    complexity_keywords: frozenset[str] = field(default_factory=lambda: DEFAULT_COMPLEXITY_KEYWORDS)
+    risk_weights: dict[str, int] = field(default_factory=lambda: DEFAULT_RISK_WEIGHTS.copy())
+
+    confidence_base: float = 0.55
+    confidence_active_signal_step: float = 0.04
+    confidence_active_signal_cap: float = 0.30
+    confidence_keyword_step: float = 0.01
+    confidence_keyword_cap: float = 0.10
+    confidence_boundary_penalty: float = 0.08
+    confidence_short_description_penalty: float = 0.05
+    confidence_short_description_word_threshold: int = 8
+    confidence_boundary_distance_threshold: int = 1
+    confidence_min: float = 0.35
+    confidence_max: float = 0.95
+
+    def validate(self) -> None:
+        """Validate config invariants used by the scoring engine."""
+        if self.feature_max_score < 0:
+            raise ValueError("feature_max_score must be >= 0")
+        if self.epic_max_score <= self.feature_max_score:
+            raise ValueError("epic_max_score must be > feature_max_score")
+        if self.max_total_score <= self.epic_max_score:
+            raise ValueError("max_total_score must be > epic_max_score")
+        if self.confidence_min < 0 or self.confidence_max > 1:
+            raise ValueError("confidence bounds must be within [0, 1]")
+        if self.confidence_min >= self.confidence_max:
+            raise ValueError("confidence_min must be < confidence_max")
 
 
 @dataclass(frozen=True)
@@ -59,15 +129,47 @@ class ScopeDetectionInput:
     integration_surface_count: int = 0
     domain_count: int = 1
     cross_team_count: int = 1
-    risk_level: str = "low"
+    risk_level: ScopeRiskLevel | str = ScopeRiskLevel.LOW
     requires_compliance_review: bool = False
     requires_migration: bool = False
 
-    def validate(self) -> None:
+    @property
+    def normalized_description(self) -> str:
+        return " ".join(self.description.lower().split())
+
+    @property
+    def normalized_risk_level(self) -> str:
+        if isinstance(self.risk_level, ScopeRiskLevel):
+            return self.risk_level.value
+        return self.risk_level.strip().lower()
+
+    def validate(self, config: ScopeDetectionConfig) -> None:
+        """Validate input type and value constraints."""
+        if not isinstance(self.description, str):
+            raise TypeError("description must be a string")
         if not self.description.strip():
             raise ValueError("description cannot be empty")
-        if self.risk_level not in RISK_WEIGHTS:
-            valid = ", ".join(sorted(RISK_WEIGHTS))
+
+        int_fields = [
+            "estimated_timeline_weeks",
+            "expected_work_items",
+            "dependency_count",
+            "integration_surface_count",
+            "domain_count",
+            "cross_team_count",
+        ]
+        for field_name in int_fields:
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{field_name} must be an integer")
+
+        bool_fields = ["requires_compliance_review", "requires_migration"]
+        for field_name in bool_fields:
+            if not isinstance(getattr(self, field_name), bool):
+                raise TypeError(f"{field_name} must be a boolean")
+
+        if self.normalized_risk_level not in config.risk_weights:
+            valid = ", ".join(sorted(config.risk_weights))
             raise ValueError(f"risk_level must be one of: {valid}")
         if self.estimated_timeline_weeks < 1:
             raise ValueError("estimated_timeline_weeks must be >= 1")
@@ -81,10 +183,6 @@ class ScopeDetectionInput:
             raise ValueError("dependency_count must be >= 0")
         if self.integration_surface_count < 0:
             raise ValueError("integration_surface_count must be >= 0")
-
-    @property
-    def normalized_description(self) -> str:
-        return " ".join(self.description.lower().split())
 
 
 @dataclass(frozen=True)
@@ -131,109 +229,138 @@ class ScopeDetectionResult:
         }
 
 
-def detect_scope(input_data: ScopeDetectionInput) -> ScopeDetectionResult:
+def detect_scope(
+    input_data: ScopeDetectionInput,
+    *,
+    config: ScopeDetectionConfig | None = None,
+) -> ScopeDetectionResult:
     """Return a deterministic scope recommendation for the provided input."""
+    resolved_config = config or ScopeDetectionConfig()
+    resolved_config.validate()
+    input_data.validate(resolved_config)
+    keywords = _matched_keywords(input_data.normalized_description, resolved_config.complexity_keywords)
 
-    input_data.validate()
-    keywords = _matched_keywords(input_data.normalized_description)
-
-    timeline_score = min(10, max(0, input_data.estimated_timeline_weeks - 1))
-    work_items_score = min(20, max(0, (input_data.expected_work_items - 1) * 5))
-    dependency_score = min(15, input_data.dependency_count * 3)
-    integration_score = min(12, input_data.integration_surface_count * 3)
-    domain_score = min(20, max(0, (input_data.domain_count - 1) * 10))
-    cross_team_score = min(12, max(0, (input_data.cross_team_count - 1) * 6))
-    risk_score = RISK_WEIGHTS[input_data.risk_level]
-    compliance_score = 7 if input_data.requires_compliance_review else 0
-    migration_score = 9 if input_data.requires_migration else 0
-    keyword_score = min(12, len(keywords))
+    timeline_score = _scaled_score(
+        max(0, input_data.estimated_timeline_weeks - 1),
+        resolved_config.timeline_multiplier,
+        resolved_config.timeline_cap,
+    )
+    work_items_score = _scaled_score(
+        max(0, input_data.expected_work_items - 1),
+        resolved_config.work_items_multiplier,
+        resolved_config.work_items_cap,
+    )
+    dependency_score = _scaled_score(
+        input_data.dependency_count,
+        resolved_config.dependency_multiplier,
+        resolved_config.dependency_cap,
+    )
+    integration_score = _scaled_score(
+        input_data.integration_surface_count,
+        resolved_config.integration_multiplier,
+        resolved_config.integration_cap,
+    )
+    domain_score = _scaled_score(
+        max(0, input_data.domain_count - 1),
+        resolved_config.domain_multiplier,
+        resolved_config.domain_cap,
+    )
+    cross_team_score = _scaled_score(
+        max(0, input_data.cross_team_count - 1),
+        resolved_config.cross_team_multiplier,
+        resolved_config.cross_team_cap,
+    )
+    risk_score = resolved_config.risk_weights[input_data.normalized_risk_level]
+    compliance_score = resolved_config.compliance_score if input_data.requires_compliance_review else 0
+    migration_score = resolved_config.migration_score if input_data.requires_migration else 0
+    keyword_score = min(resolved_config.keyword_cap, len(keywords))
 
     signals = [
         ScopeSignal(
             name="timeline_weeks",
             value=input_data.estimated_timeline_weeks,
-            weight=1,
+            weight=resolved_config.timeline_multiplier,
             score=timeline_score,
             rationale=(
-                f"Timeline estimada de {input_data.estimated_timeline_weeks} semanas "
-                f"adiciona {timeline_score} pontos de complexidade."
+                f"Estimated timeline of {input_data.estimated_timeline_weeks} weeks "
+                f"adds {timeline_score} complexity points."
             ),
         ),
         ScopeSignal(
             name="expected_work_items",
             value=input_data.expected_work_items,
-            weight=5,
+            weight=resolved_config.work_items_multiplier,
             score=work_items_score,
             rationale=(
-                f"{input_data.expected_work_items} work items previstos exigem maior "
-                f"decomposição ({work_items_score} pontos)."
+                f"{input_data.expected_work_items} expected work items require greater "
+                f"decomposition ({work_items_score} points)."
             ),
         ),
         ScopeSignal(
             name="dependency_count",
             value=input_data.dependency_count,
-            weight=3,
+            weight=resolved_config.dependency_multiplier,
             score=dependency_score,
             rationale=(
-                f"{input_data.dependency_count} dependências externas elevam coordenação "
-                f"e risco operacional ({dependency_score} pontos)."
+                f"{input_data.dependency_count} external dependencies increase "
+                f"coordination and operational risk ({dependency_score} points)."
             ),
         ),
         ScopeSignal(
             name="integration_surface_count",
             value=input_data.integration_surface_count,
-            weight=3,
+            weight=resolved_config.integration_multiplier,
             score=integration_score,
             rationale=(
-                f"{input_data.integration_surface_count} superfícies de integração "
-                f"adicionam acoplamento técnico ({integration_score} pontos)."
+                f"{input_data.integration_surface_count} integration surfaces "
+                f"add technical coupling ({integration_score} points)."
             ),
         ),
         ScopeSignal(
             name="domain_count",
             value=input_data.domain_count,
-            weight=10,
+            weight=resolved_config.domain_multiplier,
             score=domain_score,
             rationale=(
-                f"{input_data.domain_count} domínios envolvidos indicam amplitude "
-                f"de escopo ({domain_score} pontos)."
+                f"{input_data.domain_count} involved domains indicate scope "
+                f"breadth ({domain_score} points)."
             ),
         ),
         ScopeSignal(
             name="cross_team_count",
             value=input_data.cross_team_count,
-            weight=6,
+            weight=resolved_config.cross_team_multiplier,
             score=cross_team_score,
             rationale=(
-                f"{input_data.cross_team_count} equipas impactadas aumentam custo "
-                f"de alinhamento ({cross_team_score} pontos)."
+                f"{input_data.cross_team_count} impacted teams increase "
+                f"alignment cost ({cross_team_score} points)."
             ),
         ),
         ScopeSignal(
             name="risk_level",
-            value=input_data.risk_level,
+            value=input_data.normalized_risk_level,
             weight=1,
             score=risk_score,
-            rationale=f"Risco declarado '{input_data.risk_level}' soma {risk_score} pontos.",
+            rationale=f"Declared risk level '{input_data.normalized_risk_level}' adds {risk_score} points.",
         ),
         ScopeSignal(
             name="requires_compliance_review",
             value=input_data.requires_compliance_review,
-            weight=7,
+            weight=resolved_config.compliance_score,
             score=compliance_score,
             rationale=(
-                "Necessidade de compliance formal aumenta validações e dependências "
-                f"de aprovação ({compliance_score} pontos)."
+                "Formal compliance requirement increases validation and approval "
+                f"dependencies ({compliance_score} points)."
             ),
         ),
         ScopeSignal(
             name="requires_migration",
             value=input_data.requires_migration,
-            weight=9,
+            weight=resolved_config.migration_score,
             score=migration_score,
             rationale=(
-                "Migração/cutover acrescenta risco de transição e rollback "
-                f"({migration_score} pontos)."
+                "Migration/cutover adds transition and rollback risk "
+                f"({migration_score} points)."
             ),
         ),
         ScopeSignal(
@@ -242,18 +369,18 @@ def detect_scope(input_data: ScopeDetectionInput) -> ScopeDetectionResult:
             weight=1,
             score=keyword_score,
             rationale=(
-                f"Palavras-chave de complexidade detetadas ({', '.join(keywords) or 'nenhuma'}) "
-                f"contribuem {keyword_score} pontos."
+                f"Detected complexity keywords ({', '.join(keywords) or 'none'}) "
+                f"contribute {keyword_score} points."
             ),
         ),
     ]
 
     raw_score = sum(signal.score for signal in signals)
-    total_score = min(100, raw_score)
-    mode = _mode_from_score(total_score)
-    score_band = _score_band(total_score)
+    total_score = min(resolved_config.max_total_score, raw_score)
+    mode = _mode_from_score(total_score, resolved_config)
+    score_band = _score_band(total_score, resolved_config)
     reasons = _build_reasons(signals, mode)
-    confidence = _compute_confidence(input_data, total_score, signals, keywords)
+    confidence = _compute_confidence(input_data, total_score, signals, keywords, resolved_config)
 
     return ScopeDetectionResult(
         contract_version=CONTRACT_VERSION,
@@ -266,28 +393,45 @@ def detect_scope(input_data: ScopeDetectionInput) -> ScopeDetectionResult:
     )
 
 
-def _matched_keywords(description: str) -> list[str]:
-    matches = [keyword for keyword in COMPLEXITY_KEYWORDS if keyword in description]
+def _scaled_score(raw: int, multiplier: int, cap: int) -> int:
+    """Scale an integer signal by multiplier and clamp to a cap."""
+    return min(cap, max(0, raw * multiplier))
+
+
+def _matched_keywords(description: str, keywords: set[str] | frozenset[str]) -> list[str]:
+    """Find configured keywords using whole-keyword regex matching.
+
+    This prevents false positives from substring matching (e.g., 'sso' in
+    'blossom').
+    """
+    matches: list[str] = []
+    for keyword in keywords:
+        pattern = rf"(?<![a-z0-9-]){re.escape(keyword)}(?![a-z0-9-])"
+        if re.search(pattern, description):
+            matches.append(keyword)
     return sorted(set(matches))
 
 
-def _mode_from_score(score: int) -> ScopeMode:
-    if score <= 34:
+def _mode_from_score(score: int, config: ScopeDetectionConfig) -> ScopeMode:
+    """Map score to scope mode using configured boundaries."""
+    if score <= config.feature_max_score:
         return ScopeMode.FEATURE
-    if score <= 64:
+    if score <= config.epic_max_score:
         return ScopeMode.EPIC
     return ScopeMode.PROGRAM
 
 
-def _score_band(score: int) -> str:
-    if score <= 34:
-        return "0-34"
-    if score <= 64:
-        return "35-64"
-    return "65+"
+def _score_band(score: int, config: ScopeDetectionConfig) -> str:
+    """Return score band label for the configured boundaries."""
+    if score <= config.feature_max_score:
+        return f"0-{config.feature_max_score}"
+    if score <= config.epic_max_score:
+        return f"{config.feature_max_score + 1}-{config.epic_max_score}"
+    return f"{config.epic_max_score + 1}+"
 
 
 def _build_reasons(signals: list[ScopeSignal], mode: ScopeMode) -> list[str]:
+    """Build 2-3 human-readable recommendation reasons."""
     positive_signals = [signal for signal in signals if signal.score > 0]
     positive_signals.sort(key=lambda signal: (-signal.score, signal.name))
 
@@ -295,22 +439,22 @@ def _build_reasons(signals: list[ScopeSignal], mode: ScopeMode) -> list[str]:
     if len(reasons) < 2:
         if mode == ScopeMode.FEATURE:
             reasons.append(
-                "Sinais de dependências, risco e coordenação mantêm-se baixos; "
-                "é viável avançar como feature única."
+                "Dependency, risk, and coordination signals remain low; "
+                "it is viable to proceed as a single feature."
             )
         elif mode == ScopeMode.EPIC:
             reasons.append(
-                "Existe complexidade intermédia com múltiplos vetores relevantes; "
-                "é recomendado decompor em features antes de tarefas finais."
+                "Intermediate complexity with multiple relevant vectors; "
+                "decomposing into features before final tasks is recommended."
             )
         else:
             reasons.append(
-                "Complexidade agregada elevada sugere estruturação por programa "
-                "com decomposição progressiva em épicos e features."
+                "High aggregate complexity suggests program-level structuring "
+                "with progressive decomposition into epics and features."
             )
 
     if len(reasons) < 2:
-        reasons.append("Foram usados sinais estruturados para produzir recomendação determinística.")
+        reasons.append("Structured signals were used to produce a deterministic recommendation.")
 
     return reasons[:3]
 
@@ -320,14 +464,24 @@ def _compute_confidence(
     score: int,
     signals: list[ScopeSignal],
     keywords: list[str],
+    config: ScopeDetectionConfig,
 ) -> float:
+    """Compute confidence using configured heuristics and boundary proximity."""
     active_signals = sum(1 for signal in signals if signal.score > 0)
-    boundary_distance = min(abs(score - 34), abs(score - 35), abs(score - 64), abs(score - 65))
-    confidence = 0.55
-    confidence += min(0.30, active_signals * 0.04)
-    confidence += min(0.10, len(keywords) * 0.01)
-    if boundary_distance <= 1:
-        confidence -= 0.08
-    if len(input_data.description.split()) < 8:
-        confidence -= 0.05
-    return round(min(0.95, max(0.35, confidence)), 2)
+    boundary_points = (
+        config.feature_max_score,
+        config.feature_max_score + 1,
+        config.epic_max_score,
+        config.epic_max_score + 1,
+    )
+    boundary_distance = min(abs(score - point) for point in boundary_points)
+
+    confidence = config.confidence_base
+    confidence += min(config.confidence_active_signal_cap, active_signals * config.confidence_active_signal_step)
+    confidence += min(config.confidence_keyword_cap, len(keywords) * config.confidence_keyword_step)
+    if boundary_distance <= config.confidence_boundary_distance_threshold:
+        confidence -= config.confidence_boundary_penalty
+    if len(input_data.description.split()) < config.confidence_short_description_word_threshold:
+        confidence -= config.confidence_short_description_penalty
+
+    return round(min(config.confidence_max, max(config.confidence_min, confidence)), 2)
