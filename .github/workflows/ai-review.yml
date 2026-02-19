@@ -188,28 +188,21 @@ jobs:
           fi
 
           # 2) Chunked path (overlapping chunks for coherence)
-          python3 - <<'PY'
-import math, pathlib, sys
-CHUNK=int("${CHUNK_SIZE_CHARS}")
-OVERLAP=int("${CHUNK_OVERLAP_CHARS}")
-data=pathlib.Path('diff_full.txt').read_text()
-out_dir=pathlib.Path('.')
-if CHUNK <= OVERLAP:
-    print("Invalid chunk/overlap config", file=sys.stderr)
-    sys.exit(1)
-start=0
-idx=1
-count=0
-while start < len(data):
-    end = start + CHUNK
-    chunk = data[start:end]
-    out_dir.joinpath(f"diff_chunk_{idx:02d}.txt").write_text(chunk)
-    start = end - OVERLAP
-    idx += 1
-    count += 1
-print(count)
-PY
-          CHUNK_COUNT=$?
+          STEP=$((CHUNK_SIZE_CHARS - CHUNK_OVERLAP_CHARS))
+          if [ "$STEP" -le 0 ]; then
+            echo "::error::Invalid chunk config: CHUNK_SIZE_CHARS must be greater than CHUNK_OVERLAP_CHARS"
+            exit 1
+          fi
+
+          DIFF_LEN=$(wc -c < diff_full.txt)
+          CHUNK_COUNT=0
+          OFFSET=0
+          while [ "$OFFSET" -lt "$DIFF_LEN" ]; do
+            CHUNK_COUNT=$((CHUNK_COUNT + 1))
+            FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
+            dd if=diff_full.txt of="$FILE" bs=1 skip="$OFFSET" count="$CHUNK_SIZE_CHARS" status=none
+            OFFSET=$((OFFSET + STEP))
+          done
 
           if [ "$CHUNK_COUNT" -le 0 ]; then
             echo "::error::Chunking failed"
