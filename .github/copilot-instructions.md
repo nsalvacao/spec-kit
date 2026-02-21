@@ -274,7 +274,7 @@ When choosing what to work on, apply this order:
 
 Current baseline (`v0.0.52`):
 
-- `actions/checkout` is already upgraded to `@v6` in active workflows.
+- `actions/checkout` is already upgraded to `@v4` in active workflows.
 - `ai-triage.yml` was intentionally removed (obsolete/unused).
 - `ai-review.yml` now validates token presence, checks tenant model catalog availability, supports configurable A/B model pools, and appends timeline logs to workflow summaries.
 - `ai-review.yml` defaults are designed for large diffs (chunking enabled; no global diff truncation in normal path).
