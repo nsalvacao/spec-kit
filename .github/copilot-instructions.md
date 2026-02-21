@@ -120,7 +120,7 @@ To maintain continuity between sessions and agents:
 
 Memory files for this project:
 
-- `TASKS.md` (project root, gitignored) — active task board
+- `TASKS.md` (project root, gitignored) — active task board and intake queue snapshot
 - `CLAUDE.md` (project root, gitignored) — hot memory cache
 - `memory/` (project root, gitignored) — deep memory (people, projects, glossary)
 - `.ideas/` (project root, gitignored) — strategy artifacts
@@ -263,31 +263,49 @@ When choosing what to work on, apply this order:
 
 | Workflow | Status | Trigger |
 |----------|--------|---------|
-| `lint.yml` | ✅ Healthy | Push/PR — runs `markdownlint-cli2` |
-| `docs.yml` | ✅ Healthy | Push to `main` (`docs-site/**`) |
-| `stale.yml` | ✅ Healthy | Daily cron — marks stale after 150d |
-| `ai-review.yml` | ✅ Active | PR — GPT-4.1 AI review via actions-hub |
-| `ai-triage.yml` | ✅ Active | Issues — GPT-4.1-mini automatic triage |
-| `test.yml` | ✅ Active | Push/PR — uv run pytest |
-| `release.yml` | ✅ Active | Push to `main` — semantic versioning (v0.0.26) |
+| `lint.yml` | ✅ Active | Push/PR — runs `markdownlint-cli2` |
+| `docs.yml` | ✅ Active | Push to `main` (`docs-site/**`) |
+| `stale.yml` | ✅ Active | Daily cron — marks stale after 150d |
+| `ai-review.yml` | ✅ Active | PR — GitHub Models code review (long-context + fallback chain) |
+| `test.yml` | ✅ Active | Push/PR — `uv run pytest` |
+| `release.yml` | ✅ Active | Push to `main` — semantic versioning (latest: `v0.0.52`) |
 
 ### Known CI Status
 
-All workflows are healthy as of v0.0.31. The following were fixed historically:
+Current baseline (`v0.0.52`):
 
-- `release.yml` — versioning script fixed (47de07e)
-- `test.yml` — added pytest CI (47de07e); `uv.lock` tracked (5845dac)
-- `ai-review.yml` / `ai-triage.yml` — explicit permissions added (0c173ce)
+- `actions/checkout` is already upgraded to `@v4` in active workflows.
+- `ai-triage.yml` was intentionally removed (obsolete/unused).
+- `ai-review.yml` now validates token presence, checks tenant model catalog availability, supports configurable A/B model pools, and appends timeline logs to workflow summaries.
+- `ai-review.yml` defaults are designed for large diffs (chunking enabled; no global diff truncation in normal path).
 
-**Pending**: `docs.yml`, `lint.yml`, `release.yml` still use `actions/checkout@v4` — upgrade to `@v6` tracked in PR #67.
+### AI Review Runtime Configuration (Repository Variables)
+
+Configure these at repository level (Settings -> Secrets and variables -> Actions -> Variables):
+
+- `REVIEW_LONG_CONTEXT_MODEL` (optional long-context primary, tenant-dependent)
+- `REVIEW_MODEL` (primary standard fallback, default `openai/gpt-4.1`)
+- `REVIEW_FALLBACK_MODEL` (secondary fallback, default `openai/gpt-4o`)
+- `REVIEW_AB_MODE` (`off` or `parity`)
+- `REVIEW_AB_MODELS` (comma-separated model IDs for A/B rotation)
+
+Required secret:
+
+- `MODELS_PAT` with `models:read` scope
+
+Important behavior:
+
+- Models configured but unavailable in the tenant catalog are skipped automatically.
+- HTTP `429`/`retry_after` and available rate-limit headers are logged in the review timeline.
+- Logs are append-only during each run and exported to `GITHUB_STEP_SUMMARY`.
 
 ### Release Version Convention
 
-Version format: `vMAJOR.MINOR.PATCH` (e.g., `v0.0.31`, standard SemVer without fork suffix)
+Version format: `vMAJOR.MINOR.PATCH` (e.g., `v0.0.52`, standard SemVer without fork suffix)
 
-Python/PyPI equivalent: `MAJOR.MINOR.PATCH` (e.g., `0.0.31`)
+Python/PyPI equivalent: `MAJOR.MINOR.PATCH` (e.g., `0.0.52`)
 
-When creating a new release tag manually: `git tag v0.0.31 && git push origin v0.0.31`
+When creating a new release tag manually: `git tag v0.0.52 && git push origin v0.0.52`
 
 ## Development Standards
 
