@@ -120,9 +120,9 @@ To maintain continuity between sessions and agents:
 
 Memory files for this project:
 
-- `TASKS.md` (project root, tracked) — active task board and intake queue snapshot
-- `CLAUDE.md` (project root, tracked) — hot memory cache
-- `memory/` (project root, tracked) — deep memory (people, projects, glossary)
+- `TASKS.md` (project root, gitignored) — active task board and intake queue snapshot
+- `CLAUDE.md` (project root, gitignored) — hot memory cache
+- `memory/` (project root, gitignored) — deep memory (people, projects, glossary)
 - `.ideas/` (project root, gitignored) — strategy artifacts
 
 ---
