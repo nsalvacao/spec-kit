@@ -18,6 +18,53 @@ from specify_cli.scope_detection import (
 )
 
 
+@pytest.fixture
+def low_complexity_request() -> ScopeDetectionInput:
+    return ScopeDetectionInput(
+        description="Add status filter to customer listing.",
+        estimated_timeline_weeks=2,
+        expected_work_items=1,
+        dependency_count=0,
+        integration_surface_count=0,
+        domain_count=1,
+        cross_team_count=1,
+        risk_level="low",
+    )
+
+
+@pytest.fixture
+def medium_complexity_request() -> ScopeDetectionInput:
+    return ScopeDetectionInput(
+        description="Create onboarding capability with several internal integrations.",
+        estimated_timeline_weeks=8,
+        expected_work_items=3,
+        dependency_count=3,
+        integration_surface_count=2,
+        domain_count=2,
+        cross_team_count=2,
+        risk_level="medium",
+    )
+
+
+@pytest.fixture
+def high_complexity_request() -> ScopeDetectionInput:
+    return ScopeDetectionInput(
+        description=(
+            "Build a multi-tenant platform with migration, security, and cross-team rollout "
+            "for billing, observability, and compliance."
+        ),
+        estimated_timeline_weeks=14,
+        expected_work_items=5,
+        dependency_count=5,
+        integration_surface_count=4,
+        domain_count=3,
+        cross_team_count=3,
+        risk_level="high",
+        requires_compliance_review=True,
+        requires_migration=True,
+    )
+
+
 def test_feature_mode_for_simple_request():
     result = detect_scope(
         ScopeDetectionInput(
@@ -458,3 +505,129 @@ def test_validate_scope_scoring_rubric_payload_rejects_duplicate_dimension_names
 
     with pytest.raises(ValueError, match="Dimension names must be unique"):
         validate_scope_scoring_rubric_payload(payload, strict=True)
+
+
+def test_representative_scope_fixtures_cover_feature_epic_program(
+    low_complexity_request: ScopeDetectionInput,
+    medium_complexity_request: ScopeDetectionInput,
+    high_complexity_request: ScopeDetectionInput,
+):
+    low_result = detect_scope(low_complexity_request)
+    medium_result = detect_scope(medium_complexity_request)
+    high_result = detect_scope(high_complexity_request)
+
+    assert low_result.mode_recommendation == ScopeMode.FEATURE
+    assert medium_result.mode_recommendation == ScopeMode.EPIC
+    assert high_result.mode_recommendation == ScopeMode.PROGRAM
+
+
+@pytest.mark.parametrize(
+    ("estimated_timeline_weeks", "expected_score", "expected_mode"),
+    [
+        (4, 33, ScopeMode.FEATURE),
+        (5, 34, ScopeMode.FEATURE),
+        (6, 35, ScopeMode.EPIC),
+    ],
+)
+def test_low_to_mid_boundary_neighbor_scores_are_stable(
+    estimated_timeline_weeks: int,
+    expected_score: int,
+    expected_mode: ScopeMode,
+):
+    result = detect_scope(
+        ScopeDetectionInput(
+            description="Improve search with simple state filters.",
+            estimated_timeline_weeks=estimated_timeline_weeks,
+            expected_work_items=2,
+            dependency_count=3,
+            integration_surface_count=2,
+            domain_count=2,
+            cross_team_count=1,
+            risk_level="low",
+        )
+    )
+
+    assert result.total_score == expected_score
+    assert result.mode_recommendation == expected_mode
+
+
+@pytest.mark.parametrize(
+    ("estimated_timeline_weeks", "expected_score", "expected_mode"),
+    [
+        (9, 63, ScopeMode.EPIC),
+        (10, 64, ScopeMode.EPIC),
+        (11, 65, ScopeMode.PROGRAM),
+    ],
+)
+def test_mid_to_high_boundary_neighbor_scores_are_stable(
+    estimated_timeline_weeks: int,
+    expected_score: int,
+    expected_mode: ScopeMode,
+):
+    result = detect_scope(
+        ScopeDetectionInput(
+            description="platform migration rollout integration audit",
+            estimated_timeline_weeks=estimated_timeline_weeks,
+            expected_work_items=3,
+            dependency_count=3,
+            integration_surface_count=3,
+            domain_count=2,
+            cross_team_count=2,
+            risk_level="medium",
+        )
+    )
+
+    assert result.total_score == expected_score
+    assert result.mode_recommendation == expected_mode
+
+
+def test_threshold_regression_matrix_changes_classification_when_boundaries_change():
+    input_data = ScopeDetectionInput(
+        description="Create onboarding capability with several internal integrations.",
+        estimated_timeline_weeks=8,
+        expected_work_items=3,
+        dependency_count=3,
+        integration_surface_count=2,
+        domain_count=2,
+        cross_team_count=2,
+        risk_level="medium",
+    )
+
+    default_result = detect_scope(input_data)
+    custom_threshold_result = detect_scope(
+        input_data,
+        config=ScopeDetectionConfig(feature_max_score=55, epic_max_score=80, max_total_score=100),
+    )
+
+    assert default_result.total_score == custom_threshold_result.total_score
+    assert default_result.mode_recommendation == ScopeMode.EPIC
+    assert custom_threshold_result.mode_recommendation == ScopeMode.FEATURE
+
+
+def test_weight_regression_matrix_changes_classification_when_signal_weights_change():
+    input_data = ScopeDetectionInput(
+        description="Create onboarding capability with several internal integrations.",
+        estimated_timeline_weeks=8,
+        expected_work_items=3,
+        dependency_count=3,
+        integration_surface_count=2,
+        domain_count=2,
+        cross_team_count=2,
+        risk_level="medium",
+    )
+
+    default_result = detect_scope(input_data)
+    lightweight_result = detect_scope(
+        input_data,
+        config=ScopeDetectionConfig(
+            work_items_multiplier=1,
+            dependency_multiplier=1,
+            integration_multiplier=1,
+            domain_multiplier=5,
+            cross_team_multiplier=2,
+        ),
+    )
+
+    assert default_result.mode_recommendation == ScopeMode.EPIC
+    assert lightweight_result.mode_recommendation == ScopeMode.FEATURE
+    assert default_result.total_score > lightweight_result.total_score
