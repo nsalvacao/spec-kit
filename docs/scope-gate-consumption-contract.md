@@ -104,6 +104,28 @@ Programmatic API:
 - Consume machine-readable payload directly
 - Validate with `validate_scope_gate_payload(..., strict=True)` before acting
 
+## Decomposition Gate Flow (Issue #106)
+
+The decomposition gate decision flow is mandatory before task generation:
+
+`detect -> recommend -> choose -> confirm -> handoff`
+
+Supported user decision options:
+
+- `follow`
+- `inspect_rationale`
+- `override`
+
+For `override` decisions:
+
+- `override_rationale` must be non-empty.
+- If recommendation is `epic` or `program`, explicit risk acknowledgment is required.
+
+Reference implementation:
+
+- `src/specify_cli/decomposition_gate.py`
+- CLI command: `specify scope-gate`
+
 ## Versioning and Compatibility
 
 - Current version: `scope-gate-consumption.v1`

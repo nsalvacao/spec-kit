@@ -54,6 +54,8 @@ import readchar
 import ssl
 import truststore
 from datetime import datetime, timezone
+from specify_cli.decomposition_gate import run_decomposition_gate_for_input
+from specify_cli.scope_detection import ScopeDetectionInput
 
 ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 client = httpx.Client(verify=ssl_context)
@@ -2014,6 +2016,123 @@ def version():
 
     console.print(panel)
     console.print()
+
+
+@app.command("scope-gate")
+def scope_gate(
+    decision: str = typer.Option(
+        "follow",
+        "--decision",
+        help="Gate decision option: follow, inspect_rationale, or override.",
+    ),
+    description: str | None = typer.Option(
+        None,
+        "--description",
+        help="Initiative description (required when --input-json is not provided).",
+    ),
+    estimated_timeline_weeks: int = typer.Option(1, "--timeline-weeks", help="Estimated timeline in weeks."),
+    expected_work_items: int = typer.Option(1, "--work-items", help="Expected number of work items."),
+    dependency_count: int = typer.Option(0, "--dependencies", help="Number of external dependencies."),
+    integration_surface_count: int = typer.Option(0, "--integrations", help="Number of integration surfaces."),
+    domain_count: int = typer.Option(1, "--domains", help="Number of involved domains."),
+    cross_team_count: int = typer.Option(1, "--teams", help="Number of involved teams."),
+    risk_level: str = typer.Option("low", "--risk-level", help="Risk level (low|medium|high|critical)."),
+    requires_compliance_review: bool = typer.Option(
+        False,
+        "--compliance-review/--no-compliance-review",
+        help="Whether formal compliance review is required.",
+    ),
+    requires_migration: bool = typer.Option(
+        False,
+        "--migration/--no-migration",
+        help="Whether migration/cutover is required.",
+    ),
+    input_json: Path | None = typer.Option(
+        None,
+        "--input-json",
+        help="Path to JSON file with scope detection input payload.",
+    ),
+    override_mode: str | None = typer.Option(
+        None,
+        "--override-mode",
+        help="Required when --decision override (feature|epic|program).",
+    ),
+    override_rationale: str | None = typer.Option(
+        None,
+        "--override-rationale",
+        help="Required when --decision override.",
+    ),
+    risk_acknowledged: bool = typer.Option(
+        False,
+        "--risk-acknowledged",
+        help="Required for risky overrides (epic/program recommendation).",
+    ),
+    output_json: Path | None = typer.Option(
+        None,
+        "--output-json",
+        help="Optional path to persist gate output JSON.",
+    ),
+    project_root: Path = typer.Option(
+        Path("."),
+        "--project-root",
+        help="Project root used to load .specify/spec-kit.yml configuration.",
+    ),
+    compact: bool = typer.Option(False, "--compact", help="Emit compact single-line JSON output."),
+):
+    """Run mandatory decomposition gate with override/risk controls."""
+    try:
+        if input_json is not None:
+            raw_payload = json.loads(input_json.read_text(encoding="utf-8"))
+            if not isinstance(raw_payload, dict):
+                raise ValueError("scope input JSON must contain an object at top-level")
+            if not isinstance(raw_payload.get("description"), str):
+                raise ValueError("scope input JSON requires a string 'description'")
+            input_data = ScopeDetectionInput(
+                description=raw_payload["description"],
+                estimated_timeline_weeks=raw_payload.get("estimated_timeline_weeks", 1),
+                expected_work_items=raw_payload.get("expected_work_items", 1),
+                dependency_count=raw_payload.get("dependency_count", 0),
+                integration_surface_count=raw_payload.get("integration_surface_count", 0),
+                domain_count=raw_payload.get("domain_count", 1),
+                cross_team_count=raw_payload.get("cross_team_count", 1),
+                risk_level=raw_payload.get("risk_level", "low"),
+                requires_compliance_review=raw_payload.get("requires_compliance_review", False),
+                requires_migration=raw_payload.get("requires_migration", False),
+            )
+        else:
+            if not description or not description.strip():
+                raise ValueError("description is required when --input-json is not provided")
+            input_data = ScopeDetectionInput(
+                description=description.strip(),
+                estimated_timeline_weeks=estimated_timeline_weeks,
+                expected_work_items=expected_work_items,
+                dependency_count=dependency_count,
+                integration_surface_count=integration_surface_count,
+                domain_count=domain_count,
+                cross_team_count=cross_team_count,
+                risk_level=risk_level,
+                requires_compliance_review=requires_compliance_review,
+                requires_migration=requires_migration,
+            )
+
+        gate_result = run_decomposition_gate_for_input(
+            input_data,
+            decision_option=decision,
+            project_root=project_root,
+            override_mode=override_mode,
+            override_rationale=override_rationale,
+            risk_acknowledged=risk_acknowledged,
+        )
+        rendered = json.dumps(gate_result.to_dict(), indent=None if compact else 2, ensure_ascii=False)
+
+        if output_json is not None:
+            output_json.parent.mkdir(parents=True, exist_ok=True)
+            output_json.write_text(f"{rendered}\n", encoding="utf-8")
+
+        typer.echo(rendered)
+    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
 
 
 @app.command()
