@@ -421,6 +421,11 @@ def _validate_invariants(contract: HierarchyMetadataContract) -> None:
     epic_ids = [epic.id for epic in contract.epics]
     if len(set(epic_ids)) != len(epic_ids):
         raise ValueError("Epic IDs must be unique")
+    if contract.program and len(set(contract.program.epic_ids)) != len(contract.program.epic_ids):
+        raise ValueError("program.epic_ids must contain unique IDs")
+    for epic in contract.epics:
+        if len(set(epic.feature_ids)) != len(epic.feature_ids):
+            raise ValueError(f"epic.feature_ids for '{epic.id}' must contain unique IDs")
 
     if contract.mode == HierarchyMode.FEATURE and len(contract.features) != 1:
         raise ValueError("feature mode requires exactly one feature")

@@ -155,3 +155,84 @@ def test_validate_hierarchy_contract_payload_non_strict_returns_errors():
     assert errors
     assert "at least one feature" in errors[0]
 
+
+def test_normalize_hierarchy_contract_rejects_duplicate_program_epic_ids():
+    payload = {
+        "mode": "program",
+        "program": {
+            "id": "program-alpha",
+            "title": "Platform Expansion",
+            "status": "active",
+            "owner": "pm-core",
+            "epic_ids": ["epic-onboarding", "epic-onboarding"],
+        },
+        "epics": [
+            {
+                "id": "epic-onboarding",
+                "title": "Onboarding Foundation",
+                "status": "active",
+                "owner": "planner-team",
+                "program_id": "program-alpha",
+                "feature_ids": ["021-user-onboarding"],
+            }
+        ],
+        "features": [
+            {
+                "id": "021-user-onboarding",
+                "title": "User onboarding journey",
+                "status": "draft",
+                "owner": "team-app",
+                "program_id": "program-alpha",
+                "epic_id": "epic-onboarding",
+                "artifacts": {
+                    "spec": "specs/021-user-onboarding/spec.md",
+                    "plan": "specs/021-user-onboarding/plan.md",
+                    "tasks": "specs/021-user-onboarding/tasks.md",
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="program.epic_ids must contain unique IDs"):
+        normalize_hierarchy_contract_payload(payload, strict=True)
+
+
+def test_normalize_hierarchy_contract_rejects_duplicate_epic_feature_ids():
+    payload = {
+        "mode": "program",
+        "program": {
+            "id": "program-alpha",
+            "title": "Platform Expansion",
+            "status": "active",
+            "owner": "pm-core",
+            "epic_ids": ["epic-onboarding"],
+        },
+        "epics": [
+            {
+                "id": "epic-onboarding",
+                "title": "Onboarding Foundation",
+                "status": "active",
+                "owner": "planner-team",
+                "program_id": "program-alpha",
+                "feature_ids": ["021-user-onboarding", "021-user-onboarding"],
+            }
+        ],
+        "features": [
+            {
+                "id": "021-user-onboarding",
+                "title": "User onboarding journey",
+                "status": "draft",
+                "owner": "team-app",
+                "program_id": "program-alpha",
+                "epic_id": "epic-onboarding",
+                "artifacts": {
+                    "spec": "specs/021-user-onboarding/spec.md",
+                    "plan": "specs/021-user-onboarding/plan.md",
+                    "tasks": "specs/021-user-onboarding/tasks.md",
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="must contain unique IDs"):
+        normalize_hierarchy_contract_payload(payload, strict=True)

@@ -2049,7 +2049,7 @@ def hierarchy_contract(
             output_json.write_text(f"{rendered}\n", encoding="utf-8")
 
         typer.echo(rendered)
-    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError) as e:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 
