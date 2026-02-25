@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added low/medium/high complexity fixtures for reusable test inputs.
   - Added neighbor-boundary regression coverage around 34/35 and 64/65 bands.
   - Added threshold/weight regression matrix tests to detect classification drift.
+- **#103: scope detection runtime integration and structured gate handoff**
+  - Added strict input parser/normalizer for detector payloads: `scope_detection_input_from_mapping(...)`.
+  - Added `specify scope-detect` command to execute project-config-aware detection and emit parseable JSON.
+  - Command now emits combined payloads for downstream orchestration:
+    - `scope_detection` (detector contract output)
+    - `scope_gate` (stable gate-consumption contract output)
 
 ## [0.0.52] - 2026-02-19
 
