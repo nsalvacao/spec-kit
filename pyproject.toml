@@ -4,15 +4,15 @@ version = "0.0.52"
 description = "Specify CLI, part of GitHub Spec Kit. A tool to bootstrap your projects for Spec-Driven Development (SDD)."
 requires-python = ">=3.11"
 dependencies = [
-    "typer",
     "click>=8.1",
-    "rich",
     "httpx[socks]",
-    "platformdirs",
-    "readchar",
-    "truststore>=0.10.4",
-    "pyyaml>=6.0",
     "packaging>=23.0",
+    "platformdirs",
+    "pyyaml>=6.0",
+    "readchar",
+    "rich",
+    "truststore>=0.10.4",
+    "typer",
 ]
 
 [project.scripts]
