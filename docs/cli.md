@@ -9,6 +9,7 @@ This reference covers the `specify` CLI and the available slash commands after i
 | `init` | Initialize a new Specify project from templates |
 | `check` | Check for installed tools and agent CLIs |
 | `scope-gate` | Run mandatory decomposition gate flow with follow/inspect/override decisions |
+| `scope-detect` | Run adaptive scope detection and emit gate-ready JSON payload |
 
 ## `specify init` Arguments & Options
 
@@ -36,6 +37,8 @@ specify init my-project --ai gemini --no-git
 specify check
 specify scope-gate --decision follow --description "Add status filter to customer listing"
 specify scope-gate --decision override --override-mode feature --override-rationale "Emergency patch" --risk-acknowledged --description "Cross-team onboarding redesign"
+specify scope-detect --description "Cross-team migration with security and compliance controls"
+specify scope-detect --input-json scope-input.json --output-json .spec-kit/scope-gate.json
 
 ```text
 

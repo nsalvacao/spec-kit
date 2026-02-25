@@ -162,7 +162,7 @@ def test_scope_gate_json_input_requires_non_empty_description(tmp_path):
     )
 
     assert result.exit_code == 1
-    assert "A non-empty description is required" in result.output
+    assert "description cannot be empty" in result.output
 
 
 def test_scope_gate_rejects_input_json_outside_project_root(tmp_path):
