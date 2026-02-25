@@ -61,7 +61,7 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
 
 ### Phase 2: Spec Amendment (Source of Truth)
 
-5. Update spec.md with the amendment. Apply changes to **three sections**:
+1. Update spec.md with the amendment. Apply changes to **three sections**:
 
    a. **Clarifications section** — Add traceability entry:
       - Ensure `## Clarifications` section exists (create after overview section if missing)
@@ -84,11 +84,11 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
    - The new scenario does not contradict existing scenarios
    - Markdown structure remains valid
 
-6. Save the updated spec.md.
+2. Save the updated spec.md.
 
 ### Phase 3: Locate Affected Implementation
 
-7. Scan the project to identify files affected by this amendment:
+1. Scan the project to identify files affected by this amendment:
 
    a. **Test files** — Search for existing test files related to the affected user story:
       - Check test directories from plan.md project structure (e.g., `tests/`, `test/`, `spec/`, `__tests__/`)
@@ -115,7 +115,7 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
 
 ### Phase 4: Test Amendment
 
-8. Add the test for the new scenario. The approach depends on the project's testing framework (determined from plan.md):
+1. Add the test for the new scenario. The approach depends on the project's testing framework (determined from plan.md):
 
    **General pattern** (adapt to project's testing conventions):
    - Open the identified test file(s) for the affected user story
@@ -133,7 +133,7 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
      - `describe('amendment: <behavior>')`
      - `it('should <behavior> (amended YYYY-MM-DD)')`
 
-9. Run the new test to confirm it **fails** (RED state):
+2. Run the new test to confirm it **fails** (RED state):
    - Execute only the new test using the project's test runner
    - If the test **passes** (the behavior already works): Report that the amendment is already handled in code but was missing from the spec. Mark as "spec-only amendment" and skip Phase 5.
    - If the test **fails** (expected): Proceed to Phase 5.
@@ -141,13 +141,13 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
 
 ### Phase 5: Implementation Amendment
 
-10. Make the targeted code change to satisfy the new test:
+1. Make the targeted code change to satisfy the new test:
     - Open the identified implementation file(s)
     - Make the minimal change necessary to handle the new scenario
     - Do NOT refactor surrounding code — keep the change focused on the amendment
     - Follow the project's existing code style and patterns
 
-11. Run the full test suite for the affected user story:
+2. Run the full test suite for the affected user story:
     - Execute all tests (not just the new one) for regression validation
     - **If all tests pass** (GREEN): Proceed to Phase 6
     - **If existing tests fail** (REGRESSION): Revert the implementation change. Report the conflict and suggest the user resolve it manually or reconsider the amendment.
@@ -155,7 +155,7 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
 
 ### Phase 6: Traceability Update
 
-12. Append an amendment entry to tasks.md:
+1. Append an amendment entry to tasks.md:
 
     ```markdown
     ## Post-Implementation Amendments
@@ -173,7 +173,7 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
 
 ### Phase 7: Report
 
-13. Output a structured completion report:
+1. Output a structured completion report:
 
     ```text
     ## Amendment Complete
