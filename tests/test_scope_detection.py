@@ -581,17 +581,10 @@ def test_mid_to_high_boundary_neighbor_scores_are_stable(
     assert result.mode_recommendation == expected_mode
 
 
-def test_threshold_regression_matrix_changes_classification_when_boundaries_change():
-    input_data = ScopeDetectionInput(
-        description="Create onboarding capability with several internal integrations.",
-        estimated_timeline_weeks=8,
-        expected_work_items=3,
-        dependency_count=3,
-        integration_surface_count=2,
-        domain_count=2,
-        cross_team_count=2,
-        risk_level="medium",
-    )
+def test_threshold_regression_matrix_changes_classification_when_boundaries_change(
+    medium_complexity_request: ScopeDetectionInput,
+):
+    input_data = medium_complexity_request
 
     default_result = detect_scope(input_data)
     custom_threshold_result = detect_scope(
@@ -604,17 +597,10 @@ def test_threshold_regression_matrix_changes_classification_when_boundaries_chan
     assert custom_threshold_result.mode_recommendation == ScopeMode.FEATURE
 
 
-def test_weight_regression_matrix_changes_classification_when_signal_weights_change():
-    input_data = ScopeDetectionInput(
-        description="Create onboarding capability with several internal integrations.",
-        estimated_timeline_weeks=8,
-        expected_work_items=3,
-        dependency_count=3,
-        integration_surface_count=2,
-        domain_count=2,
-        cross_team_count=2,
-        risk_level="medium",
-    )
+def test_weight_regression_matrix_changes_classification_when_signal_weights_change(
+    medium_complexity_request: ScopeDetectionInput,
+):
+    input_data = medium_complexity_request
 
     default_result = detect_scope(input_data)
     lightweight_result = detect_scope(
