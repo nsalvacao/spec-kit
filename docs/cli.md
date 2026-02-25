@@ -8,6 +8,7 @@ This reference covers the `specify` CLI and the available slash commands after i
 | --- | --- |
 | `init` | Initialize a new Specify project from templates |
 | `check` | Check for installed tools and agent CLIs |
+| `scope-detect` | Run adaptive scope detection and emit gate-ready JSON payload |
 
 ## `specify init` Arguments & Options
 
@@ -33,6 +34,8 @@ specify init . --here --ai claude
 specify init my-project --ai copilot --script ps
 specify init my-project --ai gemini --no-git
 specify check
+specify scope-detect --description "Cross-team migration with security and compliance controls"
+specify scope-detect --input-json scope-input.json --output-json .spec-kit/scope-gate.json
 
 ```text
 

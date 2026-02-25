@@ -13,6 +13,7 @@ from specify_cli.scope_detection import (
     detect_scope,
     load_scope_detection_config,
     scope_scoring_rubric,
+    scope_detection_input_from_mapping,
     scope_detection_config_from_mapping,
     validate_scope_scoring_rubric_payload,
 )
@@ -233,6 +234,44 @@ def test_invalid_boolean_flag_type_raises_error():
                 requires_migration="yes",
             )
         )
+
+
+def test_scope_detection_input_from_mapping_normalizes_scalars():
+    parsed = scope_detection_input_from_mapping(
+        {
+            "description": " Cross-team migration plan ",
+            "estimated_timeline_weeks": "6",
+            "expected_work_items": "3",
+            "dependency_count": "2",
+            "integration_surface_count": 1,
+            "domain_count": "2",
+            "cross_team_count": 2,
+            "risk_level": " HIGH ",
+            "requires_compliance_review": "true",
+            "requires_migration": "0",
+        }
+    )
+
+    assert parsed.description == "Cross-team migration plan"
+    assert parsed.estimated_timeline_weeks == 6
+    assert parsed.expected_work_items == 3
+    assert parsed.dependency_count == 2
+    assert parsed.integration_surface_count == 1
+    assert parsed.domain_count == 2
+    assert parsed.cross_team_count == 2
+    assert parsed.normalized_risk_level == "high"
+    assert parsed.requires_compliance_review is True
+    assert parsed.requires_migration is False
+
+
+def test_scope_detection_input_from_mapping_rejects_unknown_keys():
+    with pytest.raises(ValueError, match="Unknown scope_detection input keys"):
+        scope_detection_input_from_mapping({"description": "hello", "unknown": 1})
+
+
+def test_scope_detection_input_from_mapping_requires_description():
+    with pytest.raises(ValueError, match="missing required key: description"):
+        scope_detection_input_from_mapping({"expected_work_items": 2})
 
 
 def test_keyword_matching_avoids_substring_false_positive():
