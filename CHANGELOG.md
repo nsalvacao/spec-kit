@@ -22,6 +22,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `tests/test_hierarchy_contract.py`
     - `tests/test_hierarchy_contract_cli.py`
   - Updated templates and command prompts to reference hierarchy metadata lineage across `spec`, `plan`, and `tasks` flows.
+- **#106: decomposition gate flow with explicit override/risk controls**
+  - Added gate flow module with deterministic state machine:
+    `detect -> recommend -> choose -> confirm -> handoff`.
+  - Added `specify scope-gate` command with decision options:
+    `follow`, `inspect_rationale`, `override`.
+  - Enforced mandatory override rationale and risk acknowledgment for risky overrides (`epic`/`program` recommendations).
+  - Added test suites for module and CLI flow coverage:
+    - `tests/test_decomposition_gate.py`
+    - `tests/test_scope_gate_cli.py`
+  - Updated tasks command guidance to require gate payload before task generation.
+- **#104: scope detection boundary and regression test hardening**
+  - Added low/medium/high complexity fixtures for reusable test inputs.
+  - Added neighbor-boundary regression coverage around 34/35 and 64/65 bands.
+  - Added threshold/weight regression matrix tests to detect classification drift.
+- **#103: scope detection runtime integration and structured gate handoff**
+  - Added strict input parser/normalizer for detector payloads: `scope_detection_input_from_mapping(...)`.
+  - Added `specify scope-detect` command to execute project-config-aware detection and emit parseable JSON.
+  - Command now emits combined payloads for downstream orchestration:
+    - `scope_detection` (detector contract output)
+    - `scope_gate` (stable gate-consumption contract output)
 
 ## [0.0.52] - 2026-02-19
 
