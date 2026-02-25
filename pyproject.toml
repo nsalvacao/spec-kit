@@ -5,6 +5,7 @@ description = "Specify CLI, part of GitHub Spec Kit. A tool to bootstrap your pr
 requires-python = ">=3.11"
 dependencies = [
     "typer",
+    "click>=8.1",
     "rich",
     "httpx[socks]",
     "platformdirs",
