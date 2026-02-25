@@ -166,7 +166,7 @@ Be specific about your tech stack and technical requirements:
 
 Generate an actionable task list using the `/speckit.tasks` command:
 
-```bash
+```markdown
 /speckit.tasks
 ```
 
