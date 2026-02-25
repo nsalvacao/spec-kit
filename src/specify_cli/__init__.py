@@ -55,8 +55,9 @@ import ssl
 import truststore
 from datetime import datetime, timezone
 from specify_cli.decomposition_gate import run_decomposition_gate_for_input
-from specify_cli.scope_detection import ScopeDetectionInput, detect_scope_for_project, scope_detection_input_from_mapping
+from specify_cli.scope_detection import detect_scope_for_project, scope_detection_input_from_mapping
 from specify_cli.scope_gate_contract import ScopeGateChannel, build_scope_gate_payload
+from specify_cli.hierarchy_contract import normalize_hierarchy_contract_payload
 
 ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 client = httpx.Client(verify=ssl_context)
@@ -2017,6 +2018,43 @@ def version():
 
     console.print(panel)
     console.print()
+
+
+@app.command("hierarchy-contract")
+def hierarchy_contract(
+    input_json: Path = typer.Option(
+        ...,
+        "--input-json",
+        help="Path to JSON payload with Program/Epic/Feature metadata contract.",
+    ),
+    output_json: Path | None = typer.Option(
+        None,
+        "--output-json",
+        help="Optional path to persist normalized hierarchy contract JSON.",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict/--no-strict",
+        help="Reject unknown top-level fields when normalizing payload.",
+    ),
+    compact: bool = typer.Option(False, "--compact", help="Emit compact single-line JSON output."),
+):
+    """Normalize and validate Program/Epic/Feature hierarchy contract payload."""
+    try:
+        raw_payload = json.loads(input_json.read_text(encoding="utf-8"))
+        if not isinstance(raw_payload, dict):
+            raise ValueError("hierarchy payload must be a JSON object at top-level")
+        normalized = normalize_hierarchy_contract_payload(raw_payload, strict=strict)
+        rendered = json.dumps(normalized.to_dict(), indent=None if compact else 2, ensure_ascii=False)
+
+        if output_json is not None:
+            output_json.parent.mkdir(parents=True, exist_ok=True)
+            output_json.write_text(f"{rendered}\n", encoding="utf-8")
+
+        typer.echo(rendered)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
 
 
 @app.command("scope-detect")

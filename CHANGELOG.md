@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **#107: Program/Epic/Feature hierarchy model and metadata contract**
+  - Added `src/specify_cli/hierarchy_contract.py` with:
+    - canonical entities (`ProgramMetadata`, `EpicMetadata`, `FeatureMetadata`)
+    - versioned payload contract (`program-epic-feature.v1`)
+    - normalizer/validator helpers for cross-channel payload consistency
+  - Added `specify hierarchy-contract` CLI command for payload normalization and validation.
+  - Added contract documentation: `docs/hierarchy-metadata-contract.md`.
+  - Added test suites:
+    - `tests/test_hierarchy_contract.py`
+    - `tests/test_hierarchy_contract_cli.py`
+  - Updated templates and command prompts to reference hierarchy metadata lineage across `spec`, `plan`, and `tasks` flows.
 - **#106: decomposition gate flow with explicit override/risk controls**
   - Added gate flow module with deterministic state machine:
     `detect -> recommend -> choose -> confirm -> handoff`.

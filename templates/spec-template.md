@@ -17,6 +17,14 @@ enables: null
 
 **Input**: User description: "$ARGUMENTS"
 
+## Scope Hierarchy Metadata *(mandatory for decomposed initiatives)*
+
+- **Mode**: `[feature|epic|program]`
+- **Program ID**: `[program-id or null for feature mode]`
+- **Epic ID**: `[epic-id or null for feature mode]`
+- **Feature ID**: `[###-feature-name]`
+- **Source Decision**: `[decomposition gate decision reference]`
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
