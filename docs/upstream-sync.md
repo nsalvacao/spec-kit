@@ -44,8 +44,12 @@ Treat these live values as source of truth. Do not rely on stale handoff snapsho
 
 For selective upstream PR intake, use one lane consistently across the full batch:
 
-- Intake branches: `intake/lote-<A|B|C>-pr-<upstream_pr_number>`
-- Review PR target: `baseline/main-sync-YYYY-MM-DD`
+- Baseline branch (canonical): `baseline/upstream-intake-YYYY-MM-DD`
+- Intake branches:
+  - `intake/upstream-value-<topic>` (value-focused intake)
+  - `intake/rehome-upstream-<upstream_pr_number>-<topic>` (rehome/supersede)
+  - `intake/lote-<A|B|C>-pr-<upstream_pr_number>` (legacy naming, still acceptable)
+- Review PR target: `baseline/upstream-intake-YYYY-MM-DD`
 - Promotion PR target (after batch): `main`
 
 Do not mix intake flow (`intake -> baseline`) with feature flow (`feat -> main`) in the same intake batch unless explicitly requested by repository owner.

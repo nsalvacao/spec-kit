@@ -618,9 +618,13 @@ Use these live results as source of truth for branch/PR planning.
 
 For selective upstream intake in this fork, use the baseline lane defined in `AGENTS.md`:
 
-- Work branches: `intake/lote-<A|B|C>-pr-<upstream_pr_number>`
-- Review PRs: `intake/... -> baseline/main-sync-YYYY-MM-DD`
-- Promotion PR after batch: `baseline/main-sync-YYYY-MM-DD -> main`
+- Baseline branch (canonical): `baseline/upstream-intake-YYYY-MM-DD`
+- Work branches:
+  - `intake/upstream-value-<topic>` (value-focused intake)
+  - `intake/rehome-upstream-<upstream_pr_number>-<topic>` (rehome/supersede)
+  - `intake/lote-<A|B|C>-pr-<upstream_pr_number>` (legacy naming, still acceptable)
+- Review PRs: `intake/... -> baseline/upstream-intake-YYYY-MM-DD`
+- Promotion PR after batch: `baseline/upstream-intake-YYYY-MM-DD -> main`
 
 Do not mix intake and feature flows in the same batch (for example `feat/* -> main` for one intake PR and `intake/* -> baseline/*` for another), unless explicitly requested by repository owner.
 
@@ -629,9 +633,9 @@ Do not mix intake and feature flows in the same batch (for example `feat/* -> ma
 ```bash
 # Per upstream PR (baseline lane)
 git fetch origin upstream --prune
-git checkout baseline/main-sync-YYYY-MM-DD
-git pull --ff-only origin baseline/main-sync-YYYY-MM-DD
-git checkout intake/lote-<A|B|C>-pr-<upstream_pr_number>
+git checkout baseline/upstream-intake-YYYY-MM-DD
+git pull --ff-only origin baseline/upstream-intake-YYYY-MM-DD
+git checkout intake/upstream-value-<topic>
 # Apply intake change (prefer: git cherry-pick -x <upstream-sha>)
 # Run tests + lint
 # Push intake branch and wait for AI review + human approval
