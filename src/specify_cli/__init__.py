@@ -1389,6 +1389,14 @@ def init(
     if not no_banner:
         show_banner()
 
+    # Guard against option flags being consumed as values for --ai.
+    if ai_assistant and ai_assistant.startswith("--"):
+        console.print(f"[red]Error:[/red] Invalid value for --ai: '{ai_assistant}'")
+        console.print("[yellow]Hint:[/yellow] Did you forget to provide a value for --ai?")
+        console.print("[yellow]Example:[/yellow] specify init --ai claude --here")
+        console.print(f"[yellow]Available agents:[/yellow] {', '.join(AGENT_CONFIG.keys())}")
+        raise typer.Exit(1)
+
     if project_name == ".":
         here = True
         project_name = None  # Clear project_name to use existing validation logic
