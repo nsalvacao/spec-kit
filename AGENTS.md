@@ -453,8 +453,12 @@ This workflow complements the general upstream synchronization process described
 
 ### Branching Convention
 
-> **Baseline**: Stable baseline branch: `baseline/main-sync-YYYY-MM-DD`
-> **Intake**: Intake branch per upstream PR: `intake/lote-<A|B|C>-pr-<upstream_pr_number>`
+> **Baseline**: Stable baseline branch (canonical): `baseline/upstream-intake-YYYY-MM-DD`
+> **Intake**: Intake branch per upstream PR. Accepted patterns:
+>
+> - `intake/upstream-value-<topic>` (value-focused intake)
+> - `intake/rehome-upstream-<upstream_pr_number>-<topic>` (rehome/supersede)
+> - `intake/lote-<A|B|C>-pr-<upstream_pr_number>` (legacy naming, still acceptable)
 > **Review**: Review PR target: `intake/... -> baseline/...`
 > **Final**: Final promotion PR target: `baseline/... -> main`
 
