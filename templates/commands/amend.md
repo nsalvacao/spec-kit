@@ -41,7 +41,7 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
 
 ### Phase 1: Context Loading
 
-1. Run `{SCRIPT}` from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. Run `{SCRIPT}` from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in arguments, use shell-appropriate escaping (e.g., `'I'\''m Groot'` in bash, `'I''m Groot'` in PowerShell) or use double quotes if possible (e.g., `"I'm Groot"`).
 
 2. Load and validate the implementation context:
    - **REQUIRED**: Read spec.md — the source of truth being amended
@@ -155,21 +155,20 @@ This is a **micro-cycle**: it updates the spec as the source of truth, then casc
 
 ### Phase 6: Traceability Update
 
-1. Append an amendment entry to tasks.md:
+1. Append an amendment traceability entry to tasks.md using the existing checklist format defined by `/speckit.tasks`:
 
     ```markdown
-    ## Post-Implementation Amendments
-
-    - [x] AMEND-001 [USN] <Amendment description> (YYYY-MM-DD)
-      - Spec: Scenario N in spec.md User Story N
+    - [x] T<next-id> [USN] Record amendment: <short description> in specs/<feature>/tasks.md
+      - Spec: Scenario N in spec.md User Story N (Amended YYYY-MM-DD)
       - Test: <test file path>:<test name>
       - Code: <implementation file path>
       - Type: <edge case | new scenario | behavioral correction | regression fix>
     ```
 
-    - If a "Post-Implementation Amendments" section already exists, append to it
-    - If not, create it after the last phase section
-    - Increment AMEND-NNN sequentially from any existing amendment entries
+    - Determine `<next-id>` by continuing from the highest existing `Txxx` task ID in the file
+    - Place the amendment entry under the affected user story phase whenever possible
+    - If no suitable story phase exists, append under "Final Phase: Polish & Cross-Cutting Concerns"
+    - Do **not** introduce alternate task ID schemes (e.g., `AMEND-NNN`) unless `/speckit.tasks` is globally updated first
 
 ### Phase 7: Report
 
