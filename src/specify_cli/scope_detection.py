@@ -62,6 +62,21 @@ DEFAULT_RISK_WEIGHTS = {
     "critical": 18,
 }
 
+SCOPE_DETECTION_INPUT_ALLOWED_FIELDS = frozenset(
+    {
+        "description",
+        "estimated_timeline_weeks",
+        "expected_work_items",
+        "dependency_count",
+        "integration_surface_count",
+        "domain_count",
+        "cross_team_count",
+        "risk_level",
+        "requires_compliance_review",
+        "requires_migration",
+    }
+)
+
 
 class ScopeMode(str, Enum):
     """Supported orchestration modes."""
@@ -589,6 +604,56 @@ def validate_scope_scoring_rubric_payload(
         raise ValueError("Dimension names must be unique")
 
 
+def scope_detection_input_from_mapping(raw_input: Mapping[str, Any]) -> ScopeDetectionInput:
+    """Build and normalize ScopeDetectionInput from a generic mapping.
+
+    This parser is intentionally strict about keys so downstream contracts can
+    fail fast on schema drift while still normalizing common scalar formats.
+    """
+    if not isinstance(raw_input, Mapping):
+        raise ValueError("scope_detection input must be a mapping")
+
+    unknown_keys = sorted(set(raw_input.keys()) - SCOPE_DETECTION_INPUT_ALLOWED_FIELDS)
+    if unknown_keys:
+        unknown = ", ".join(unknown_keys)
+        raise ValueError(f"Unknown scope_detection input keys: {unknown}")
+
+    if "description" not in raw_input:
+        raise ValueError("scope_detection input missing required key: description")
+
+    description = raw_input["description"]
+    if not isinstance(description, str):
+        raise TypeError("description must be a string")
+
+    return ScopeDetectionInput(
+        description=description.strip(),
+        estimated_timeline_weeks=_coerce_int_input(
+            raw_input.get("estimated_timeline_weeks", 1),
+            field_name="estimated_timeline_weeks",
+        ),
+        expected_work_items=_coerce_int_input(
+            raw_input.get("expected_work_items", 1),
+            field_name="expected_work_items",
+        ),
+        dependency_count=_coerce_int_input(raw_input.get("dependency_count", 0), field_name="dependency_count"),
+        integration_surface_count=_coerce_int_input(
+            raw_input.get("integration_surface_count", 0),
+            field_name="integration_surface_count",
+        ),
+        domain_count=_coerce_int_input(raw_input.get("domain_count", 1), field_name="domain_count"),
+        cross_team_count=_coerce_int_input(raw_input.get("cross_team_count", 1), field_name="cross_team_count"),
+        risk_level=_coerce_risk_level_input(raw_input.get("risk_level", ScopeRiskLevel.LOW.value)),
+        requires_compliance_review=_coerce_bool_input(
+            raw_input.get("requires_compliance_review", False),
+            field_name="requires_compliance_review",
+        ),
+        requires_migration=_coerce_bool_input(
+            raw_input.get("requires_migration", False),
+            field_name="requires_migration",
+        ),
+    )
+
+
 def scope_detection_config_from_mapping(raw_config: Mapping[str, Any] | None) -> ScopeDetectionConfig:
     """Build ScopeDetectionConfig from a generic mapping."""
     if raw_config is None:
@@ -634,6 +699,42 @@ def scope_detection_config_from_mapping(raw_config: Mapping[str, Any] | None) ->
     config = ScopeDetectionConfig(**config_data)
     config.validate()
     return config
+
+
+def _coerce_int_input(value: Any, *, field_name: str) -> int:
+    if isinstance(value, bool):
+        raise TypeError(f"{field_name} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip()
+        if re.fullmatch(r"-?\d+", normalized):
+            return int(normalized)
+    raise TypeError(f"{field_name} must be an integer")
+
+
+def _coerce_bool_input(value: Any, *, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    raise TypeError(f"{field_name} must be a boolean")
+
+
+def _coerce_risk_level_input(value: Any) -> ScopeRiskLevel | str:
+    if isinstance(value, ScopeRiskLevel):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized:
+            return normalized
+    raise TypeError("risk_level must be a string")
 
 
 def load_scope_detection_config(

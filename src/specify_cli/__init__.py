@@ -54,6 +54,8 @@ import readchar
 import ssl
 import truststore
 from datetime import datetime, timezone
+from specify_cli.scope_detection import ScopeDetectionInput, detect_scope_for_project, scope_detection_input_from_mapping
+from specify_cli.scope_gate_contract import ScopeGateChannel, build_scope_gate_payload
 
 ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 client = httpx.Client(verify=ssl_context)
@@ -2014,6 +2016,107 @@ def version():
 
     console.print(panel)
     console.print()
+
+
+@app.command("scope-detect")
+def scope_detect(
+    description: str | None = typer.Option(
+        None,
+        "--description",
+        help="Initiative description (required when --input-json is not provided).",
+    ),
+    estimated_timeline_weeks: int = typer.Option(1, "--timeline-weeks", help="Estimated timeline in weeks."),
+    expected_work_items: int = typer.Option(1, "--work-items", help="Expected number of work items."),
+    dependency_count: int = typer.Option(0, "--dependencies", help="Number of external dependencies."),
+    integration_surface_count: int = typer.Option(0, "--integrations", help="Number of integration surfaces."),
+    domain_count: int = typer.Option(1, "--domains", help="Number of involved domains."),
+    cross_team_count: int = typer.Option(1, "--teams", help="Number of involved teams."),
+    risk_level: str = typer.Option("low", "--risk-level", help="Risk level (low|medium|high|critical)."),
+    requires_compliance_review: bool = typer.Option(
+        False,
+        "--compliance-review/--no-compliance-review",
+        help="Whether formal compliance review is required.",
+    ),
+    requires_migration: bool = typer.Option(
+        False,
+        "--migration/--no-migration",
+        help="Whether migration/cutover is required.",
+    ),
+    input_json: Path | None = typer.Option(
+        None,
+        "--input-json",
+        help="Path to JSON file with scope detection input payload.",
+    ),
+    output_json: Path | None = typer.Option(
+        None,
+        "--output-json",
+        help="Optional path to persist combined scope detection + gate payload.",
+    ),
+    project_root: Path = typer.Option(
+        Path("."),
+        "--project-root",
+        help="Project root used to load .specify/spec-kit.yml configuration.",
+    ),
+    compact: bool = typer.Option(False, "--compact", help="Emit compact single-line JSON output."),
+):
+    """Run scope detection and emit gate-ready structured output."""
+    try:
+        project_root_resolved = project_root.resolve()
+
+        if input_json is not None:
+            input_path = input_json.resolve()
+            try:
+                input_path.relative_to(project_root_resolved)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Input path '{input_json}' must be within project root '{project_root_resolved}'."
+                ) from exc
+
+            raw_text = input_path.read_text(encoding="utf-8")
+            raw_payload = json.loads(raw_text)
+            if not isinstance(raw_payload, dict):
+                raise ValueError("scope input JSON must contain an object at top-level")
+            input_data = scope_detection_input_from_mapping(raw_payload)
+        else:
+            if not description or not description.strip():
+                raise ValueError("description is required when --input-json is not provided")
+            input_data = ScopeDetectionInput(
+                description=description.strip(),
+                estimated_timeline_weeks=estimated_timeline_weeks,
+                expected_work_items=expected_work_items,
+                dependency_count=dependency_count,
+                integration_surface_count=integration_surface_count,
+                domain_count=domain_count,
+                cross_team_count=cross_team_count,
+                risk_level=risk_level,
+                requires_compliance_review=requires_compliance_review,
+                requires_migration=requires_migration,
+            )
+
+        detection_result = detect_scope_for_project(input_data, project_root=project_root)
+        gate_payload = build_scope_gate_payload(detection_result, channel=ScopeGateChannel.CLI)
+        combined_payload = {
+            "scope_detection": detection_result.to_dict(),
+            "scope_gate": gate_payload.to_dict(),
+        }
+        rendered = json.dumps(combined_payload, indent=None if compact else 2, ensure_ascii=False)
+
+        if output_json is not None:
+            output_path = output_json.resolve()
+            try:
+                output_path.relative_to(project_root_resolved)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Output path '{output_json}' must be within project root '{project_root_resolved}'."
+                ) from exc
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(f"{rendered}\n", encoding="utf-8")
+
+        typer.echo(rendered)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
 
 
 @app.command()
