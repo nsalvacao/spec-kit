@@ -2081,39 +2081,56 @@ def scope_gate(
 ):
     """Run mandatory decomposition gate with override/risk controls."""
     try:
+        project_root_resolved = project_root.resolve()
+
+        def _scope_input_from_mapping(payload: dict) -> ScopeDetectionInput:
+            description_value = payload.get("description")
+            if not isinstance(description_value, str) or not description_value.strip():
+                raise ValueError("A non-empty description is required via --description or in input JSON.")
+            return ScopeDetectionInput(
+                description=description_value.strip(),
+                estimated_timeline_weeks=payload.get("estimated_timeline_weeks", 1),
+                expected_work_items=payload.get("expected_work_items", 1),
+                dependency_count=payload.get("dependency_count", 0),
+                integration_surface_count=payload.get("integration_surface_count", 0),
+                domain_count=payload.get("domain_count", 1),
+                cross_team_count=payload.get("cross_team_count", 1),
+                risk_level=payload.get("risk_level", "low"),
+                requires_compliance_review=payload.get("requires_compliance_review", False),
+                requires_migration=payload.get("requires_migration", False),
+            )
+
+        input_params: dict
         if input_json is not None:
-            raw_payload = json.loads(input_json.read_text(encoding="utf-8"))
+            input_path = input_json.resolve()
+            try:
+                input_path.relative_to(project_root_resolved)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Input path '{input_json}' must be within project root '{project_root_resolved}'."
+                ) from exc
+
+            raw_payload = json.loads(input_path.read_text(encoding="utf-8"))
             if not isinstance(raw_payload, dict):
                 raise ValueError("scope input JSON must contain an object at top-level")
-            if not isinstance(raw_payload.get("description"), str):
-                raise ValueError("scope input JSON requires a string 'description'")
-            input_data = ScopeDetectionInput(
-                description=raw_payload["description"],
-                estimated_timeline_weeks=raw_payload.get("estimated_timeline_weeks", 1),
-                expected_work_items=raw_payload.get("expected_work_items", 1),
-                dependency_count=raw_payload.get("dependency_count", 0),
-                integration_surface_count=raw_payload.get("integration_surface_count", 0),
-                domain_count=raw_payload.get("domain_count", 1),
-                cross_team_count=raw_payload.get("cross_team_count", 1),
-                risk_level=raw_payload.get("risk_level", "low"),
-                requires_compliance_review=raw_payload.get("requires_compliance_review", False),
-                requires_migration=raw_payload.get("requires_migration", False),
-            )
+            input_params = raw_payload
         else:
             if not description or not description.strip():
                 raise ValueError("description is required when --input-json is not provided")
-            input_data = ScopeDetectionInput(
-                description=description.strip(),
-                estimated_timeline_weeks=estimated_timeline_weeks,
-                expected_work_items=expected_work_items,
-                dependency_count=dependency_count,
-                integration_surface_count=integration_surface_count,
-                domain_count=domain_count,
-                cross_team_count=cross_team_count,
-                risk_level=risk_level,
-                requires_compliance_review=requires_compliance_review,
-                requires_migration=requires_migration,
-            )
+            input_params = {
+                "description": description,
+                "estimated_timeline_weeks": estimated_timeline_weeks,
+                "expected_work_items": expected_work_items,
+                "dependency_count": dependency_count,
+                "integration_surface_count": integration_surface_count,
+                "domain_count": domain_count,
+                "cross_team_count": cross_team_count,
+                "risk_level": risk_level,
+                "requires_compliance_review": requires_compliance_review,
+                "requires_migration": requires_migration,
+            }
+
+        input_data = _scope_input_from_mapping(input_params)
 
         gate_result = run_decomposition_gate_for_input(
             input_data,
@@ -2126,11 +2143,18 @@ def scope_gate(
         rendered = json.dumps(gate_result.to_dict(), indent=None if compact else 2, ensure_ascii=False)
 
         if output_json is not None:
-            output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(f"{rendered}\n", encoding="utf-8")
+            output_path = output_json.resolve()
+            try:
+                output_path.relative_to(project_root_resolved)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Output path '{output_json}' must be within project root '{project_root_resolved}'."
+                ) from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(f"{rendered}\n", encoding="utf-8")
 
         typer.echo(rendered)
-    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError) as e:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 

@@ -93,8 +93,6 @@ def resolve_decomposition_gate(
         # For follow/inspect flows, selected mode stays aligned with recommendation.
         user_choice = recommended_mode
         risk_acknowledged = False
-    else:
-        raise ValueError(f"Unsupported decision_option: {option}")
 
     state_trace.append(DecompositionGateState.CHOICE_CAPTURED)
     state_trace.append(DecompositionGateState.CONFIRMED)
