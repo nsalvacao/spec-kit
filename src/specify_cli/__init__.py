@@ -2061,8 +2061,18 @@ def scope_detect(
 ):
     """Run scope detection and emit gate-ready structured output."""
     try:
+        project_root_resolved = project_root.resolve()
+
         if input_json is not None:
-            raw_text = input_json.read_text(encoding="utf-8")
+            input_path = input_json.resolve()
+            try:
+                input_path.relative_to(project_root_resolved)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Input path '{input_json}' must be within project root '{project_root_resolved}'."
+                ) from exc
+
+            raw_text = input_path.read_text(encoding="utf-8")
             raw_payload = json.loads(raw_text)
             if not isinstance(raw_payload, dict):
                 raise ValueError("scope input JSON must contain an object at top-level")
@@ -2092,11 +2102,19 @@ def scope_detect(
         rendered = json.dumps(combined_payload, indent=None if compact else 2, ensure_ascii=False)
 
         if output_json is not None:
-            output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(f"{rendered}\n", encoding="utf-8")
+            output_path = output_json.resolve()
+            try:
+                output_path.relative_to(project_root_resolved)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Output path '{output_json}' must be within project root '{project_root_resolved}'."
+                ) from exc
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(f"{rendered}\n", encoding="utf-8")
 
         typer.echo(rendered)
-    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError) as e:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 
