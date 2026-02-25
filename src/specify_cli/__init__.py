@@ -1390,7 +1390,7 @@ def init(
         show_banner()
 
     # Guard against option flags being consumed as values for --ai.
-    if ai_assistant and ai_assistant.startswith("--"):
+    if ai_assistant and ai_assistant.startswith("-"):
         console.print(f"[red]Error:[/red] Invalid value for --ai: '{ai_assistant}'")
         console.print("[yellow]Hint:[/yellow] Did you forget to provide a value for --ai?")
         console.print("[yellow]Example:[/yellow] specify init --ai claude --here")
