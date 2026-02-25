@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **#106: decomposition gate flow with explicit override/risk controls**
+  - Added gate flow module with deterministic state machine:
+    `detect -> recommend -> choose -> confirm -> handoff`.
+  - Added `specify scope-gate` command with decision options:
+    `follow`, `inspect_rationale`, `override`.
+  - Enforced mandatory override rationale and risk acknowledgment for risky overrides (`epic`/`program` recommendations).
+  - Added test suites for module and CLI flow coverage:
+    - `tests/test_decomposition_gate.py`
+    - `tests/test_scope_gate_cli.py`
+  - Updated tasks command guidance to require gate payload before task generation.
 - **#104: scope detection boundary and regression test hardening**
   - Added low/medium/high complexity fixtures for reusable test inputs.
   - Added neighbor-boundary regression coverage around 34/35 and 64/65 bands.
