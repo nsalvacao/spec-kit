@@ -4,6 +4,13 @@
 
 **Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
+## Hierarchy Contract
+
+- **Contract File**: `.spec-kit/hierarchy-contract.json`
+- **Contract Version**: `program-epic-feature.v1`
+- **Execution Unit**: Feature (`specs/[###-feature-name]/tasks.md`)
+- **Lineage**: record `program_id`, `epic_id`, and `source_decision`
+
 **Note**: This template is filled in by the `/speckit.plan` command. The execution workflow is defined in your AI agent's command configuration (e.g., `.claude/commands/speckit.plan.md`, `.cursor/commands/speckit.plan.md`, `.codex/prompts/speckit.plan.md`, etc.).
 
 ## Summary
