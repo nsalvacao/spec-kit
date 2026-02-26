@@ -139,7 +139,7 @@ jobs:
             echo "::add-mask::$GH_MODELS_TOKEN"
           fi
 
-          SYSTEM_PROMPT="You are a senior code reviewer. Only report actionable findings grounded in changed lines. Focus on security vulnerabilities, bugs, and best-practice violations."
+          SYSTEM_PROMPT="You are a senior code reviewer. Report actionable findings grounded in changed lines. Prioritize security vulnerabilities, bugs, logic errors, and best-practice violations. Also flag performance regressions and maintainability concerns when clearly evidenced by the diff. For each finding, provide explicit reasoning and assign a confidence score reflecting your certainty."
           RESPONSE_SCHEMA=$(cat <<'JSON'
           {
             "name": "review_findings",
@@ -221,9 +221,11 @@ jobs:
           build_payload() {
             local MODEL="$1"
             local CONTENT="$2"
+            local USER_PROMPT="Review this pull request diff. Return a JSON object with a findings array. Each finding must include severity, file, line, issue, recommendation, and a confidence score (0-1). Only include findings you can justify from the diff."
             if [[ "$MODEL" == openai/o* || "$MODEL" == openai/gpt-5* ]]; then
               jq -n \
                 --arg system "$SYSTEM_PROMPT" \
+                --arg user_prompt "$USER_PROMPT" \
                 --arg diff "$CONTENT" \
                 --arg model "$MODEL" \
                 --argjson schema "$RESPONSE_SCHEMA" \
@@ -232,7 +234,7 @@ jobs:
                   model: $model,
                   messages: [
                     {role: "system", content: $system},
-                    {role: "user", content: ("Review this pull request diff and return findings JSON.\n\n" + $diff)}
+                    {role: "user", content: ($user_prompt + "\n\n" + $diff)}
                   ],
                   response_format: {
                     type: "json_schema",
@@ -243,6 +245,7 @@ jobs:
             else
               jq -n \
                 --arg system "$SYSTEM_PROMPT" \
+                --arg user_prompt "$USER_PROMPT" \
                 --arg diff "$CONTENT" \
                 --arg model "$MODEL" \
                 --argjson schema "$RESPONSE_SCHEMA" \
@@ -251,7 +254,7 @@ jobs:
                   model: $model,
                   messages: [
                     {role: "system", content: $system},
-                    {role: "user", content: ("Review this pull request diff and return findings JSON.\n\n" + $diff)}
+                    {role: "user", content: ($user_prompt + "\n\n" + $diff)}
                   ],
                   response_format: {
                     type: "json_schema",
@@ -490,19 +493,22 @@ jobs:
 
               if [ "$PATCH_SIZE" -gt "$CHUNK_SIZE_CHARS" ]; then
                 local OFFSET=0
+                local SUB_COUNT=0
                 while [ "$OFFSET" -lt "$PATCH_SIZE" ]; do
                   CHUNK_COUNT=$((CHUNK_COUNT + 1))
-                  CHUNK_FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
-                  dd if="$PATCH_FILE" of="$CHUNK_FILE" bs=1 skip="$OFFSET" count="$CHUNK_SIZE_CHARS" status=none
+                  SUB_COUNT=$((SUB_COUNT + 1))
+                  CHUNK_FILE=$(printf "diff_chunk_%03d.txt" "$CHUNK_COUNT")
+                  tail -c +"$((OFFSET + 1))" "$PATCH_FILE" | head -c "$CHUNK_SIZE_CHARS" > "$CHUNK_FILE"  # tail -c uses 1-based offset
                   OFFSET=$((OFFSET + CHUNK_SIZE_CHARS))
                 done
+                timeline "oversized_file_split file=$(basename "$PATCH_FILE") size=$PATCH_SIZE sub_chunks=$SUB_COUNT"
                 CURRENT_SIZE=0
                 continue
               fi
 
               if [ "$CHUNK_COUNT" -eq 0 ] || [ $((CURRENT_SIZE + PATCH_SIZE)) -gt "$CHUNK_SIZE_CHARS" ]; then
                 CHUNK_COUNT=$((CHUNK_COUNT + 1))
-                CHUNK_FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
+                CHUNK_FILE=$(printf "diff_chunk_%03d.txt" "$CHUNK_COUNT")
                 : > "$CHUNK_FILE"
                 CURRENT_SIZE=0
               fi
