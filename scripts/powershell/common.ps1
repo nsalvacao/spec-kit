@@ -122,6 +122,10 @@ function Get-FeatureDir {
         if ($matchesByPrefix.Count -eq 1) {
             return (Join-Path $specsDir $matchesByPrefix[0].Name)
         }
+        if ($matchesByPrefix.Count -gt 1) {
+            $dirNames = ($matchesByPrefix | ForEach-Object { $_.Name }) -join ', '
+            throw "Multiple spec directories found with prefix '$prefix': $dirNames"
+        }
     }
 
     return (Join-Path $RepoRoot "specs/$Branch")
