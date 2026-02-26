@@ -33,7 +33,10 @@ def _utc_now() -> str:
 
 
 def _as_repo_root(repo_root: str | Path) -> Path:
-    path = Path(repo_root).expanduser().resolve()
+    raw_value = str(repo_root).strip() if repo_root is not None else ""
+    if not raw_value:
+        raise BranchPolicyError("Repository root must be a non-empty path.")
+    path = Path(raw_value).expanduser().resolve()
     if not path.exists() or not path.is_dir():
         raise BranchPolicyError(f"Repository root does not exist: {path}")
     return path
@@ -45,6 +48,8 @@ def _contract_path(repo_root: Path) -> Path:
 
 def validate_feature_branch(branch: str) -> ValidatedFeatureBranch:
     branch_name = (branch or "").strip()
+    if not branch_name:
+        raise BranchPolicyError("Branch must be a non-empty string.")
     match = FEATURE_BRANCH_PATTERN.fullmatch(branch_name)
     if not match:
         raise BranchPolicyError(
@@ -163,6 +168,8 @@ def register_feature_branch(
 def resolve_feature_dir(*, repo_root: str | Path, branch: str) -> dict[str, Any]:
     root = _as_repo_root(repo_root)
     branch_name = (branch or "").strip()
+    if not branch_name:
+        raise BranchPolicyError("Branch must be a non-empty string.")
     specs_dir = root / "specs"
     default_dir = specs_dir / branch_name
 

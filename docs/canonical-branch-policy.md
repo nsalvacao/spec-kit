@@ -76,3 +76,16 @@ python3 scripts/python/branch-policy.py register-feature --repo-root . --branch 
 - Non-git mode still works with `SPECIFY_FEATURE`.
 - Existing commands keep the same interfaces.
 - Policy enforcement is applied where feature-context scripts require a canonical feature branch.
+
+## Recovery
+
+If `.spec-kit/branch-policy.json` is missing or corrupted:
+
+1. Fix or remove the corrupted file.
+1. Re-run feature creation for the active branch (or register manually):
+
+```bash
+python3 scripts/python/branch-policy.py register-feature --repo-root . --branch 021-user-onboarding --feature-id 021-user-onboarding
+```
+
+1. Re-run the command that failed (`/speckit.specify`, `/speckit.plan`, or prerequisite checks).

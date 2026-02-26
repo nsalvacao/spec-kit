@@ -9,7 +9,7 @@ This guide helps you get started with the forked Spec Kit workflow, which includ
 
 > [!TIP]
 > **Context Awareness**: Spec Kit commands automatically detect the active feature based on your current Git branch (e.g., `001-feature-name`). To switch between different specifications, simply switch Git branches.
-> Canonical policy is one execution branch per feature: `NNN-kebab-case`. Branch metadata is tracked in `.spec-kit/branch-policy.json`.
+> Canonical policy is one execution branch per feature: `NNN-kebab-case`. Branch metadata is tracked in `.spec-kit/branch-policy.json` (see `docs/canonical-branch-policy.md`).
 
 ### Step 1: Install Specify (Fork)
 

@@ -81,11 +81,7 @@ check_feature_branch() {
     fi
 
     if command -v python3 >/dev/null 2>&1 && [[ -f "$policy_script" ]]; then
-        local validation_error=""
-        validation_error="$(python3 "$policy_script" validate --branch "$branch" 2>&1 >/dev/null)" || {
-            echo "ERROR: $validation_error" >&2
-            return 1
-        }
+        python3 "$policy_script" validate --branch "$branch" >/dev/null || return 1
         return 0
     fi
 
@@ -111,11 +107,7 @@ find_feature_dir_by_prefix() {
 
     if command -v python3 >/dev/null 2>&1 && [[ -f "$policy_script" ]]; then
         local feature_dir
-        feature_dir="$(python3 "$policy_script" resolve-feature-dir --repo-root "$repo_root" --branch "$branch_name" --path-only 2>/dev/null)" || {
-            echo "ERROR: Unable to resolve feature directory for branch '$branch_name'" >&2
-            echo "$specs_dir/$branch_name"
-            return
-        }
+        feature_dir="$(python3 "$policy_script" resolve-feature-dir --repo-root "$repo_root" --branch "$branch_name" --path-only)" || return 1
         echo "$feature_dir"
         return
     fi
@@ -164,7 +156,8 @@ get_feature_paths() {
     fi
 
     # Use prefix-based lookup to support multiple branches per spec
-    local feature_dir=$(find_feature_dir_by_prefix "$repo_root" "$current_branch")
+    local feature_dir
+    feature_dir="$(find_feature_dir_by_prefix "$repo_root" "$current_branch")" || return 1
 
     cat <<EOF
 REPO_ROOT='$repo_root'

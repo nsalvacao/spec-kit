@@ -82,9 +82,8 @@ function Test-FeatureBranch {
     }
 
     if ((Get-Command python3 -ErrorAction SilentlyContinue) -and (Test-Path $script:BranchPolicyScript -PathType Leaf)) {
-        $validationOutput = & python3 $script:BranchPolicyScript validate --branch $Branch 2>&1
+        & python3 $script:BranchPolicyScript validate --branch $Branch > $null
         if ($LASTEXITCODE -ne 0) {
-            Write-Output "ERROR: $validationOutput"
             return $false
         }
         return $true
@@ -103,9 +102,12 @@ function Get-FeatureDir {
 
     $specsDir = Join-Path $RepoRoot 'specs'
     if ((Get-Command python3 -ErrorAction SilentlyContinue) -and (Test-Path $script:BranchPolicyScript -PathType Leaf)) {
-        $resolvedPath = & python3 $script:BranchPolicyScript resolve-feature-dir --repo-root $RepoRoot --branch $Branch --path-only 2>$null
+        $resolvedPath = & python3 $script:BranchPolicyScript resolve-feature-dir --repo-root $RepoRoot --branch $Branch --path-only
         if ($LASTEXITCODE -eq 0 -and $resolvedPath) {
             return $resolvedPath.Trim()
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "Branch policy helper failed to resolve feature directory."
         }
     }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -12,7 +13,7 @@ SCRIPT = Path(__file__).parent.parent / "scripts" / "python" / "branch-policy.py
 
 def run_policy(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["python3", str(SCRIPT), *args],
+        [sys.executable, str(SCRIPT), *args],
         cwd=str(cwd) if cwd else None,
         capture_output=True,
         text=True,
@@ -139,3 +140,25 @@ def test_resolve_feature_dir_fails_on_prefix_ambiguity(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "multiple spec directories" in result.stderr.lower()
+
+
+def test_validate_rejects_empty_branch_argument() -> None:
+    result = run_policy("validate", "--branch", "")
+
+    assert result.returncode != 0
+    assert "non-empty string" in result.stderr.lower()
+
+
+def test_register_feature_rejects_empty_repo_root() -> None:
+    result = run_policy(
+        "register-feature",
+        "--repo-root",
+        "",
+        "--branch",
+        "010-api-gateway",
+        "--feature-id",
+        "010-api-gateway",
+    )
+
+    assert result.returncode != 0
+    assert "non-empty path" in result.stderr.lower()
