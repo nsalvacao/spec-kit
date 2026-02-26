@@ -581,21 +581,16 @@ jobs:
 
           CANDIDATES=("$REVIEW_LONG_CONTEXT_MODEL" "$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL" "$REVIEW_FALLBACK_MODEL_2")
           MODEL_CHAIN=()
+          declare -A MODEL_SEEN=()
           for CANDIDATE in "${CANDIDATES[@]}"; do
             [ -z "$CANDIDATE" ] && continue
             if ! model_in_catalog "$CANDIDATE"; then
               timeline "model_not_in_catalog model=$CANDIDATE"
               continue
             fi
-            DUPLICATE=0
-            for EXISTING in "${MODEL_CHAIN[@]}"; do
-              if [ "$EXISTING" = "$CANDIDATE" ]; then
-                DUPLICATE=1
-                break
-              fi
-            done
-            if [ "$DUPLICATE" -eq 0 ]; then
+            if [ -z "${MODEL_SEEN[$CANDIDATE]+x}" ]; then
               MODEL_CHAIN+=("$CANDIDATE")
+              MODEL_SEEN[$CANDIDATE]=1
             fi
           done
 
@@ -655,14 +650,34 @@ jobs:
                 recommendation: .recommendation,
                 confidence: .confidence
               })
-              | unique_by(.severity, .file, .line, .issue, .recommendation)
+              | sort_by(.file, .line, .issue, .recommendation)
+              | group_by(.file, .line, .issue, .recommendation)
+              | map({
+                  severity: (
+                    map(.severity)
+                    | if index("critical") then "critical"
+                      elif index("warning") then "warning"
+                      else "info"
+                      end
+                  ),
+                  file: .[0].file,
+                  line: .[0].line,
+                  issue: .[0].issue,
+                  recommendation: .[0].recommendation,
+                  confidence: (map(.confidence) | max)
+                })
               | sort_by((.severity | rank), .file, .line, .issue)
             )
           ' review_findings_all.json > review_findings_final.json
 
           render_markdown review_findings_final.json
 
-          TOTAL_TOKENS=$(awk '{sum += $1} END {print sum + 0}' tokens_*.txt 2>/dev/null || echo 0)
+          if ls tokens_*.txt >/dev/null 2>&1; then
+            TOTAL_TOKENS=$(awk '{sum += $1} END {print sum + 0}' tokens_*.txt)
+          else
+            TOTAL_TOKENS=0
+            timeline "token_files_missing defaulting_tokens=0"
+          fi
           FINDING_COUNT=$(jq '.findings | length' review_findings_final.json)
           MODEL_LIST=$(sort -u "$MODELS_USED_FILE" | paste -sd ',' -)
           [ -z "$MODEL_LIST" ] && MODEL_LIST="unknown"
