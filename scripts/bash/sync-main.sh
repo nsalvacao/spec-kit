@@ -57,8 +57,16 @@ fi
 echo "Fetching '$REMOTE' with prune..."
 git fetch "$REMOTE" --prune
 
-echo "Checking out 'main'..."
-git checkout main
+if git show-ref --verify --quiet refs/heads/main; then
+    echo "Checking out 'main'..."
+    git checkout main
+elif git show-ref --verify --quiet "refs/remotes/$REMOTE/main"; then
+    echo "Creating local 'main' from '$REMOTE/main'..."
+    git checkout -b main "$REMOTE/main"
+else
+    echo "ERROR: Branch 'main' not found locally or at '$REMOTE/main'." >&2
+    exit 1
+fi
 
 echo "Fast-forward pulling '$REMOTE/main'..."
 git pull --ff-only "$REMOTE" main

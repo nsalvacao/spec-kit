@@ -159,6 +159,27 @@ def test_check_fails_when_release_tag_mismatch(tmp_path: Path) -> None:
     assert "does not match release tag" in " ".join(payload["errors"])
 
 
+def test_sync_fails_with_invalid_release_date(tmp_path: Path) -> None:
+    seed_repo(tmp_path)
+
+    result = run_script(
+        tmp_path,
+        "sync",
+        "--repo-root",
+        str(tmp_path),
+        "--policy",
+        ".github/release-version-policy.yml",
+        "--release-tag",
+        "v0.0.54",
+        "--release-date",
+        "2026-02-30",
+        "--json",
+    )
+
+    assert result.returncode != 0
+    assert "Release date must follow 'YYYY-MM-DD'." in result.stderr
+
+
 def test_check_fails_when_changelog_heading_missing(tmp_path: Path) -> None:
     seed_repo(tmp_path)
     (tmp_path / "CHANGELOG.md").write_text(

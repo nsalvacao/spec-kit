@@ -41,8 +41,23 @@ try {
 Write-Output "Fetching '$Remote' with prune..."
 git fetch $Remote --prune
 
-Write-Output "Checking out 'main'..."
-git checkout main
+git show-ref --verify --quiet refs/heads/main 2>$null
+$hasLocalMain = ($LASTEXITCODE -eq 0)
+
+if ($hasLocalMain) {
+    Write-Output "Checking out 'main'..."
+    git checkout main
+} else {
+    git show-ref --verify --quiet "refs/remotes/$Remote/main" 2>$null
+    $hasRemoteMain = ($LASTEXITCODE -eq 0)
+    if ($hasRemoteMain) {
+        Write-Output "Creating local 'main' from '$Remote/main'..."
+        git checkout -b main "$Remote/main"
+    } else {
+        Write-Output "ERROR: Branch 'main' not found locally or at '$Remote/main'."
+        exit 1
+    }
+}
 
 Write-Output "Fast-forward pulling '$Remote/main'..."
 git pull --ff-only $Remote main

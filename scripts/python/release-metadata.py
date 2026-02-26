@@ -113,6 +113,21 @@ def _normalize_release_tag(release_tag: str) -> str:
     return match.group("version")
 
 
+def _normalize_release_date(raw_release_date: str | None) -> str:
+    if raw_release_date is None:
+        return date.today().isoformat()
+    value = raw_release_date.strip()
+    if not value:
+        return date.today().isoformat()
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise ReleaseMetadataError(
+            "Release date must follow 'YYYY-MM-DD'."
+        ) from exc
+    return value
+
+
 def _extract_canonical_version(content: str, pattern: str, file_path: Path) -> str:
     compiled = re.compile(pattern, re.MULTILINE)
     match = compiled.search(content)
@@ -376,7 +391,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
 def _cmd_sync(args: argparse.Namespace) -> int:
     root = _as_repo_root(args.repo_root)
     policy = _load_policy(root, args.policy)
-    release_date = args.release_date or date.today().isoformat()
+    release_date = _normalize_release_date(args.release_date)
     payload = sync_release_metadata(
         repo_root=root,
         policy=policy,
