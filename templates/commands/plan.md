@@ -1,7 +1,6 @@
 ---
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
-handoffs: 
-
+handoffs:
   - label: Create Tasks
     agent: speckit.tasks
     prompt: Break the plan into tasks
@@ -22,10 +21,17 @@ agent_scripts:
 
 ```text
 $ARGUMENTS
-
-```text
+```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+## Instruction Contract
+
+- `instruction-contract:options` Present feasible planning paths and downstream command options when alternatives exist.
+- `instruction-contract:recommended-default` Recommend the safest default planning path with explicit rationale.
+- `instruction-contract:risk-confirmation` Require confirmation when the user chooses a higher-risk override to decomposition guidance.
+- `instruction-contract:canonical-write-paths` Write design artifacts only inside canonical feature paths (`specs/<feature>/...`) and `.spec-kit/...` metadata files.
+- `instruction-contract:machine-readable-output` Preserve and propagate machine-readable gate/handoff fields required by downstream automation.
 
 ## Outline
 

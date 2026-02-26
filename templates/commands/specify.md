@@ -1,7 +1,6 @@
 ---
 description: Create or update the feature specification from a natural language feature description.
-handoffs: 
-
+handoffs:
   - label: Build Technical Plan
     agent: speckit.plan
     prompt: Create a plan for the spec. I am building with...
@@ -38,6 +37,14 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty). The text after `/speckit.specify` **is** the feature description — do not ask the user to repeat it unless they provided an empty command.
+
+## Instruction Contract
+
+- `instruction-contract:options` Present users with valid next-step options (`/speckit.clarify`, `/speckit.plan`) whenever ambiguity or branching is detected.
+- `instruction-contract:recommended-default` Recommend one default path with rationale before listing alternatives.
+- `instruction-contract:risk-confirmation` Require explicit user confirmation when overriding a high-risk decomposition recommendation.
+- `instruction-contract:canonical-write-paths` Write only to canonical artifacts under `specs/<feature>/...` and `.spec-kit/...`.
+- `instruction-contract:machine-readable-output` Emit machine-readable gate/handoff fields (`mode_recommendation`, `user_choice`, `override_flag`, `next_action`, `handoff_owner`, `validation_status`) when scope-gate data is produced.
 
 ## Execution Flow
 

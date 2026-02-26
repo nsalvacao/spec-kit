@@ -1,7 +1,6 @@
 ---
 description: Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.
-handoffs: 
-
+handoffs:
   - label: Build Technical Plan
     agent: speckit.plan
     prompt: Create a plan for the spec. I am building with...
@@ -14,10 +13,17 @@ scripts:
 
 ```text
 $ARGUMENTS
-
-```text
+```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+## Instruction Contract
+
+- `instruction-contract:options` Ask one question at a time and always provide explicit answer options or a constrained short-answer format.
+- `instruction-contract:recommended-default` For each clarification question, provide the recommended option with concise rationale before alternatives.
+- `instruction-contract:risk-confirmation` Require explicit confirmation when the user selects a riskier override than the recommendation.
+- `instruction-contract:canonical-write-paths` Apply clarifications only to the active canonical spec artifact (`specs/<feature>/spec.md`).
+- `instruction-contract:machine-readable-output` Keep decision traces parseable and suitable for downstream gate/handoff consumption.
 
 ## Outline
 

@@ -3,6 +3,9 @@
 Every artifact in the Phase 0 → SDD pipeline carries a standard YAML frontmatter block
 that enables traceability from ideation through to implementation.
 
+For the runtime machine-readable stage handoff schema (`handoff-metadata.v1`),
+see `docs/handoff-metadata-schema-contract.md`.
+
 ## Schema (v1.0)
 
 ```yaml

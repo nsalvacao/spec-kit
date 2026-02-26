@@ -28,3 +28,8 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ --tb=short -v
+
+      - name: Run contract validation gates
+        run: |
+          uv run python scripts/python/template-instruction-contract.py validate --repo-root .
+          uv run python scripts/python/handoff-metadata-lint.py templates --repo-root .
