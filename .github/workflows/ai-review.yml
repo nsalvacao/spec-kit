@@ -417,8 +417,12 @@ jobs:
 
                 if [ "$HTTP_CODE" = "413" ] || jq -e '.error.code == "tokens_limit_reached"' "$BODY_FILE" >/dev/null 2>&1; then
                   timeline "tokens_limit purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
-                  echo "::warning::Received tokens_limit_reached/413 from $MODEL; switching to semantic chunking."
-                  return 413
+                  if [ "$PURPOSE" = "full-diff" ]; then
+                    echo "::warning::Received tokens_limit_reached/413 from $MODEL; switching to semantic chunking."
+                    return 413
+                  fi
+                  echo "::warning::Received tokens_limit_reached/413 from $MODEL on chunk $CHUNK_ID; trying next model."
+                  break
                 fi
 
                 ERROR_CODE=$(jq -r '.error.code // empty' "$BODY_FILE" 2>/dev/null || true)
@@ -483,6 +487,19 @@ jobs:
             for PATCH_FILE in .ai_review_chunks/per_file/*.diff; do
               local PATCH_SIZE
               PATCH_SIZE=$(wc -c < "$PATCH_FILE")
+
+              if [ "$PATCH_SIZE" -gt "$CHUNK_SIZE_CHARS" ]; then
+                local OFFSET=0
+                while [ "$OFFSET" -lt "$PATCH_SIZE" ]; do
+                  CHUNK_COUNT=$((CHUNK_COUNT + 1))
+                  CHUNK_FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
+                  dd if="$PATCH_FILE" of="$CHUNK_FILE" bs=1 skip="$OFFSET" count="$CHUNK_SIZE_CHARS" status=none
+                  OFFSET=$((OFFSET + CHUNK_SIZE_CHARS))
+                done
+                CURRENT_SIZE=0
+                continue
+              fi
+
               if [ "$CHUNK_COUNT" -eq 0 ] || [ $((CURRENT_SIZE + PATCH_SIZE)) -gt "$CHUNK_SIZE_CHARS" ]; then
                 CHUNK_COUNT=$((CHUNK_COUNT + 1))
                 CHUNK_FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
