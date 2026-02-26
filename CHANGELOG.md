@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.53] - 2026-02-26
+
 ### Added
 
 - **#107: Program/Epic/Feature hierarchy model and metadata contract**

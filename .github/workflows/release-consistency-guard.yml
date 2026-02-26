@@ -1,0 +1,107 @@
+name: Release Consistency Guard
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  release-consistency-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Resolve latest release tag
+        id: latest_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Run release consistency guard
+        id: guard
+        run: |
+          set +e
+          cmd=(python scripts/python/release-metadata.py check \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --policy .github/release-version-policy.yml \
+            --json)
+
+          if [[ "${GITHUB_EVENT_NAME}" != "pull_request" && -n "${{ steps.latest_tag.outputs.tag }}" ]]; then
+            cmd+=(--release-tag "${{ steps.latest_tag.outputs.tag }}" --enforce-release-match)
+          fi
+
+          "${cmd[@]}" > guard-result.json
+          status=$?
+          set -e
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat guard-result.json
+
+          {
+            echo "## Release Consistency Guard"
+            echo ""
+            echo '```json'
+            cat guard-result.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or update drift issue (monitor mode)
+        if: steps.guard.outputs.status != '0' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="[Automation] Release consistency drift detected"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body=$(cat <<EOF
+          Automated release consistency guard detected metadata drift.
+
+          - Workflow run: ${run_url}
+          - Event: ${GITHUB_EVENT_NAME}
+          - Latest release tag: ${{ steps.latest_tag.outputs.tag }}
+
+          \`\`\`json
+          $(cat guard-result.json)
+          \`\`\`
+          EOF
+          )
+
+          existing="$(gh issue list --state open --search "${title} in:title" --json number,title --jq 'map(select(.title == "'"${title}"'")) | .[0].number // ""')"
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create \
+              --title "$title" \
+              --body "$body" \
+              --label "infrastructure" \
+              --label "enhancement"
+          fi
+
+      - name: Enforce guard for pull requests
+        if: steps.guard.outputs.status != '0' && github.event_name == 'pull_request'
+        run: |
+          echo "Release consistency guard failed on pull_request." >&2
+          exit 1
