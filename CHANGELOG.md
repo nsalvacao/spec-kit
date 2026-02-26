@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
+  - Added manifest source of truth: `.github/version-map.yml`.
+  - Added orchestration engine: `scripts/python/version-orchestrator.py` with `check`, `bump`, and `sync`.
+  - Added cross-platform bump wrappers:
+    - `scripts/bash/version-bump.sh`
+    - `scripts/powershell/version-bump.ps1`
+  - Added CI coherence gate:
+    - `.github/workflows/version-coherence.yml`
+  - Added regression test suite:
+    - `tests/test_version_orchestrator.py`
+
+### Changed
+
+- **Release metadata sync automation**
+  - Updated `.github/workflows/release-metadata-sync.yml` to use `version-orchestrator.py sync`.
+  - Metadata sync now propagates to `uv.lock` in addition to `pyproject.toml` and `CHANGELOG.md`.
+
 ## [0.0.53] - 2026-02-26
 
 ### Added
