@@ -18,6 +18,11 @@ Release metadata consistency is governed by:
 
 The guard validates release metadata coherence. The version coherence workflow validates canonical version propagation using the manifest map. The sync workflow opens a PR (never pushes directly to `main`) when metadata drift is detected.
 
+Authority split:
+
+- `.github/version-map.yml` is the source of truth for version propagation (`pyproject.toml`, `uv.lock`, changelog/runtime/tag checks).
+- `.github/release-version-policy.yml` governs release guard and branch hygiene policy behavior.
+
 ## 1) Versioning Rules
 
 - Use SemVer in `pyproject.toml` (for example: `0.0.35`).
@@ -91,6 +96,7 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 
 - Metadata drift is handled by `release-metadata-sync.yml`, which opens/updates:
   - `automation/release-metadata-vX.Y.Z` -> `main`
+- The sync workflow enforces file safety using `allowlist` from `.github/version-map.yml`.
 - `release-consistency-guard.yml` blocks PRs to `main` when coherence fails.
 - `version-coherence.yml` blocks PRs to `main` when mapped version drift is detected.
 - Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.

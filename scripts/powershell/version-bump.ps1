@@ -55,5 +55,12 @@ if ($Json) {
     $command += "--json"
 }
 
-& python $command
+if (Get-Command python3 -ErrorAction SilentlyContinue) {
+    & python3 $command
+} elseif (Get-Command python -ErrorAction SilentlyContinue) {
+    & python $command
+} else {
+    Write-Output "ERROR: Python interpreter not found (expected 'python3' or 'python')."
+    exit 1
+}
 exit $LASTEXITCODE

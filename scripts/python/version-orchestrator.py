@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -69,12 +69,13 @@ def _as_repo_root(repo_root: str | Path) -> Path:
 
 
 def _resolve_repo_file(repo_root: Path, relative_path: str) -> Path:
+    root = repo_root.resolve()
     raw = str(relative_path).strip()
     if not raw:
         raise VersionOrchestrationError("Manifest file path must be non-empty.")
-    candidate = (repo_root / raw).resolve()
+    candidate = (root / raw).resolve()
     try:
-        candidate.relative_to(repo_root)
+        candidate.relative_to(root)
     except ValueError as exc:
         raise VersionOrchestrationError(
             f"Path '{relative_path}' resolves outside repository root."
@@ -188,6 +189,15 @@ def _load_version_map(repo_root: Path, map_path: str | Path) -> VersionMap:
         raise VersionOrchestrationError("Runtime rule requires non-empty list 'command'.")
     if not runtime_pattern:
         raise VersionOrchestrationError("Runtime rule requires 'version_pattern'.")
+    runtime_executable = str(runtime_command[0]).strip()
+    if "/" in runtime_executable or "\\" in runtime_executable:
+        raise VersionOrchestrationError(
+            "Runtime command executable must be a tool name, not a path."
+        )
+    if any("\n" in str(item) or "\r" in str(item) for item in runtime_command):
+        raise VersionOrchestrationError(
+            "Runtime command arguments must not contain newline characters."
+        )
 
     tag_pattern = str(tagging_cfg.get("tag_pattern", "")).strip()
     if not tag_pattern:
@@ -321,10 +331,10 @@ def _insert_release_heading(
 
 def _normalize_release_date(raw_release_date: str | None) -> str:
     if raw_release_date is None:
-        return date.today().isoformat()
+        return datetime.now(timezone.utc).date().isoformat()
     value = str(raw_release_date).strip()
     if not value:
-        return date.today().isoformat()
+        return datetime.now(timezone.utc).date().isoformat()
     try:
         date.fromisoformat(value)
     except ValueError as exc:
@@ -696,7 +706,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
 
     if bool(args.target_version) == bool(args.release_tag):
         raise VersionOrchestrationError(
-            "Provide exactly one of --target-version or --release-tag."
+            "Provide one and only one of --target-version or --release-tag."
         )
 
     source = "sync:target-version"

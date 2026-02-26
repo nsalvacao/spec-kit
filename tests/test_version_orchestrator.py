@@ -252,4 +252,27 @@ def test_sync_requires_exactly_one_target_selector(tmp_path: Path) -> None:
     )
 
     assert result.returncode != 0
-    assert "Provide exactly one of --target-version or --release-tag." in result.stderr
+    assert "Provide one and only one of --target-version or --release-tag." in result.stderr
+
+
+def test_check_rejects_runtime_command_with_path_executable(tmp_path: Path) -> None:
+    seed_repo(tmp_path, canonical_version="0.0.53", target_version="0.0.53")
+    map_path = tmp_path / ".github" / "version-map.yml"
+    map_path.write_text(
+        map_path.read_text(encoding="utf-8").replace('- "uv"', '- "/bin/uv"'),
+        encoding="utf-8",
+    )
+
+    result = run_script(
+        tmp_path,
+        "check",
+        "--repo-root",
+        str(tmp_path),
+        "--map",
+        ".github/version-map.yml",
+        "--skip-runtime",
+        "--json",
+    )
+
+    assert result.returncode != 0
+    assert "Runtime command executable must be a tool name, not a path." in result.stderr
