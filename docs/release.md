@@ -2,6 +2,27 @@
 
 This guide describes how releases are published for this fork.
 
+## 0) Automation Baseline
+
+Release metadata consistency is governed by:
+
+- Policy file: `.github/release-version-policy.yml`
+- Manifest file: `.github/version-map.yml`
+- Guard workflow: `.github/workflows/release-consistency-guard.yml`
+- Coherence workflow: `.github/workflows/version-coherence.yml`
+- Sync workflow: `.github/workflows/release-metadata-sync.yml`
+- Hygiene workflow: `.github/workflows/branch-hygiene.yml`
+- Bump helpers:
+  - `scripts/bash/version-bump.sh`
+  - `scripts/powershell/version-bump.ps1`
+
+The guard validates release metadata coherence. The version coherence workflow validates canonical version propagation using the manifest map. The sync workflow opens a PR (never pushes directly to `main`) when metadata drift is detected.
+
+Authority split:
+
+- `.github/version-map.yml` is the source of truth for version propagation (`pyproject.toml`, `uv.lock`, changelog/runtime/tag checks).
+- `.github/release-version-policy.yml` governs release guard and branch hygiene policy behavior.
+
 ## 1) Versioning Rules
 
 - Use SemVer in `pyproject.toml` (for example: `0.0.35`).
@@ -24,6 +45,30 @@ Before publishing a release:
 
 If a tag was published without detailed curated notes, add the version heading
 and include at least a release-notes link to keep the changelog version-indexed.
+
+## 2.1) Version Bump Orchestration
+
+Use the manifest-driven bump helpers to keep `pyproject.toml`, `uv.lock`, and
+`CHANGELOG.md` synchronized:
+
+```bash
+scripts/bash/version-bump.sh --part patch --dry-run --include-diff
+scripts/bash/version-bump.sh --part patch
+```
+
+PowerShell:
+
+```powershell
+scripts/powershell/version-bump.ps1 -Part patch -DryRun -IncludeDiff
+scripts/powershell/version-bump.ps1 -Part patch
+```
+
+To add new managed targets safely:
+
+1. Add the file and regex capture rule to `.github/version-map.yml`.
+2. Keep the regex scoped and deterministic with one `version` capture group.
+3. Add the target path to `sync.allowlist`.
+4. Run `python scripts/python/version-orchestrator.py check --skip-runtime`.
 
 ## 3) Build Release Packages
 
@@ -49,7 +94,25 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 
 ## 6) Post-Release Hygiene
 
-- Ensure `CHANGELOG.md` has the new version title.
-- Ensure `## [Unreleased]` is reset for the next cycle.
-- If needed, backfill missing headings for any tags created outside the normal
-  release flow.
+- Metadata drift is handled by `release-metadata-sync.yml`, which opens/updates:
+  - `automation/release-metadata-vX.Y.Z` -> `main`
+- The sync workflow enforces file safety using `allowlist` from `.github/version-map.yml`.
+- `release-consistency-guard.yml` blocks PRs to `main` when coherence fails.
+- `version-coherence.yml` blocks PRs to `main` when mapped version drift is detected.
+- Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.
+
+## 7) Local Main Hygiene
+
+Use the helper scripts before starting new implementation branches:
+
+```bash
+scripts/bash/sync-main.sh
+```
+
+PowerShell:
+
+```powershell
+scripts/powershell/sync-main.ps1
+```
+
+Default mode is dry-run for stale local branch cleanup. Pass `--apply` (bash) or `-Apply` (PowerShell) to delete local branches whose upstream is `[gone]`.

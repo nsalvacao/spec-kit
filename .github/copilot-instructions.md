@@ -268,13 +268,13 @@ When choosing what to work on, apply this order:
 | `stale.yml` | ✅ Active | Daily cron — marks stale after 150d |
 | `ai-review.yml` | ✅ Active | PR — GitHub Models code review (long-context + fallback chain) |
 | `test.yml` | ✅ Active | Push/PR — `uv run pytest` |
-| `release.yml` | ✅ Active | Push to `main` — semantic versioning (latest: `v0.0.52`) |
+| `release.yml` | ✅ Active | Push to `main` — semantic versioning (latest tag from repo releases) |
 
 ### Known CI Status
 
-Current baseline (`v0.0.52`):
+Current baseline (latest published release tag):
 
-- `actions/checkout` is already upgraded to `@v4` in active workflows.
+- `actions/checkout` is already upgraded to `@v6` in active workflows.
 - `ai-triage.yml` was intentionally removed (obsolete/unused).
 - `ai-review.yml` now validates token presence, checks tenant model catalog availability, supports configurable A/B model pools, and appends timeline logs to workflow summaries.
 - `ai-review.yml` defaults are designed for large diffs (chunking enabled; no global diff truncation in normal path).
@@ -301,11 +301,11 @@ Important behavior:
 
 ### Release Version Convention
 
-Version format: `vMAJOR.MINOR.PATCH` (e.g., `v0.0.52`, standard SemVer without fork suffix)
+Version format: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`, standard SemVer without fork suffix)
 
-Python/PyPI equivalent: `MAJOR.MINOR.PATCH` (e.g., `0.0.52`)
+Python/PyPI equivalent: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
 
-When creating a new release tag manually: `git tag v0.0.52 && git push origin v0.0.52`
+When creating a new release tag manually: `git tag vX.Y.Z && git push origin vX.Y.Z`
 
 ## Development Standards
 
