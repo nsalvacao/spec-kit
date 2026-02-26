@@ -22,37 +22,56 @@ Options:
     exit 0
 }
 
-try {
-    git rev-parse --show-toplevel 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Not in git repo" }
-} catch {
+function Invoke-GitChecked {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string]$ErrorMessage
+    )
+
+    & git @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        Write-Output "ERROR: $ErrorMessage"
+        exit 1
+    }
+}
+
+function Test-GitRefExists {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Ref
+    )
+
+    & git show-ref --verify --quiet $Ref 2>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
+git rev-parse --show-toplevel 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) {
     Write-Output "ERROR: Not inside a git repository."
     exit 1
 }
 
-try {
-    git remote get-url $Remote 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Missing remote" }
-} catch {
+git remote get-url $Remote 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) {
     Write-Output "ERROR: Remote '$Remote' not found."
     exit 1
 }
 
 Write-Output "Fetching '$Remote' with prune..."
-git fetch $Remote --prune
+Invoke-GitChecked -Arguments @("fetch", $Remote, "--prune") -ErrorMessage "Failed to fetch remote '$Remote'."
 
-git show-ref --verify --quiet refs/heads/main 2>$null
-$hasLocalMain = ($LASTEXITCODE -eq 0)
+$hasLocalMain = Test-GitRefExists -Ref "refs/heads/main"
 
 if ($hasLocalMain) {
     Write-Output "Checking out 'main'..."
-    git checkout main
+    Invoke-GitChecked -Arguments @("checkout", "main") -ErrorMessage "Failed to checkout local 'main' branch."
 } else {
-    git show-ref --verify --quiet "refs/remotes/$Remote/main" 2>$null
-    $hasRemoteMain = ($LASTEXITCODE -eq 0)
+    $hasRemoteMain = Test-GitRefExists -Ref "refs/remotes/$Remote/main"
     if ($hasRemoteMain) {
         Write-Output "Creating local 'main' from '$Remote/main'..."
-        git checkout -b main "$Remote/main"
+        Invoke-GitChecked -Arguments @("checkout", "-b", "main", "$Remote/main") -ErrorMessage "Failed to create local 'main' from '$Remote/main'."
     } else {
         Write-Output "ERROR: Branch 'main' not found locally or at '$Remote/main'."
         exit 1
@@ -60,7 +79,7 @@ if ($hasLocalMain) {
 }
 
 Write-Output "Fast-forward pulling '$Remote/main'..."
-git pull --ff-only $Remote main
+Invoke-GitChecked -Arguments @("pull", "--ff-only", $Remote, "main") -ErrorMessage "Failed to fast-forward 'main' from '$Remote/main'."
 
 $goneBranches = @()
 $refs = git for-each-ref --format='%(refname:short)|%(upstream:track)' refs/heads
