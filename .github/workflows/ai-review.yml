@@ -11,6 +11,7 @@
 #   REVIEW_AB_MODELS            — comma-separated model IDs for A/B pool
 #   MAX_REVIEW_CHARS            — full-diff threshold before chunking
 #   CHUNK_SIZE_CHARS            — semantic chunk target size
+#   (semantic chunking is file/hunk-based; overlap is intentionally not used)
 #   MAX_REVIEW_TOKENS           — max completion tokens per request
 #   MIN_REVIEW_CONFIDENCE       — minimum confidence [0..1] for published findings
 #   MAX_RETRY                   — retries per model
@@ -403,7 +404,10 @@ jobs:
                   fi
 
                   if ! extract_json_from_content "$RAW_CONTENT_FILE" "$PARSED_JSON_FILE"; then
+                    INVALID_OUTPUT_FILE="/tmp/invalid-json-${CHUNK_ID}-$(echo "$MODEL" | tr '/:' '__').txt"
+                    cp "$RAW_CONTENT_FILE" "$INVALID_OUTPUT_FILE"
                     timeline "invalid_json_content purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL"
+                    timeline "invalid_json_saved purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL path=$INVALID_OUTPUT_FILE"
                     echo "::warning::Model $MODEL returned non-JSON findings. Trying next model."
                     break
                   fi
@@ -673,7 +677,12 @@ jobs:
           render_markdown review_findings_final.json
 
           if ls tokens_*.txt >/dev/null 2>&1; then
-            TOTAL_TOKENS=$(awk '{sum += $1} END {print sum + 0}' tokens_*.txt)
+            INVALID_TOKEN_FILES=$(grep -L '^[0-9]+$' tokens_*.txt || true)
+            if [ -n "$INVALID_TOKEN_FILES" ]; then
+              INVALID_TOKEN_LIST=$(echo "$INVALID_TOKEN_FILES" | tr '\n' ',' | sed 's/,$//')
+              timeline "invalid_token_files files=$INVALID_TOKEN_LIST summing_numeric_only=true"
+            fi
+            TOTAL_TOKENS=$(awk '/^[0-9]+$/ {sum += $1} END {print sum + 0}' tokens_*.txt)
           else
             TOTAL_TOKENS=0
             timeline "token_files_missing defaulting_tokens=0"
