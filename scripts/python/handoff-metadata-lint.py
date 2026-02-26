@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 MAX_INPUT_BYTES = 1_048_576  # 1 MiB
 MAX_JSON_DEPTH = 64
@@ -65,7 +66,7 @@ def _as_payload_file(value: str | Path) -> Path:
     return path
 
 
-def _write_payload(payload: dict[str, object], output: str | None) -> None:
+def _write_payload(payload: dict[str, Any], output: str | None) -> None:
     serialized = json.dumps(payload, indent=2, sort_keys=False) + "\n"
     if output:
         path = Path(output).expanduser().resolve()
@@ -89,8 +90,8 @@ def _cmd_templates(args: argparse.Namespace) -> int:
 
 def _cmd_payload(args: argparse.Namespace) -> int:
     payload_file = _as_payload_file(args.input)
-    _ensure_json_depth(payload_file)
-    normalized, exit_code = validate_payload_file(payload_file, strict=args.strict)
+    raw = _load_and_check_depth(payload_file)
+    normalized, exit_code = validate_payload_file(payload_file, strict=args.strict, _parsed=raw)
     result = {
         "ok": exit_code == 0,
         "normalized_payload": normalized,
@@ -129,7 +130,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _ensure_json_depth(payload_file: Path) -> None:
+def _load_and_check_depth(payload_file: Path) -> dict[str, Any]:
+    """Parse JSON payload file, validate structure and nesting depth, return parsed dict."""
     try:
         raw = json.loads(payload_file.read_text(encoding="utf-8"))
     except UnicodeDecodeError as exc:
@@ -155,6 +157,7 @@ def _ensure_json_depth(payload_file: Path) -> None:
         raise HandoffLintCommandError(
             f"Payload JSON nesting depth {payload_depth} exceeds limit {MAX_JSON_DEPTH}."
         )
+    return raw
 
 
 def main(argv: list[str] | None = None) -> int:

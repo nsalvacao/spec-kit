@@ -48,6 +48,21 @@ def test_build_handoff_metadata_creates_valid_payload() -> None:
     assert serialized["contract_issues"] == []
 
 
+def test_build_handoff_metadata_sdd_to_specify_transition() -> None:
+    payload = build_handoff_metadata(
+        from_stage="sdd",
+        to_stage="specify",
+        handoff_owner="agent:specify",
+        next_action="Create feature specification from validated vision brief.",
+    )
+    serialized = payload.to_dict()
+
+    assert serialized["from_stage"] == "sdd"
+    assert serialized["to_stage"] == "specify"
+    assert serialized["validation_status"]["status"] == "pass"
+    assert serialized["contract_issues"] == []
+
+
 def test_normalize_handoff_metadata_reports_invalid_transition() -> None:
     normalized = normalize_handoff_metadata(
         {
