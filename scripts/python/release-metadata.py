@@ -185,17 +185,18 @@ def _insert_release_heading(
         suffix = "\n\n" + "\n".join(block)
         return base + suffix + "\n"
 
+    # Insert immediately after [Unreleased] so existing unreleased entries
+    # are moved under the new version heading.
     insert_at = unreleased_index + 1
-    while insert_at < len(lines) and lines[insert_at].strip():
-        insert_at += 1
-    while insert_at < len(lines) and not lines[insert_at].strip():
-        insert_at += 1
-
     prefix = lines[:insert_at]
+    suffix = lines[insert_at:]
+    while suffix and not suffix[0].strip():
+        suffix = suffix[1:]
+
     separator: list[str] = []
     if not prefix or prefix[-1].strip():
         separator = [""]
-    new_lines = prefix + separator + block + lines[insert_at:]
+    new_lines = prefix + separator + block + suffix
     return "\n".join(new_lines).rstrip("\n") + "\n"
 
 

@@ -13,10 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- *No changes documented yet.*
-
-### Added
-
 - **#107: Program/Epic/Feature hierarchy model and metadata contract**
   - Added `src/specify_cli/hierarchy_contract.py` with:
     - canonical entities (`ProgramMetadata`, `EpicMetadata`, `FeatureMetadata`)

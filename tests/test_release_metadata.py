@@ -98,6 +98,44 @@ def test_sync_updates_pyproject_and_inserts_changelog_heading(tmp_path: Path) ->
     assert "## [0.0.54] - 2026-02-27" in changelog
 
 
+def test_sync_inserts_release_before_unreleased_content_without_blank_line(tmp_path: Path) -> None:
+    seed_repo(tmp_path)
+    (tmp_path / "CHANGELOG.md").write_text(
+        """# Changelog
+
+## [Unreleased]
+### Added
+- Keep me in release
+
+## [0.0.53] - 2026-02-26
+
+### Added
+
+- Previous release
+""",
+        encoding="utf-8",
+    )
+
+    result = run_script(
+        tmp_path,
+        "sync",
+        "--repo-root",
+        str(tmp_path),
+        "--policy",
+        ".github/release-version-policy.yml",
+        "--release-tag",
+        "v0.0.54",
+        "--release-date",
+        "2026-02-27",
+        "--json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    changelog = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## [Unreleased]\n\n## [0.0.54] - 2026-02-27" in changelog
+    assert changelog.index("## [0.0.54] - 2026-02-27") < changelog.index("- Keep me in release")
+
+
 def test_check_fails_when_release_tag_mismatch(tmp_path: Path) -> None:
     seed_repo(tmp_path)
 
