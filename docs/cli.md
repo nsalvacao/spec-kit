@@ -36,7 +36,7 @@ specify init . --here --ai claude
 specify init my-project --ai copilot --script ps
 specify init my-project --ai gemini --no-git
 specify check
-specify hierarchy-contract --input-json hierarchy.json --output-json .spec-kit/hierarchy-contract.json
+specify hierarchy-contract --input-json hierarchy.json --output-json .spec-kit/hierarchy-contract.json --project-root .
 specify scope-gate --decision follow --description "Add status filter to customer listing"
 specify scope-gate --decision override --override-mode feature --override-rationale "Emergency patch" --risk-acknowledged --description "Cross-team onboarding redesign"
 specify scope-detect --description "Cross-team migration with security and compliance controls"

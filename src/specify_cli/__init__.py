@@ -2032,6 +2032,11 @@ def hierarchy_contract(
         "--output-json",
         help="Optional path to persist normalized hierarchy contract JSON.",
     ),
+    project_root: Path = typer.Option(
+        Path("."),
+        "--project-root",
+        help="Project root used to constrain hierarchy contract JSON input/output paths.",
+    ),
     strict: bool = typer.Option(
         False,
         "--strict/--no-strict",
@@ -2041,15 +2046,31 @@ def hierarchy_contract(
 ):
     """Normalize and validate Program/Epic/Feature hierarchy contract payload."""
     try:
-        raw_payload = json.loads(input_json.read_text(encoding="utf-8"))
+        project_root_resolved = project_root.resolve()
+        input_path = input_json.resolve()
+        try:
+            input_path.relative_to(project_root_resolved)
+        except ValueError as exc:
+            raise ValueError(
+                f"Input path '{input_json}' must be within project root '{project_root_resolved}'."
+            ) from exc
+
+        raw_payload = json.loads(input_path.read_text(encoding="utf-8"))
         if not isinstance(raw_payload, dict):
             raise ValueError("hierarchy payload must be a JSON object at top-level")
         normalized = normalize_hierarchy_contract_payload(raw_payload, strict=strict)
         rendered = json.dumps(normalized.to_dict(), indent=None if compact else 2, ensure_ascii=False)
 
         if output_json is not None:
-            output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(f"{rendered}\n", encoding="utf-8")
+            output_path = output_json.resolve()
+            try:
+                output_path.relative_to(project_root_resolved)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Output path '{output_json}' must be within project root '{project_root_resolved}'."
+                ) from exc
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(f"{rendered}\n", encoding="utf-8")
 
         typer.echo(rendered)
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:

@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `scope_detection` (detector contract output)
     - `scope_gate` (stable gate-consumption contract output)
 
+### Changed
+
+- **CLI hardening (`hierarchy-contract`)**:
+  - Added `--project-root` option and enforced resolved-path containment for `--input-json` and `--output-json`.
+  - Added regression tests for outside-root and symlink-escape scenarios in `tests/test_hierarchy_contract_cli.py`.
+- **Version metadata**:
+  - Bumped CLI package version to `0.0.53` in `pyproject.toml` and aligned local package entry in `uv.lock`.
+
 ## [0.0.52] - 2026-02-19
 
 ### Added
