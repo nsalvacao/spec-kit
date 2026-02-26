@@ -37,9 +37,15 @@ You **MUST** consider the user input before proceeding (if not empty).
 2. **Load design documents**: Read from FEATURE_DIR:
    - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
    - **Optional**: data-model.md (entities), contracts/ (interface contracts), research.md (decisions), quickstart.md (test scenarios)
+   - **Hierarchy metadata**: `.spec-kit/hierarchy-contract.json` (required for `epic`/`program` initiatives)
    - Note: Not all projects have all documents. Generate tasks based on what's available.
 
 3. **Execute task generation workflow**:
+   - Enforce decomposition gate before task generation:
+     - Require a scope gate decision payload (`.spec-kit/scope-gate.json` or equivalent channel payload).
+     - If missing, halt with: `ERROR \"Missing decomposition gate decision payload\"`.
+     - If payload indicates `override_flag=true`, require non-empty `override_rationale`.
+     - If payload shows override from an `epic`/`program` recommendation, require explicit risk acknowledgment in gate metadata before proceeding.
    - Load plan.md and extract tech stack, libraries, project structure
    - Load spec.md and extract user stories with their priorities (P1, P2, P3, etc.)
    - If data-model.md exists: Extract entities and map to user stories
@@ -70,9 +76,9 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Independent test criteria for each story
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
-   - If a scope gate decision payload exists (see `docs/scope-gate-consumption-contract.md`):
-     surface `mode_recommendation`, `user_choice`, `override_flag`, `next_action`,
-     and `handoff_owner` in the summary.
+   - Surface decomposition gate fields in the summary:
+     `mode_recommendation`, `recommendation_reasons`, `user_choice`,
+     `override_flag`, `next_action`, `handoff_owner`, and `validation_status`.
 
 Context for task generation: {ARGS}
 

@@ -15,6 +15,8 @@
       href: scope-scoring-rubric.md
     - name: Scope Gate Contract
       href: scope-gate-consumption-contract.md
+    - name: Hierarchy Contract
+      href: hierarchy-metadata-contract.md
     - name: Upgrade
       href: upgrade.md
 

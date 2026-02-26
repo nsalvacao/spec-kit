@@ -393,9 +393,10 @@ wheels = [
 
 [[package]]
 name = "specify-cli"
-version = "0.0.52"
+version = "0.0.53"
 source = { editable = "." }
 dependencies = [
+    { name = "click" },
     { name = "httpx", extra = ["socks"] },
     { name = "packaging" },
     { name = "platformdirs" },
@@ -420,6 +421,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.1" },
     { name = "httpx", extras = ["socks"] },
     { name = "packaging", specifier = ">=23.0" },
     { name = "platformdirs" },
