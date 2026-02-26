@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `tests/test_hierarchy_contract.py`
     - `tests/test_hierarchy_contract_cli.py`
   - Updated templates and command prompts to reference hierarchy metadata lineage across `spec`, `plan`, and `tasks` flows.
+- **#108: canonical branch policy for multi-feature initiatives**
+  - Added branch policy helper: `scripts/python/branch-policy.py`.
+  - Added canonical branch metadata contract file:
+    - `.spec-kit/branch-policy.json` (`branch-feature.v1`)
+  - Added branch policy documentation:
+    - `docs/canonical-branch-policy.md`
+  - Added regression tests for validation, registration, prefix-collision, and path-resolution:
+    - `tests/test_branch_policy.py`
 - **#106: decomposition gate flow with explicit override/risk controls**
   - Added gate flow module with deterministic state machine:
     `detect -> recommend -> choose -> confirm -> handoff`.

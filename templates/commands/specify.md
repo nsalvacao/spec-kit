@@ -96,6 +96,7 @@ You **MUST** consider the user input before proceeding (if not empty). The text 
 | Feature spec | `specs/N-short-name/spec.md` | Completed specification |
 | Quality checklist | `specs/N-short-name/checklists/requirements.md` | Validation results |
 | Hierarchy contract seed | `.spec-kit/hierarchy-contract.json` | Program/Epic/Feature metadata seed for downstream planning |
+| Branch policy metadata | `.spec-kit/branch-policy.json` | Canonical branch↔feature mapping (`branch-feature.v1`) |
 
 **Script contract**: `{SCRIPT}` creates the branch and initialises `SPEC_FILE` before writing. Run exactly once per feature.
 
