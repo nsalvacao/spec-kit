@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **#176: Command discoverability audit — amend + global coverage**
+  - Added `/speckit.amend`, `/speckit.validate`, `/speckit.taskstoissues` to
+    the "Next Steps" panel shown after `specify init`.
+  - Reordered commands in "Next Steps" to follow canonical workflow sequence.
+  - Added "Optional Quality Helpers" section for analyze, checklist,
+    taskstoissues.
+
+### Added
+
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.
   - Added orchestration engine: `scripts/python/version-orchestrator.py` with `check`, `bump`, and `sync`.
