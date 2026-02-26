@@ -103,6 +103,32 @@ Checks cross‑artifact consistency before execution.
 
 Executes tasks according to the plan.
 
+## 9) Amend (Post-Implementation)
+
+```text
+/speckit.amend Describe the edge case, new scenario, or behavioral correction.
+```
+
+Applies a targeted amendment when an edge case or correction is discovered
+after implementation. Updates the spec, adds a failing test, then fixes the
+code without re-running the full pipeline.
+
+## 10) Checklist
+
+```text
+/speckit.checklist
+```
+
+Generates a quality checklist for the current feature.
+
+## 11) Tasks to Issues
+
+```text
+/speckit.taskstoissues
+```
+
+Converts tasks into GitHub issues for project tracking.
+
 ## Troubleshooting Tips
 
 - If you are not using git branches, set:
