@@ -76,9 +76,10 @@ Upstream Spec Kit provides a strong SDD foundation. This fork extends it with a 
   - `/speckit.plan`
   - `/speckit.tasks`
   - `/speckit.taskstoissues`
+  - `/speckit.implement`
+  - `/speckit.amend`
   - `/speckit.analyze`
   - `/speckit.checklist`
-  - `/speckit.implement`
 - Runtime utility commands:
   - `specify check`
   - `specify version`
@@ -282,6 +283,7 @@ specify init my-project --ai agy
 ### 4) Optional quality helpers
 
 ```text
+/speckit.amend
 /speckit.checklist
 /speckit.analyze
 /speckit.taskstoissues

@@ -68,8 +68,10 @@ specify init my-project --template-repo nsalvacao/spec-kit --ai codex
 ### Optional Commands
 
 - `/speckit.clarify`
+- `/speckit.amend`
 - `/speckit.analyze`
 - `/speckit.checklist`
+- `/speckit.taskstoissues`
 
 ## Environment Variables
 
