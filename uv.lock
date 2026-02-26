@@ -393,7 +393,7 @@ wheels = [
 
 [[package]]
 name = "specify-cli"
-version = "0.0.54"
+version = "0.0.53"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
