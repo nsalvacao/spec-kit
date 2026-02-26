@@ -1,7 +1,6 @@
 ---
 description: Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts.
-handoffs: 
-
+handoffs:
   - label: Analyze For Consistency
     agent: speckit.analyze
     prompt: Run a project analysis for consistency
@@ -20,10 +19,17 @@ scripts:
 
 ```text
 $ARGUMENTS
-
-```text
+```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+## Instruction Contract
+
+- `instruction-contract:options` Present tasking options when there are valid decomposition alternatives or sequencing choices.
+- `instruction-contract:recommended-default` Recommend one default decomposition/tasking path and explain why.
+- `instruction-contract:risk-confirmation` Require explicit confirmation and rationale for risky overrides before finalizing tasks.
+- `instruction-contract:canonical-write-paths` Write only to canonical `FEATURE_DIR/tasks.md` and related canonical artifact paths.
+- `instruction-contract:machine-readable-output` Include parseable decomposition-gate fields in the summary so orchestration remains deterministic.
 
 ## Outline
 

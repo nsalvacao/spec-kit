@@ -21,6 +21,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `.github/workflows/version-coherence.yml`
   - Added regression test suite:
     - `tests/test_version_orchestrator.py`
+- **#113: Programmatic orchestration contract (channel-agnostic envelope)**
+  - Added `src/specify_cli/orchestration_contract.py` with versioned envelope `orchestration-payload.v1`.
+  - Added helper script and wrappers:
+    - `scripts/python/orchestration-contract.py`
+    - `scripts/bash/orchestration-contract.sh`
+    - `scripts/powershell/orchestration-contract.ps1`
+  - Added docs and script regression tests:
+    - `docs/programmatic-orchestration-contract.md`
+    - `tests/test_orchestration_contract.py`
+    - `tests/test_orchestration_contract_script.py`
+- **#115: Template/script instruction contract for LLM agents**
+  - Added instruction contract validator module: `src/specify_cli/template_instruction_contract.py`.
+  - Added validator script and wrappers:
+    - `scripts/python/template-instruction-contract.py`
+    - `scripts/bash/template-instruction-contract.sh`
+    - `scripts/powershell/template-instruction-contract.ps1`
+  - Updated core command templates (`specify`, `clarify`, `plan`, `tasks`) with required instruction-contract markers.
+  - Added docs and tests:
+    - `docs/template-instruction-contract.md`
+    - `tests/test_template_instruction_contract.py`
+- **#116: Handoff metadata schema + lint/validation gate**
+  - Added handoff schema/normalization module: `src/specify_cli/handoff_contract.py` (`handoff-metadata.v1`).
+  - Added template/payload lint gate module: `src/specify_cli/handoff_metadata_lint.py`.
+  - Added lint script and wrappers:
+    - `scripts/python/handoff-metadata-lint.py`
+    - `scripts/bash/handoff-metadata-lint.sh`
+    - `scripts/powershell/handoff-metadata-lint.ps1`
+  - Added schema documentation and regression tests:
+    - `docs/handoff-metadata-schema-contract.md`
+    - `tests/test_handoff_contract_gate.py`
 
 ### Changed
 
