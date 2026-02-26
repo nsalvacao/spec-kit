@@ -9,10 +9,25 @@ import sys
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_PATH = REPO_ROOT / "src"
-if str(SRC_PATH) not in sys.path:
-    sys.path.insert(0, str(SRC_PATH))
+MAX_INPUT_BYTES = 1_048_576  # 1 MiB
+
+
+def _bootstrap_src_path() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    src_path = (repo_root / "src").resolve()
+    package_dir = src_path / "specify_cli"
+
+    if not src_path.is_dir() or not package_dir.is_dir():
+        raise RuntimeError("Unable to locate expected source package at 'src/specify_cli'.")
+    if repo_root not in src_path.parents:
+        raise RuntimeError("Resolved source path escapes repository root.")
+
+    src_path_str = str(src_path)
+    if src_path_str not in sys.path:
+        sys.path.insert(0, src_path_str)
+
+
+_bootstrap_src_path()
 
 from specify_cli.orchestration_contract import (
     build_orchestration_payload,
@@ -29,8 +44,15 @@ def _load_json_file(path_value: str | Path, *, field_name: str) -> dict[str, Any
     path = Path(str(path_value).strip()).expanduser().resolve()
     if not path.is_file():
         raise OrchestrationContractError(f"{field_name} file does not exist: {path}")
+    if path.stat().st_size > MAX_INPUT_BYTES:
+        raise OrchestrationContractError(
+            f"{field_name} file is too large ({path.stat().st_size} bytes). "
+            f"Limit is {MAX_INPUT_BYTES} bytes."
+        )
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise OrchestrationContractError(f"{field_name} file must be UTF-8 text JSON: {path}") from exc
     except json.JSONDecodeError as exc:
         raise OrchestrationContractError(f"{field_name} file must be valid JSON: {path}") from exc
     if not isinstance(payload, dict):
@@ -123,6 +145,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.handler(args))
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except OrchestrationContractError as exc:
         print(str(exc), file=sys.stderr)
         return 1

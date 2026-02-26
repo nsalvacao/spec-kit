@@ -8,10 +8,23 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_PATH = REPO_ROOT / "src"
-if str(SRC_PATH) not in sys.path:
-    sys.path.insert(0, str(SRC_PATH))
+
+def _bootstrap_src_path() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    src_path = (repo_root / "src").resolve()
+    package_dir = src_path / "specify_cli"
+
+    if not src_path.is_dir() or not package_dir.is_dir():
+        raise RuntimeError("Unable to locate expected source package at 'src/specify_cli'.")
+    if repo_root not in src_path.parents:
+        raise RuntimeError("Resolved source path escapes repository root.")
+
+    src_path_str = str(src_path)
+    if src_path_str not in sys.path:
+        sys.path.insert(0, src_path_str)
+
+
+_bootstrap_src_path()
 
 from specify_cli.template_instruction_contract import (
     INSTRUCTION_CONTRACT_MARKERS,
@@ -68,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.handler(args))
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except InstructionContractError as exc:
         print(str(exc), file=sys.stderr)
         return 1

@@ -24,7 +24,8 @@ HANDOFF_REQUIRED_FIELDS = frozenset(
         "validation_status",
     }
 )
-HANDOFF_ALLOWED_STAGES = (
+HANDOFF_ALLOWED_STAGES = frozenset(
+    (
     "ideate",
     "select",
     "structure",
@@ -35,6 +36,7 @@ HANDOFF_ALLOWED_STAGES = (
     "plan",
     "tasks",
     "implement",
+    )
 )
 HANDOFF_ALLOWED_TRANSITIONS = frozenset(
     {
@@ -258,7 +260,7 @@ def _normalize_stage(
             HandoffContractIssue(
                 code=HandoffIssueCode.INVALID_FIELD_VALUE,
                 field=field_name,
-                message=f"Invalid {field_name}; expected one of {list(HANDOFF_ALLOWED_STAGES)}.",
+                message=f"Invalid {field_name}; expected one of {sorted(HANDOFF_ALLOWED_STAGES)}.",
                 severity=HandoffIssueSeverity.ERROR,
             )
         )

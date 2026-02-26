@@ -152,3 +152,27 @@ def test_handoff_metadata_lint_script_payload_fails_invalid_transition(tmp_path:
     assert result.returncode == 1
     payload = json.loads(result.stdout)
     assert payload["ok"] is False
+
+
+def test_handoff_metadata_lint_script_payload_rejects_oversized_input(tmp_path: Path) -> None:
+    payload_file = tmp_path / "oversized.json"
+    payload_file.write_text(" " * 1_048_577, encoding="utf-8")
+
+    result = run_script("payload", "--input", str(payload_file))
+    assert result.returncode == 1
+    assert "too large" in result.stderr.lower()
+
+
+def test_handoff_metadata_lint_script_payload_rejects_excessive_depth(tmp_path: Path) -> None:
+    deep_payload: dict[str, object] = {}
+    cursor: dict[str, object] = deep_payload
+    for _ in range(70):
+        nested: dict[str, object] = {}
+        cursor["nested"] = nested
+        cursor = nested
+    payload_file = tmp_path / "too-deep.json"
+    payload_file.write_text(json.dumps(deep_payload), encoding="utf-8")
+
+    result = run_script("payload", "--input", str(payload_file))
+    assert result.returncode == 1
+    assert "nesting depth" in result.stderr.lower()

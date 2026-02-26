@@ -42,6 +42,9 @@ def validate_instruction_contract(
     required_markers: Iterable[str] = INSTRUCTION_CONTRACT_MARKERS,
 ) -> list[InstructionContractError]:
     """Validate instruction-contract markers in template command files."""
+    if not repo_root.exists() or not repo_root.is_dir():
+        raise ValueError(f"repo_root must be an existing directory: {repo_root}")
+
     errors: list[InstructionContractError] = []
     normalized_markers = tuple(required_markers)
 
@@ -56,7 +59,16 @@ def validate_instruction_contract(
             )
             continue
 
-        content = absolute_path.read_text(encoding="utf-8")
+        try:
+            content = absolute_path.read_text(encoding="utf-8")
+        except OSError:
+            errors.append(
+                InstructionContractError(
+                    template=rel_path,
+                    missing_markers=["<file-read-error>"],
+                )
+            )
+            continue
         missing = [marker for marker in normalized_markers if marker not in content]
         if missing:
             errors.append(
