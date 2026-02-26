@@ -206,10 +206,36 @@ fi
 # Source common functions
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
+TASK_POLICY_SCRIPT="$SCRIPT_DIR/../python/task-artifact-policy.py"
 
 # Get feature paths and validate branch
 eval $(get_feature_paths)
 check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
+
+run_tasks_artifact_policy_guard() {
+    local python_cmd=""
+    if command -v python3 >/dev/null 2>&1; then
+        python_cmd="python3"
+    elif command -v python >/dev/null 2>&1; then
+        python_cmd="python"
+    else
+        echo "ERROR: Python is required to validate canonical tasks artifact policy." >&2
+        exit 1
+    fi
+
+    if [[ ! -f "$TASK_POLICY_SCRIPT" ]]; then
+        echo "ERROR: Task artifact policy script not found: $TASK_POLICY_SCRIPT" >&2
+        exit 1
+    fi
+
+    if ! "$python_cmd" "$TASK_POLICY_SCRIPT" validate \
+        --repo-root "$REPO_ROOT" \
+        --feature-dir "$FEATURE_DIR" \
+        --tasks-path "$TASKS" >/dev/null; then
+        # task-artifact-policy.py already emits actionable stderr output.
+        exit 1
+    fi
+}
 
 # If paths-only mode, output paths and exit (support JSON + paths-only combined)
 if $PATHS_ONLY; then
@@ -243,6 +269,8 @@ if [[ ! -f "$IMPL_PLAN" ]]; then
     echo "Run /speckit.plan first to create the implementation plan." >&2
     exit 1
 fi
+
+run_tasks_artifact_policy_guard
 
 # Check for tasks.md if required
 if $REQUIRE_TASKS && [[ ! -f "$TASKS" ]]; then
