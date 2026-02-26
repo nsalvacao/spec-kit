@@ -212,7 +212,7 @@ def test_bump_fails_for_invalid_release_date(tmp_path: Path) -> None:
     )
 
     assert result.returncode != 0
-    assert "Release date must follow 'YYYY-MM-DD'." in result.stderr
+    assert "Release date must be a valid UTC date in 'YYYY-MM-DD' format." in result.stderr
 
 
 def test_sync_from_release_tag_updates_all_mapped_files(tmp_path: Path) -> None:

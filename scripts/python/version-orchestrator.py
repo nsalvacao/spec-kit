@@ -339,7 +339,7 @@ def _normalize_release_date(raw_release_date: str | None) -> str:
         date.fromisoformat(value)
     except ValueError as exc:
         raise VersionOrchestrationError(
-            "Release date must follow 'YYYY-MM-DD'."
+            "Release date must be a valid UTC date in 'YYYY-MM-DD' format."
         ) from exc
     return value
 
