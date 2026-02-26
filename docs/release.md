@@ -7,11 +7,16 @@ This guide describes how releases are published for this fork.
 Release metadata consistency is governed by:
 
 - Policy file: `.github/release-version-policy.yml`
+- Manifest file: `.github/version-map.yml`
 - Guard workflow: `.github/workflows/release-consistency-guard.yml`
+- Coherence workflow: `.github/workflows/version-coherence.yml`
 - Sync workflow: `.github/workflows/release-metadata-sync.yml`
 - Hygiene workflow: `.github/workflows/branch-hygiene.yml`
+- Bump helpers:
+  - `scripts/bash/version-bump.sh`
+  - `scripts/powershell/version-bump.ps1`
 
-The guard validates version/changelog/runtime coherence. The sync workflow opens a PR (never pushes directly to `main`) when release metadata drift is detected.
+The guard validates release metadata coherence. The version coherence workflow validates canonical version propagation using the manifest map. The sync workflow opens a PR (never pushes directly to `main`) when metadata drift is detected.
 
 ## 1) Versioning Rules
 
@@ -35,6 +40,30 @@ Before publishing a release:
 
 If a tag was published without detailed curated notes, add the version heading
 and include at least a release-notes link to keep the changelog version-indexed.
+
+## 2.1) Version Bump Orchestration
+
+Use the manifest-driven bump helpers to keep `pyproject.toml`, `uv.lock`, and
+`CHANGELOG.md` synchronized:
+
+```bash
+scripts/bash/version-bump.sh --part patch --dry-run --include-diff
+scripts/bash/version-bump.sh --part patch
+```
+
+PowerShell:
+
+```powershell
+scripts/powershell/version-bump.ps1 -Part patch -DryRun -IncludeDiff
+scripts/powershell/version-bump.ps1 -Part patch
+```
+
+To add new managed targets safely:
+
+1. Add the file and regex capture rule to `.github/version-map.yml`.
+2. Keep the regex scoped and deterministic with one `version` capture group.
+3. Add the target path to `sync.allowlist`.
+4. Run `python scripts/python/version-orchestrator.py check --skip-runtime`.
 
 ## 3) Build Release Packages
 
@@ -63,6 +92,7 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 - Metadata drift is handled by `release-metadata-sync.yml`, which opens/updates:
   - `automation/release-metadata-vX.Y.Z` -> `main`
 - `release-consistency-guard.yml` blocks PRs to `main` when coherence fails.
+- `version-coherence.yml` blocks PRs to `main` when mapped version drift is detected.
 - Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.
 
 ## 7) Local Main Hygiene
