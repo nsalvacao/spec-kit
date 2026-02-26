@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 MAX_INPUT_BYTES = 1_048_576  # 1 MiB
 MAX_JSON_DEPTH = 64
@@ -65,7 +66,7 @@ def _as_payload_file(value: str | Path) -> Path:
     return path
 
 
-def _write_payload(payload: dict[str, object], output: str | None) -> None:
+def _write_payload(payload: dict[str, Any], output: str | None) -> None:
     serialized = json.dumps(payload, indent=2, sort_keys=False) + "\n"
     if output:
         path = Path(output).expanduser().resolve()
@@ -129,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_and_check_depth(payload_file: Path) -> dict[str, object]:
+def _load_and_check_depth(payload_file: Path) -> dict[str, Any]:
     """Parse JSON payload file, validate structure and nesting depth, return parsed dict."""
     try:
         raw = json.loads(payload_file.read_text(encoding="utf-8"))
