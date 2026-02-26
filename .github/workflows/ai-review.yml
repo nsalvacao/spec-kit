@@ -1,25 +1,26 @@
 # =============================================================================
-# 🤖 AI Review — inline, no cross-repo reusable dependency
-# Uses GitHub Models free tier — ZERO premium requests consumed
+# AI Review — inline, no reusable cross-repo dependency
+# Uses GitHub Models free tier (no premium requests)
 #
-# Configurable via env block at the top of each job:
-#   REVIEW_MODEL           — primary model for code review         (#77)
-#   REVIEW_FALLBACK_MODEL  — fallback model if primary 429s        (#77)
-#   REVIEW_FALLBACK_MODEL_2— 2nd fallback (higher rate limits)     (#77)
-#   SUMMARY_MODEL          — primary model for PR summary          (#77)
-#   SUMMARY_FALLBACK_MODEL — fallback model if primary 429s        (#77)
-#   SUMMARY_FALLBACK_MODEL_2— 2nd fallback (higher rate limits)    (#77)
-#   MAX_REVIEW_CHARS       — max diff chars for review             (#76)
-#   MAX_SUMMARY_CHARS      — max diff chars for summary            (#76)
-#   MAX_RETRY              — retry attempts per model              (#77)
-#   REVIEW_AB_MODE         — off|parity (A/B selector mode)
-#   REVIEW_AB_MODELS       — comma-separated model IDs for A/B pool
-#   Model IDs should match runtime catalog: https://models.github.ai/catalog/models
-#   Review timeline logs are append-only per run (UTC timestamps)
-#   and exported to the workflow summary for easier debugging.
-#   Missing MODELS_PAT in dependabot/fork contexts now degrades gracefully
-#   (skip + explicit reason) instead of failing the whole job.
-#   Dependabot PRs that modify workflow files are inference-protected and skipped.
+# Configurable via repository variables:
+#   REVIEW_LONG_CONTEXT_MODEL   — long-context primary override
+#   REVIEW_MODEL                — primary model (default: openai/gpt-4.1)
+#   REVIEW_FALLBACK_MODEL       — fallback model (default: openai/gpt-4o)
+#   REVIEW_FALLBACK_MODEL_2     — fallback model 2 (default: meta/llama-4-maverick-17b-128e-instruct-fp8)
+#   REVIEW_AB_MODE              — off|parity (A/B mode is opt-in via label)
+#   REVIEW_AB_MODELS            — comma-separated model IDs for A/B pool
+#   MAX_REVIEW_CHARS            — full-diff threshold before chunking
+#   CHUNK_SIZE_CHARS            — semantic chunk target size
+#   (semantic chunking is file/hunk-based; overlap is intentionally not used)
+#   MAX_REVIEW_TOKENS           — max completion tokens per request
+#   MIN_REVIEW_CONFIDENCE       — minimum confidence [0..1] for published findings
+#   MAX_RETRY                   — retries per model
+#   MAX_RETRY_SLEEP             — cap for exponential backoff seconds
+#
+# Notes:
+#   - A/B routing only activates when label `ai-review-ab` is present.
+#   - Rate limits are observed dynamically from HTTP 429 + retry-after + headers.
+#   - Timeline logs are append-only and exported in workflow summary.
 # =============================================================================
 name: AI Review
 
@@ -43,18 +44,18 @@ jobs:
   code-review:
     name: AI Code Review
     runs-on: ubuntu-latest
-    # Skip review for PRs labelled 'skip-ai-review' (#76)
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     env:
-      REVIEW_LONG_CONTEXT_MODEL: ${{ vars.REVIEW_LONG_CONTEXT_MODEL || '' }} # optional, tenant-specific
+      REVIEW_LONG_CONTEXT_MODEL: ${{ vars.REVIEW_LONG_CONTEXT_MODEL || 'openai/gpt-4.1' }}
       REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'openai/gpt-4.1' }}
       REVIEW_FALLBACK_MODEL: ${{ vars.REVIEW_FALLBACK_MODEL || 'openai/gpt-4o' }}
+      REVIEW_FALLBACK_MODEL_2: ${{ vars.REVIEW_FALLBACK_MODEL_2 || 'meta/llama-4-maverick-17b-128e-instruct-fp8' }}
       REVIEW_AB_MODE: ${{ vars.REVIEW_AB_MODE || 'off' }}
       REVIEW_AB_MODELS: ${{ vars.REVIEW_AB_MODELS || '' }}
       MAX_REVIEW_CHARS: "50000"
       MAX_REVIEW_TOKENS: "2000"
       CHUNK_SIZE_CHARS: "18000"
-      CHUNK_OVERLAP_CHARS: "1200"
+      MIN_REVIEW_CONFIDENCE: "0.55"
       MAX_RETRY: "5"
       MAX_RETRY_SLEEP: "60"
     steps:
@@ -119,40 +120,69 @@ jobs:
             echo "chunk_required=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # no truncation; chunking later if required
-          echo "truncated=false" >> "$GITHUB_OUTPUT"
-          echo "truncated_at=0" >> "$GITHUB_OUTPUT"
-
           if [ ! -s diff_full.txt ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: AI Review via GitHub Models (with retry)
+      - name: AI Review via GitHub Models (structured + retry)
         if: steps.preflight.outputs.skip_inference != 'true' && steps.diff.outputs.skip != 'true'
         id: review
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           set -euo pipefail
-          # Mask token to prevent accidental log exposure
+
           if [ -n "${GH_MODELS_TOKEN:-}" ]; then
             echo "::add-mask::$GH_MODELS_TOKEN"
           fi
 
-          SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
+          SYSTEM_PROMPT="You are a senior code reviewer. Report actionable findings grounded in changed lines. Prioritize security vulnerabilities, bugs, logic errors, and best-practice violations. Also flag performance regressions and maintainability concerns when clearly evidenced by the diff. For each finding, provide explicit reasoning and assign a confidence score reflecting your certainty."
+          RESPONSE_SCHEMA=$(cat <<'JSON'
+          {
+            "name": "review_findings",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "severity": { "type": "string", "enum": ["critical", "warning", "info"] },
+                      "file": { "type": "string" },
+                      "line": { "type": "integer" },
+                      "issue": { "type": "string" },
+                      "recommendation": { "type": "string" },
+                      "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+                    },
+                    "required": ["severity", "file", "line", "issue", "recommendation", "confidence"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["findings"],
+              "additionalProperties": false
+            }
+          }
+          JSON
+          )
+
           CHUNK_REQUIRED=${{ steps.diff.outputs.chunk_required == 'true' && '1' || '0' }}
           TIMELINE_FILE="review_timeline.md"
+          MODELS_USED_FILE="models_used.txt"
           : > "$TIMELINE_FILE"
+          : > "$MODELS_USED_FILE"
 
           timeline() {
             local MESSAGE="$1"
             printf '%s | %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$MESSAGE" | tee -a "$TIMELINE_FILE" >&2
           }
 
-          timeline "AI review started full_diff_chars=${{ steps.diff.outputs.full_size }} chunk_required=$CHUNK_REQUIRED"
+          timeline "review_started full_diff_chars=${{ steps.diff.outputs.full_size }} chunk_required=$CHUNK_REQUIRED"
 
           CATALOG_FILE="/tmp/models_catalog.json"
           CATALOG_OK=0
@@ -171,119 +201,189 @@ jobs:
             jq -e --arg model "$MODEL" '.[] | select(.id == $model)' "$CATALOG_FILE" >/dev/null 2>&1
           }
 
-          if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ] && ! model_in_catalog "$REVIEW_LONG_CONTEXT_MODEL"; then
-            timeline "long_context_not_in_catalog model=$REVIEW_LONG_CONTEXT_MODEL"
-            REVIEW_LONG_CONTEXT_MODEL=""
-          fi
-          if [ -n "$REVIEW_MODEL" ] && ! model_in_catalog "$REVIEW_MODEL"; then
-            timeline "primary_not_in_catalog model=$REVIEW_MODEL"
-          fi
-          if [ -n "$REVIEW_FALLBACK_MODEL" ] && ! model_in_catalog "$REVIEW_FALLBACK_MODEL"; then
-            timeline "fallback_not_in_catalog model=$REVIEW_FALLBACK_MODEL"
-          fi
-
-          # Optional A/B selector: choose long-context model from REVIEW_AB_MODELS by PR parity.
-          if [ "${REVIEW_AB_MODE:-off}" != "off" ] && [ -n "${REVIEW_AB_MODELS:-}" ]; then
-            mapfile -t AB_MODELS_RAW < <(echo "$REVIEW_AB_MODELS" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed '/^$/d')
-            AB_MODELS=()
-            for MODEL in "${AB_MODELS_RAW[@]}"; do
-              if model_in_catalog "$MODEL"; then
-                AB_MODELS+=("$MODEL")
-              else
-                timeline "ab_model_not_in_catalog model=$MODEL"
-              fi
-            done
-
-            if [ "${#AB_MODELS[@]}" -gt 0 ]; then
-              if [ "$REVIEW_AB_MODE" = "parity" ]; then
-                INDEX=$((PR_NUMBER % ${#AB_MODELS[@]}))
-                REVIEW_LONG_CONTEXT_MODEL="${AB_MODELS[$INDEX]}"
-                timeline "ab_selected mode=parity pr=$PR_NUMBER index=$INDEX model=$REVIEW_LONG_CONTEXT_MODEL pool=${#AB_MODELS[@]}"
-              else
-                timeline "ab_unknown_mode mode=$REVIEW_AB_MODE (supported: off, parity)"
-              fi
-            else
-              timeline "ab_no_available_models mode=$REVIEW_AB_MODE"
+          extract_retry_after() {
+            local HEADER_FILE="$1"
+            local BODY_FILE="$2"
+            local HEADER_RETRY
+            local BODY_RETRY
+            HEADER_RETRY=$(grep -im1 '^retry-after:' "$HEADER_FILE" | awk '{print $2}' | tr -d '\r' || true)
+            BODY_RETRY=$(jq -r '.retry_after // .error.retry_after // empty' "$BODY_FILE" 2>/dev/null || true)
+            if [ -n "$HEADER_RETRY" ]; then
+              echo "$HEADER_RETRY"
+              return
             fi
-          fi
+            if [ -n "$BODY_RETRY" ]; then
+              echo "$BODY_RETRY"
+              return
+            fi
+            echo ""
+          }
 
-          call_model() {
-            local MODEL="$1" CONTENT="$2" PURPOSE="$3" CHUNK_ID="$4"
-            local HEADERS_FILE="/tmp/headers-$CHUNK_ID.txt"
-            local INPUT_CHARS=${#CONTENT}
-            timeline "request purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL input_chars=$INPUT_CHARS"
-
-            RESPONSE=$(curl -s -D "$HEADERS_FILE" -w "\n%{http_code}" -X POST \
-              "https://models.github.ai/inference/chat/completions" \
-              -H "Authorization: Bearer $GH_MODELS_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$(jq -n \
+          build_payload() {
+            local MODEL="$1"
+            local CONTENT="$2"
+            local USER_PROMPT="Review this pull request diff. Return a JSON object with a findings array. Each finding must include severity, file, line, issue, recommendation, and a confidence score (0-1). Only include findings you can justify from the diff."
+            if [[ "$MODEL" == openai/o* || "$MODEL" == openai/gpt-5* ]]; then
+              jq -n \
                 --arg system "$SYSTEM_PROMPT" \
+                --arg user_prompt "$USER_PROMPT" \
                 --arg diff "$CONTENT" \
                 --arg model "$MODEL" \
+                --argjson schema "$RESPONSE_SCHEMA" \
                 --argjson max_tokens "$MAX_REVIEW_TOKENS" \
                 '{
                   model: $model,
                   messages: [
                     {role: "system", content: $system},
-                    {role: "user", content: ("Review this pull request diff:\n\n" + $diff)}
+                    {role: "user", content: ($user_prompt + "\n\n" + $diff)}
                   ],
+                  response_format: {
+                    type: "json_schema",
+                    json_schema: $schema
+                  },
+                  max_completion_tokens: $max_tokens
+                }'
+            else
+              jq -n \
+                --arg system "$SYSTEM_PROMPT" \
+                --arg user_prompt "$USER_PROMPT" \
+                --arg diff "$CONTENT" \
+                --arg model "$MODEL" \
+                --argjson schema "$RESPONSE_SCHEMA" \
+                --argjson max_tokens "$MAX_REVIEW_TOKENS" \
+                '{
+                  model: $model,
+                  messages: [
+                    {role: "system", content: $system},
+                    {role: "user", content: ($user_prompt + "\n\n" + $diff)}
+                  ],
+                  response_format: {
+                    type: "json_schema",
+                    json_schema: $schema
+                  },
                   max_tokens: $max_tokens,
-                  temperature: 0.2
-                }')")
+                  temperature: 0.1
+                }'
+            fi
+          }
 
-            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
-            RETRY_AFTER_HINT=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
-            if [ -n "$RETRY_AFTER_HINT" ]; then
-              timeline "response purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE retry_after=$RETRY_AFTER_HINT"
+          extract_json_from_content() {
+            local CONTENT_FILE="$1"
+            local OUTPUT_JSON="$2"
+            if jq -e . "$CONTENT_FILE" >/dev/null 2>&1; then
+              cp "$CONTENT_FILE" "$OUTPUT_JSON"
+              return 0
+            fi
+            sed -n '/```json/,/```/p' "$CONTENT_FILE" | sed '1d;$d' > "$OUTPUT_JSON"
+            if [ -s "$OUTPUT_JSON" ] && jq -e . "$OUTPUT_JSON" >/dev/null 2>&1; then
+              return 0
+            fi
+            sed -n '/```/,/```/p' "$CONTENT_FILE" | sed '1d;$d' > "$OUTPUT_JSON"
+            if [ -s "$OUTPUT_JSON" ] && jq -e . "$OUTPUT_JSON" >/dev/null 2>&1; then
+              return 0
+            fi
+            return 1
+          }
+
+          normalize_findings() {
+            local INPUT_JSON="$1"
+            local OUTPUT_JSON="$2"
+            jq --argjson min_conf "$MIN_REVIEW_CONFIDENCE" '
+              def severity_norm(v):
+                (v // "warning" | tostring | ascii_downcase) as $s
+                | if $s == "critical" or $s == "warning" or $s == "info" then $s else "warning" end;
+              def confidence_norm(v):
+                if v == null then 0
+                elif (v | type) == "number" then v
+                elif (v | type) == "string" then
+                  (v | ascii_downcase) as $s
+                  | if $s == "high" then 0.9
+                    elif $s == "medium" then 0.7
+                    elif $s == "low" then 0.5
+                    else (v | tonumber? // 0)
+                    end
+                else 0 end;
+              def line_norm(v):
+                if (v | type) == "number" then (if v < 0 then 0 else (v | floor) end)
+                elif (v | type) == "string" and (v | test("^[0-9]+$")) then (v | tonumber)
+                else 0 end;
+              def text_norm(v):
+                if (v | type) == "string" then (v | gsub("\\s+"; " ") | gsub("^\\s+|\\s+$"; ""))
+                else "" end;
+              (if type == "object" then
+                 if (.findings | type) == "array" then .findings
+                 elif (.key_findings | type) == "array" then .key_findings
+                 else []
+                 end
+               elif type == "array" then .
+               else []
+               end) as $raw
+              | {
+                  findings: [
+                    $raw[]?
+                    | {
+                        severity: severity_norm(.severity),
+                        file: text_norm(.file),
+                        line: line_norm(.line),
+                        issue: text_norm(.issue),
+                        recommendation: text_norm(.recommendation),
+                        confidence: confidence_norm(.confidence)
+                      }
+                    | select(.file != "" and .line > 0 and .issue != "" and .recommendation != "" and .confidence >= $min_conf)
+                  ]
+                }
+            ' "$INPUT_JSON" > "$OUTPUT_JSON"
+          }
+
+          call_model() {
+            local MODEL="$1"
+            local CONTENT="$2"
+            local PURPOSE="$3"
+            local CHUNK_ID="$4"
+            local SAFE_MODEL
+            SAFE_MODEL=$(echo "$MODEL" | tr '/:' '__')
+            HEADERS_FILE="/tmp/headers-${CHUNK_ID}-${SAFE_MODEL}.txt"
+            BODY_FILE="/tmp/body-${CHUNK_ID}-${SAFE_MODEL}.txt"
+            REQUEST_JSON_FILE="/tmp/request-${CHUNK_ID}-${SAFE_MODEL}.json"
+            build_payload "$MODEL" "$CONTENT" > "$REQUEST_JSON_FILE"
+
+            local INPUT_CHARS
+            INPUT_CHARS=${#CONTENT}
+            timeline "request purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL input_chars=$INPUT_CHARS"
+
+            HTTP_CODE=$(curl -sS -D "$HEADERS_FILE" -o "$BODY_FILE" -w "%{http_code}" -X POST \
+              "https://models.github.ai/inference/chat/completions" \
+              -H "Authorization: Bearer $GH_MODELS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @"$REQUEST_JSON_FILE")
+
+            RETRY_AFTER_VALUE=$(extract_retry_after "$HEADERS_FILE" "$BODY_FILE")
+            if [ -n "$RETRY_AFTER_VALUE" ]; then
+              timeline "response purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE retry_after=$RETRY_AFTER_VALUE"
             else
               timeline "response purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
             fi
 
-            # Log rate-limit headers when present (free tier variability)
-            if [ -f "$HEADERS_FILE" ]; then
-              RATE_HEADERS=$(grep -iE 'x-ratelimit|retry-after' "$HEADERS_FILE" | tr -d '\r' || true)
-              if [ -n "$RATE_HEADERS" ]; then
-                while IFS= read -r HEADER_LINE; do
-                  timeline "header purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL $HEADER_LINE"
-                done <<< "$RATE_HEADERS"
-              fi
+            RATE_HEADERS=$(grep -iE '^(x-ratelimit|retry-after|x-ms-error-code|x-ratelimit-type|x-ratelimit-timeremaining)' "$HEADERS_FILE" | tr -d '\r' || true)
+            if [ -n "$RATE_HEADERS" ]; then
+              while IFS= read -r HEADER_LINE; do
+                timeline "header purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL $HEADER_LINE"
+              done <<< "$RATE_HEADERS"
             fi
           }
 
           review_with_chain() {
-            local CONTENT="$1" PURPOSE="$2" CHUNK_ID="$3"
-            local CANDIDATES=()
-            if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ]; then
-              CANDIDATES+=("$REVIEW_LONG_CONTEXT_MODEL")
-            fi
-            CANDIDATES+=("$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL")
+            local CONTENT="$1"
+            local PURPOSE="$2"
+            local CHUNK_ID="$3"
 
-            local MODELS=()
-            local CANDIDATE
-            local EXISTING
-            local DUPLICATE
-            for CANDIDATE in "${CANDIDATES[@]}"; do
-              [ -z "$CANDIDATE" ] && continue
-              DUPLICATE=0
-              for EXISTING in "${MODELS[@]}"; do
-                if [ "$EXISTING" = "$CANDIDATE" ]; then
-                  DUPLICATE=1
-                  break
-                fi
-              done
-              if [ "$DUPLICATE" -eq 0 ]; then
-                MODELS+=("$CANDIDATE")
-              fi
-            done
-
-            if [ "${#MODELS[@]}" -eq 0 ]; then
+            if [ "${#MODEL_CHAIN[@]}" -eq 0 ]; then
               timeline "no_models_configured purpose=$PURPOSE chunk=$CHUNK_ID"
               return 1
             fi
 
-            for MODEL in "${MODELS[@]}"; do
+            local MODEL
+            for MODEL in "${MODEL_CHAIN[@]}"; do
               timeline "trying_model purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL"
               ATTEMPT=0
               while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
@@ -292,34 +392,65 @@ jobs:
                 call_model "$MODEL" "$CONTENT" "$PURPOSE" "$CHUNK_ID"
 
                 if [ "$HTTP_CODE" = "200" ]; then
-                  USED_MODEL="$MODEL"
-                  echo "$BODY" | jq -r '.choices[0].message.content' > "review_$CHUNK_ID.md"
-                  TOKENS=$(echo "$BODY" | jq '.usage.total_tokens // 0')
-                  echo "$TOKENS" > "tokens_$CHUNK_ID.txt"
-                  timeline "success purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL tokens=$TOKENS"
+                  RAW_CONTENT_FILE="/tmp/raw-content-${CHUNK_ID}.txt"
+                  PARSED_JSON_FILE="/tmp/parsed-content-${CHUNK_ID}.json"
+                  REVIEW_JSON_FILE="review_json_${CHUNK_ID}.json"
+
+                  jq -r '.choices[0].message.content // empty' "$BODY_FILE" > "$RAW_CONTENT_FILE" || true
+                  if [ ! -s "$RAW_CONTENT_FILE" ]; then
+                    timeline "empty_content purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL"
+                    echo "::warning::Empty review payload from $MODEL. Trying next model."
+                    break
+                  fi
+
+                  if ! extract_json_from_content "$RAW_CONTENT_FILE" "$PARSED_JSON_FILE"; then
+                    INVALID_OUTPUT_FILE="/tmp/invalid-json-${CHUNK_ID}-$(echo "$MODEL" | tr '/:' '__').txt"
+                    cp "$RAW_CONTENT_FILE" "$INVALID_OUTPUT_FILE"
+                    timeline "invalid_json_content purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL"
+                    timeline "invalid_json_saved purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL path=$INVALID_OUTPUT_FILE"
+                    echo "::warning::Model $MODEL returned non-JSON findings. Trying next model."
+                    break
+                  fi
+
+                  normalize_findings "$PARSED_JSON_FILE" "$REVIEW_JSON_FILE"
+                  TOKENS=$(jq '.usage.total_tokens // 0' "$BODY_FILE" 2>/dev/null || echo 0)
+                  RAW_FINDINGS=$(jq 'if type=="object" and (.findings|type)=="array" then (.findings|length) elif type=="array" then length else 0 end' "$PARSED_JSON_FILE" 2>/dev/null || echo 0)
+                  FILTERED_FINDINGS=$(jq '.findings | length' "$REVIEW_JSON_FILE" 2>/dev/null || echo 0)
+                  echo "$TOKENS" > "tokens_${CHUNK_ID}.txt"
+                  echo "$MODEL" >> "$MODELS_USED_FILE"
+                  timeline "success purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL tokens=$TOKENS raw_findings=$RAW_FINDINGS filtered_findings=$FILTERED_FINDINGS"
                   return 0
                 fi
 
-                if echo "$BODY" | jq -e '.error.code == "tokens_limit_reached"' >/dev/null 2>&1 || [ "$HTTP_CODE" = "413" ]; then
+                if [ "$HTTP_CODE" = "413" ] || jq -e '.error.code == "tokens_limit_reached"' "$BODY_FILE" >/dev/null 2>&1; then
                   timeline "tokens_limit purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
-                  echo "::warning::Received tokens_limit_reached/413 from $MODEL; will fallback to chunking"
-                  return 413
+                  if [ "$PURPOSE" = "full-diff" ]; then
+                    echo "::warning::Received tokens_limit_reached/413 from $MODEL; switching to semantic chunking."
+                    return 413
+                  fi
+                  echo "::warning::Received tokens_limit_reached/413 from $MODEL on chunk $CHUNK_ID; trying next model."
+                  break
                 fi
 
+                ERROR_CODE=$(jq -r '.error.code // empty' "$BODY_FILE" 2>/dev/null || true)
+                ERROR_MSG=$(jq -r '.error.message // empty' "$BODY_FILE" 2>/dev/null || true)
+                if [ -z "$ERROR_MSG" ]; then
+                  ERROR_MSG=$(head -c 180 "$BODY_FILE" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
+                fi
+                [ -z "$ERROR_CODE" ] && ERROR_CODE="unknown"
+
                 if [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
-                  ERROR_CODE=$(echo "$BODY" | jq -r '.error.code // "unknown"' 2>/dev/null || echo "unknown")
-                  ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // empty' 2>/dev/null | tr '\n' ' ' | cut -c1-180)
                   timeline "non_retryable purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE error_code=$ERROR_CODE error_msg=$ERROR_MSG"
                   echo "::warning::Non-retryable HTTP $HTTP_CODE from $MODEL (error: $ERROR_CODE). Trying next model..."
                   break
                 fi
 
-                timeline "attempt_failed purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE"
+                timeline "attempt_failed purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL http=$HTTP_CODE error_code=$ERROR_CODE"
                 echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
+
                 if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-                  RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
-                  if [ -n "$RETRY_AFTER" ]; then
-                    SLEEP="$RETRY_AFTER"
+                  if [[ "$RETRY_AFTER_VALUE" =~ ^[0-9]+$ ]]; then
+                    SLEEP="$RETRY_AFTER_VALUE"
                   else
                     RAW_SLEEP=$((2 ** ATTEMPT))
                     SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
@@ -327,81 +458,249 @@ jobs:
                   JITTER=$((RANDOM % 5))
                   SLEEP=$((SLEEP + JITTER))
                   timeline "backoff purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL sleep=${SLEEP}s"
-                  echo "Retrying in ${SLEEP}s..."
                   sleep "$SLEEP"
                 fi
               done
               timeline "model_exhausted purpose=$PURPOSE chunk=$CHUNK_ID model=$MODEL last_http=$HTTP_CODE"
-              echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
             done
+
             return 1
           }
 
-          # 1) Try full diff if within soft limit
+          build_semantic_chunks() {
+            rm -rf .ai_review_chunks
+            mkdir -p .ai_review_chunks/per_file
+            rm -f diff_chunk_*.txt
+
+            awk '
+              BEGIN { idx=0; out="" }
+              /^diff --git / {
+                idx++;
+                out=sprintf(".ai_review_chunks/per_file/%04d.diff", idx);
+              }
+              { if (idx > 0) print >> out }
+            ' diff_full.txt
+
+            if ! ls .ai_review_chunks/per_file/*.diff >/dev/null 2>&1; then
+              cp diff_full.txt diff_chunk_01.txt
+              echo 1
+              return
+            fi
+
+            local CHUNK_COUNT=0
+            local CHUNK_FILE=""
+            local CURRENT_SIZE=0
+            local PATCH_FILE
+            for PATCH_FILE in .ai_review_chunks/per_file/*.diff; do
+              local PATCH_SIZE
+              PATCH_SIZE=$(wc -c < "$PATCH_FILE")
+
+              if [ "$PATCH_SIZE" -gt "$CHUNK_SIZE_CHARS" ]; then
+                local OFFSET=0
+                local SUB_COUNT=0
+                while [ "$OFFSET" -lt "$PATCH_SIZE" ]; do
+                  CHUNK_COUNT=$((CHUNK_COUNT + 1))
+                  SUB_COUNT=$((SUB_COUNT + 1))
+                  CHUNK_FILE=$(printf "diff_chunk_%03d.txt" "$CHUNK_COUNT")
+                  tail -c +"$((OFFSET + 1))" "$PATCH_FILE" | head -c "$CHUNK_SIZE_CHARS" > "$CHUNK_FILE"  # tail -c uses 1-based offset
+                  OFFSET=$((OFFSET + CHUNK_SIZE_CHARS))
+                done
+                timeline "oversized_file_split file=$(basename "$PATCH_FILE") size=$PATCH_SIZE sub_chunks=$SUB_COUNT"
+                CURRENT_SIZE=0
+                continue
+              fi
+
+              if [ "$CHUNK_COUNT" -eq 0 ] || [ $((CURRENT_SIZE + PATCH_SIZE)) -gt "$CHUNK_SIZE_CHARS" ]; then
+                CHUNK_COUNT=$((CHUNK_COUNT + 1))
+                CHUNK_FILE=$(printf "diff_chunk_%03d.txt" "$CHUNK_COUNT")
+                : > "$CHUNK_FILE"
+                CURRENT_SIZE=0
+              fi
+              cat "$PATCH_FILE" >> "$CHUNK_FILE"
+              printf '\n' >> "$CHUNK_FILE"
+              CURRENT_SIZE=$((CURRENT_SIZE + PATCH_SIZE + 1))
+            done
+
+            echo "$CHUNK_COUNT"
+          }
+
+          render_markdown() {
+            local INPUT_JSON="$1"
+            local TOTAL
+            local CRITICAL
+            local WARNING
+            local INFO
+
+            TOTAL=$(jq '.findings | length' "$INPUT_JSON")
+            CRITICAL=$(jq '[.findings[] | select(.severity == "critical")] | length' "$INPUT_JSON")
+            WARNING=$(jq '[.findings[] | select(.severity == "warning")] | length' "$INPUT_JSON")
+            INFO=$(jq '[.findings[] | select(.severity == "info")] | length' "$INPUT_JSON")
+
+            {
+              echo "### Findings"
+              echo
+              echo "Counts: 🔴 $CRITICAL | 🟡 $WARNING | 🔵 $INFO"
+              echo
+              if [ "$TOTAL" -eq 0 ]; then
+                echo "No actionable findings above confidence threshold (${MIN_REVIEW_CONFIDENCE})."
+              else
+                jq -r '
+                  .findings[] |
+                  (if .severity == "critical" then "🔴 **Critical**" elif .severity == "warning" then "🟡 **Warning**" else "🔵 **Info**" end) +
+                  " — `" + .file + ":" + (.line | tostring) + "`\n" +
+                  "Issue: " + .issue + "\n" +
+                  "Recommendation: " + .recommendation + "\n" +
+                  "Confidence: " + (((.confidence * 100) | round) | tostring) + "%\n"
+                ' "$INPUT_JSON"
+              fi
+            } > review.md
+          }
+
+          if [ -n "$REVIEW_LONG_CONTEXT_MODEL" ] && ! model_in_catalog "$REVIEW_LONG_CONTEXT_MODEL"; then
+            timeline "long_context_not_in_catalog model=$REVIEW_LONG_CONTEXT_MODEL"
+            REVIEW_LONG_CONTEXT_MODEL=""
+          fi
+
+          if [ "${REVIEW_AB_MODE:-off}" != "off" ] && [ -n "${REVIEW_AB_MODELS:-}" ]; then
+            PR_LABELS_CSV=",${PR_LABELS},"
+            if [[ "$PR_LABELS_CSV" == *",ai-review-ab,"* ]]; then
+              mapfile -t AB_MODELS_RAW < <(echo "$REVIEW_AB_MODELS" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed '/^$/d')
+              AB_MODELS=()
+              for MODEL in "${AB_MODELS_RAW[@]}"; do
+                if model_in_catalog "$MODEL"; then
+                  AB_MODELS+=("$MODEL")
+                else
+                  timeline "ab_model_not_in_catalog model=$MODEL"
+                fi
+              done
+              if [ "${#AB_MODELS[@]}" -gt 0 ] && [ "$REVIEW_AB_MODE" = "parity" ]; then
+                INDEX=$((PR_NUMBER % ${#AB_MODELS[@]}))
+                REVIEW_LONG_CONTEXT_MODEL="${AB_MODELS[$INDEX]}"
+                timeline "ab_selected mode=parity pr=$PR_NUMBER index=$INDEX model=$REVIEW_LONG_CONTEXT_MODEL pool=${#AB_MODELS[@]}"
+              fi
+            else
+              timeline "ab_mode_ignored_missing_label mode=$REVIEW_AB_MODE required_label=ai-review-ab"
+            fi
+          fi
+
+          CANDIDATES=("$REVIEW_LONG_CONTEXT_MODEL" "$REVIEW_MODEL" "$REVIEW_FALLBACK_MODEL" "$REVIEW_FALLBACK_MODEL_2")
+          MODEL_CHAIN=()
+          declare -A MODEL_SEEN=()
+          for CANDIDATE in "${CANDIDATES[@]}"; do
+            [ -z "$CANDIDATE" ] && continue
+            if ! model_in_catalog "$CANDIDATE"; then
+              timeline "model_not_in_catalog model=$CANDIDATE"
+              continue
+            fi
+            if [ -z "${MODEL_SEEN[$CANDIDATE]+x}" ]; then
+              MODEL_CHAIN+=("$CANDIDATE")
+              MODEL_SEEN[$CANDIDATE]=1
+            fi
+          done
+
+          if [ "${#MODEL_CHAIN[@]}" -eq 0 ]; then
+            echo "::error::No review models available after catalog validation."
+            exit 1
+          fi
+
+          REVIEW_MODE="chunked"
           if [ "$CHUNK_REQUIRED" -eq 0 ]; then
             DIFF_CONTENT=$(cat diff_full.txt)
             if review_with_chain "$DIFF_CONTENT" "full-diff" "full"; then
-              echo "### Full diff review" > review.md
-              cat review_full.md >> review.md
-              echo >> review.md
-              echo "tokens=$(cat tokens_full.txt)" >> "$GITHUB_OUTPUT"
-              echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
-              echo "chunked=false" >> "$GITHUB_OUTPUT"
-              timeline "full_diff_completed model=$USED_MODEL tokens=$(cat tokens_full.txt)"
-              exit 0
+              REVIEW_MODE="full"
+              timeline "full_diff_completed"
+            else
+              timeline "full_diff_fallback_to_semantic_chunking"
             fi
-            timeline "full_diff_fallback_to_chunking"
-            echo "::warning::Full diff path failed or hit 413; switching to chunked review"
           else
-            timeline "chunking_enabled_due_to_size full_diff_chars=${{ steps.diff.outputs.full_size }} max_review_chars=$MAX_REVIEW_CHARS"
-            echo "Diff size exceeds MAX_REVIEW_CHARS; using chunked review"
+            timeline "semantic_chunking_required full_diff_chars=${{ steps.diff.outputs.full_size }} max_review_chars=$MAX_REVIEW_CHARS"
           fi
 
-          # 2) Chunked path (overlapping chunks for coherence)
-          STEP=$((CHUNK_SIZE_CHARS - CHUNK_OVERLAP_CHARS))
-          if [ "$STEP" -le 0 ]; then
-            echo "::error::Invalid chunk config: CHUNK_SIZE_CHARS must be greater than CHUNK_OVERLAP_CHARS (size=$CHUNK_SIZE_CHARS overlap=$CHUNK_OVERLAP_CHARS)"
-            exit 1
-          fi
-
-          DIFF_LEN=$(wc -c < diff_full.txt)
-          timeline "chunking_config diff_len=$DIFF_LEN chunk_size=$CHUNK_SIZE_CHARS chunk_overlap=$CHUNK_OVERLAP_CHARS step=$STEP"
-          CHUNK_COUNT=0
-          OFFSET=0
-          while [ "$OFFSET" -lt "$DIFF_LEN" ]; do
-            CHUNK_COUNT=$((CHUNK_COUNT + 1))
-            FILE=$(printf "diff_chunk_%02d.txt" "$CHUNK_COUNT")
-            dd if=diff_full.txt of="$FILE" bs=1 skip="$OFFSET" count="$CHUNK_SIZE_CHARS" status=none
-            timeline "chunk_created id=$(printf '%02d' "$CHUNK_COUNT") offset=$OFFSET"
-            OFFSET=$((OFFSET + STEP))
-          done
-
-          if [ "$CHUNK_COUNT" -le 0 ]; then
-            echo "::error::Chunking failed"
-            exit 1
-          fi
-
-          timeline "chunking_started chunk_count=$CHUNK_COUNT"
-          TOTAL_TOKENS=0
-          > review.md
-          for FILE in diff_chunk_*.txt; do
-            CID=$(echo "$FILE" | sed 's/[^0-9]//g')
-            CONTENT=$(cat "$FILE")
-            if ! review_with_chain "$CONTENT" "chunk-$CID" "$CID"; then
-              echo "::error::Chunk $CID failed"; exit 1
+          if [ "$REVIEW_MODE" = "chunked" ]; then
+            CHUNK_COUNT=$(build_semantic_chunks)
+            if [ "${CHUNK_COUNT:-0}" -le 0 ]; then
+              echo "::error::Failed to build semantic diff chunks."
+              exit 1
             fi
-            echo "### Chunk $CID" >> review.md
-            cat "review_${CID}.md" >> review.md
-            echo >> review.md
-            TOK=$(cat "tokens_${CID}.txt")
-            TOTAL_TOKENS=$((TOTAL_TOKENS + TOK))
-            timeline "chunk_completed id=$CID tokens=$TOK total_tokens=$TOTAL_TOKENS"
-          done
+            timeline "chunking_started chunk_count=$CHUNK_COUNT chunk_size=$CHUNK_SIZE_CHARS"
+            for FILE in diff_chunk_*.txt; do
+              CID=$(basename "$FILE" .txt | sed 's/diff_chunk_//')
+              CONTENT=$(cat "$FILE")
+              if ! review_with_chain "$CONTENT" "chunk-$CID" "$CID"; then
+                echo "::error::Chunk $CID failed after exhausting model chain."
+                exit 1
+              fi
+            done
+          fi
 
+          if ! ls review_json_*.json >/dev/null 2>&1; then
+            echo "::error::No structured review outputs were generated."
+            exit 1
+          fi
+
+          jq -s '{findings: (map(.findings // []) | add // [])}' review_json_*.json > review_findings_all.json
+          jq '
+            def rank:
+              if . == "critical" then 0
+              elif . == "warning" then 1
+              else 2
+              end;
+            .findings |= (
+              map({
+                severity: .severity,
+                file: .file,
+                line: .line,
+                issue: .issue,
+                recommendation: .recommendation,
+                confidence: .confidence
+              })
+              | sort_by(.file, .line, .issue, .recommendation)
+              | group_by(.file, .line, .issue, .recommendation)
+              | map({
+                  severity: (
+                    map(.severity)
+                    | if index("critical") then "critical"
+                      elif index("warning") then "warning"
+                      else "info"
+                      end
+                  ),
+                  file: .[0].file,
+                  line: .[0].line,
+                  issue: .[0].issue,
+                  recommendation: .[0].recommendation,
+                  confidence: (map(.confidence) | max)
+                })
+              | sort_by((.severity | rank), .file, .line, .issue)
+            )
+          ' review_findings_all.json > review_findings_final.json
+
+          render_markdown review_findings_final.json
+
+          if ls tokens_*.txt >/dev/null 2>&1; then
+            INVALID_TOKEN_FILES=$(grep -L '^[0-9]+$' tokens_*.txt || true)
+            if [ -n "$INVALID_TOKEN_FILES" ]; then
+              INVALID_TOKEN_LIST=$(echo "$INVALID_TOKEN_FILES" | tr '\n' ',' | sed 's/,$//')
+              timeline "invalid_token_files files=$INVALID_TOKEN_LIST summing_numeric_only=true"
+            fi
+            TOTAL_TOKENS=$(awk '/^[0-9]+$/ {sum += $1} END {print sum + 0}' tokens_*.txt)
+          else
+            TOTAL_TOKENS=0
+            timeline "token_files_missing defaulting_tokens=0"
+          fi
+          FINDING_COUNT=$(jq '.findings | length' review_findings_final.json)
+          MODEL_LIST=$(sort -u "$MODELS_USED_FILE" | paste -sd ',' -)
+          [ -z "$MODEL_LIST" ] && MODEL_LIST="unknown"
+          if [ "$REVIEW_MODE" = "chunked" ]; then
+            CHUNKED_FLAG="true"
+          else
+            CHUNKED_FLAG="false"
+          fi
+
+          timeline "review_completed mode=$REVIEW_MODE tokens=$TOTAL_TOKENS findings=$FINDING_COUNT models=$MODEL_LIST"
           echo "tokens=$TOTAL_TOKENS" >> "$GITHUB_OUTPUT"
-          echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
-          echo "chunked=true" >> "$GITHUB_OUTPUT"
-          timeline "chunked_review_completed model=$USED_MODEL total_tokens=$TOTAL_TOKENS"
+          echo "model=$MODEL_LIST" >> "$GITHUB_OUTPUT"
+          echo "chunked=$CHUNKED_FLAG" >> "$GITHUB_OUTPUT"
+          echo "findings=$FINDING_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Append AI review timeline to workflow summary
         if: steps.preflight.outputs.skip_inference != 'true' && steps.diff.outputs.skip != 'true'
@@ -422,15 +721,12 @@ jobs:
           script: |
             const fs = require('fs');
             const review = fs.readFileSync('review.md', 'utf8');
-            const truncated = '${{ steps.diff.outputs.truncated }}' === 'true';
-            const truncatedAt = '${{ steps.diff.outputs.truncated_at }}';
             const tokens = '${{ steps.review.outputs.tokens }}';
-            const model = '${{ steps.review.outputs.model }}';
-
-            let footer = `\n\n---\n*🤖 AI Review · ${model} · ${tokens} tokens · GitHub Models free tier · 0 premium requests*`;
-            if (truncated) {
-              footer += `\n\n> ⚠️ **Diff truncated** to ${truncatedAt} chars (full diff: ${{ steps.diff.outputs.full_size }} chars). Changes beyond this point were **not reviewed**. Add label \`skip-ai-review\` to suppress, or split the PR.`;
-            }
+            const models = '${{ steps.review.outputs.model }}';
+            const findings = '${{ steps.review.outputs.findings }}';
+            const chunked = '${{ steps.review.outputs.chunked }}' === 'true';
+            const mode = chunked ? 'semantic-chunked' : 'full-diff';
+            const footer = `\n\n---\n*AI Review · models: ${models} · ${tokens} tokens · findings: ${findings} · mode: ${mode} · GitHub Models free tier · 0 premium requests*`;
 
             await github.rest.issues.createComment({
               ...context.repo,
@@ -456,194 +752,3 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "::notice::AI review skipped: ${{ steps.preflight.outputs.skip_reason }}"
-
-  pr-summary:
-    name: AI PR Summary
-    runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
-    env:
-      SUMMARY_MODEL: "openai/gpt-4.1-mini"
-      SUMMARY_FALLBACK_MODEL: "openai/gpt-4o-mini"
-      SUMMARY_FALLBACK_MODEL_2: "meta/llama-3.3-70b-instruct"
-      MAX_SUMMARY_CHARS: "12000"
-      MAX_SUMMARY_TOKENS: "1000"
-      MAX_RETRY: "5"
-      MAX_RETRY_SLEEP: "60"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Preflight context and token policy
-        id: preflight
-        env:
-          GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
-        run: |
-          set -euo pipefail
-          ACTOR="${{ github.actor }}"
-          BASE_REPO="${{ github.repository }}"
-          HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
-          CONTEXT="trusted"
-          if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
-            CONTEXT="untrusted"
-          fi
-
-          WORKFLOW_CHANGED="false"
-          if git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} | grep -q '^\.github/workflows/'; then
-            WORKFLOW_CHANGED="true"
-          fi
-
-          SKIP_REASON=""
-          if [ -z "${GH_MODELS_TOKEN:-}" ]; then
-            if [ "$CONTEXT" = "trusted" ] && [ "$ACTOR" != "dependabot[bot]" ]; then
-              echo "::error::Missing MODELS_PAT secret in trusted context. Configure repository secret MODELS_PAT (models:read)."
-              exit 1
-            fi
-            SKIP_REASON="missing_models_pat_${CONTEXT}_context"
-          elif [ "$ACTOR" = "dependabot[bot]" ] && [ "$WORKFLOW_CHANGED" = "true" ]; then
-            SKIP_REASON="dependabot_workflow_change_protection"
-          fi
-
-          if [ -n "$SKIP_REASON" ]; then
-            echo "skip_inference=true" >> "$GITHUB_OUTPUT"
-            echo "skip_reason=$SKIP_REASON" >> "$GITHUB_OUTPUT"
-            echo "workflow_changed=$WORKFLOW_CHANGED" >> "$GITHUB_OUTPUT"
-            echo "::notice::AI summary inference skipped ($SKIP_REASON)."
-          else
-            echo "skip_inference=false" >> "$GITHUB_OUTPUT"
-            echo "skip_reason=" >> "$GITHUB_OUTPUT"
-            echo "workflow_changed=$WORKFLOW_CHANGED" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Get PR info
-        id: info
-        if: steps.preflight.outputs.skip_inference != 'true'
-        run: |
-          set -euo pipefail
-          git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
-          head -c "$MAX_SUMMARY_CHARS" diff_full.txt > diff.txt
-          git diff --name-status ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > files.txt
-
-          if [ ! -s diff.txt ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Generate summary (with retry)
-        if: steps.preflight.outputs.skip_inference != 'true' && steps.info.outputs.skip != 'true'
-        id: summary
-        env:
-          GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
-        run: |
-          set -euo pipefail
-          # Mask token to prevent accidental log exposure
-          if [ -n "${GH_MODELS_TOKEN:-}" ]; then
-            echo "::add-mask::$GH_MODELS_TOKEN"
-          fi
-
-          SYSTEM="Generate a concise PR summary in markdown. Include: ## Summary (1-2 sentences), ## Changes (list key changes), ## Impact (what's affected). Be concise."
-          FILES=$(cat files.txt)
-          DIFF=$(cat diff.txt)
-
-          # Model fallback chain: primary → fallback → high-rate-limit fallback (#77)
-          MODELS=("$SUMMARY_MODEL" "$SUMMARY_FALLBACK_MODEL" "$SUMMARY_FALLBACK_MODEL_2")
-          HTTP_CODE=""
-          BODY=""
-          USED_MODEL=""
-
-          for MODEL in "${MODELS[@]}"; do
-            echo "Trying model: $MODEL"
-            ATTEMPT=0
-            while [ "$ATTEMPT" -lt "$MAX_RETRY" ]; do
-              ATTEMPT=$((ATTEMPT + 1))
-              echo "Attempt $ATTEMPT/$MAX_RETRY with $MODEL..."
-
-              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-                "https://models.github.ai/inference/chat/completions" \
-                -H "Authorization: Bearer $GH_MODELS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$(jq -n \
-                  --arg system "$SYSTEM" \
-                  --arg files "$FILES" \
-                  --arg diff "$DIFF" \
-                  --arg model "$MODEL" \
-                  --argjson max_tokens "$MAX_SUMMARY_TOKENS" \
-                  '{
-                    model: $model,
-                    messages: [
-                      {role: "system", content: $system},
-                      {role: "user", content: ("Files changed:\n" + $files + "\n\nDiff:\n" + $diff)}
-                    ],
-                    max_tokens: $max_tokens,
-                    temperature: 0.3
-                  }')")
-
-              HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-              BODY=$(echo "$RESPONSE" | sed '$d')
-
-              if [ "$HTTP_CODE" = "200" ]; then
-                USED_MODEL="$MODEL"
-                break 2
-              fi
-
-              echo "::warning::Attempt $ATTEMPT failed (HTTP $HTTP_CODE) with $MODEL"
-              if [ "$ATTEMPT" -lt "$MAX_RETRY" ]; then
-                RETRY_AFTER=$(echo "$BODY" | jq -r '.retry_after // empty' 2>/dev/null || true)
-                if [ -n "$RETRY_AFTER" ]; then
-                  SLEEP="$RETRY_AFTER"
-                else
-                  RAW_SLEEP=$((2 ** ATTEMPT))
-                  SLEEP=$(( RAW_SLEEP < MAX_RETRY_SLEEP ? RAW_SLEEP : MAX_RETRY_SLEEP ))
-                fi
-                JITTER=$((RANDOM % 5))
-                SLEEP=$((SLEEP + JITTER))
-                echo "Retrying in ${SLEEP}s..."
-                sleep "$SLEEP"
-              fi
-            done
-
-            if [ "$HTTP_CODE" != "200" ]; then
-              echo "::warning::All $MAX_RETRY attempts exhausted for $MODEL (HTTP $HTTP_CODE); trying next model..."
-            fi
-          done
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::All models failed after exhausting retries. Last HTTP $HTTP_CODE"
-            echo "$BODY" | jq .error 2>/dev/null || true
-            exit 1
-          fi
-
-          echo "$BODY" | jq -r '.choices[0].message.content' > summary.md
-          echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
-
-      - name: Post summary
-        if: steps.preflight.outputs.skip_inference != 'true' && steps.info.outputs.skip != 'true'
-        uses: actions/github-script@v8
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const summary = fs.readFileSync('summary.md', 'utf8');
-            const model = '${{ steps.summary.outputs.model }}';
-            await github.rest.issues.createComment({
-              ...context.repo,
-              issue_number: context.issue.number,
-              body: `## 📝 AI PR Summary\n\n${summary}\n\n---\n*🤖 Auto-generated · ${model} · GitHub Models free tier · 0 premium requests*`
-            });
-
-      - name: Skip summary notice (no diff)
-        if: steps.preflight.outputs.skip_inference != 'true' && steps.info.outputs.skip == 'true'
-        run: echo "::notice::No diff detected — skipping AI PR summary"
-
-      - name: Skip summary inference notice
-        if: steps.preflight.outputs.skip_inference == 'true'
-        run: |
-          {
-            echo "## AI PR Summary"
-            echo
-            echo "Model inference skipped: \`${{ steps.preflight.outputs.skip_reason }}\`"
-            echo "Actor: \`${{ github.actor }}\`, workflow_changed: \`${{ steps.preflight.outputs.workflow_changed }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "::notice::AI PR summary skipped: ${{ steps.preflight.outputs.skip_reason }}"
