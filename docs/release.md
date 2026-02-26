@@ -2,6 +2,17 @@
 
 This guide describes how releases are published for this fork.
 
+## 0) Automation Baseline
+
+Release metadata consistency is governed by:
+
+- Policy file: `.github/release-version-policy.yml`
+- Guard workflow: `.github/workflows/release-consistency-guard.yml`
+- Sync workflow: `.github/workflows/release-metadata-sync.yml`
+- Hygiene workflow: `.github/workflows/branch-hygiene.yml`
+
+The guard validates version/changelog/runtime coherence. The sync workflow opens a PR (never pushes directly to `main`) when release metadata drift is detected.
+
 ## 1) Versioning Rules
 
 - Use SemVer in `pyproject.toml` (for example: `0.0.35`).
@@ -49,7 +60,23 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 
 ## 6) Post-Release Hygiene
 
-- Ensure `CHANGELOG.md` has the new version title.
-- Ensure `## [Unreleased]` is reset for the next cycle.
-- If needed, backfill missing headings for any tags created outside the normal
-  release flow.
+- Metadata drift is handled by `release-metadata-sync.yml`, which opens/updates:
+  - `automation/release-metadata-vX.Y.Z` -> `main`
+- `release-consistency-guard.yml` blocks PRs to `main` when coherence fails.
+- Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.
+
+## 7) Local Main Hygiene
+
+Use the helper scripts before starting new implementation branches:
+
+```bash
+scripts/bash/sync-main.sh
+```
+
+PowerShell:
+
+```powershell
+scripts/powershell/sync-main.ps1
+```
+
+Default mode is dry-run for stale local branch cleanup. Pass `--apply` (bash) or `-Apply` (PowerShell) to delete local branches whose upstream is `[gone]`.
