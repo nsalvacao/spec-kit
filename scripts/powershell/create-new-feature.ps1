@@ -10,6 +10,7 @@ param(
     [string[]]$FeatureDescription
 )
 $ErrorActionPreference = 'Stop'
+$branchPolicyScript = Join-Path $PSScriptRoot '../python/branch-policy.py'
 
 # Show help if requested
 if ($Help) {
@@ -155,6 +156,15 @@ try {
 
 Set-Location $repoRoot
 
+$previousBranch = ""
+if ($hasGit) {
+    try {
+        $previousBranch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+    } catch {
+        $previousBranch = ""
+    }
+}
+
 $specsDir = Join-Path $repoRoot 'specs'
 New-Item -ItemType Directory -Path $specsDir -Force | Out-Null
 
@@ -291,10 +301,32 @@ if ($hasGit) {
     }
 } else {
     Write-Warning "[specify] Warning: Git repository not detected; skipped branch creation for $branchName"
+    $branchCreated = $false
 }
 
 $featureDir = Join-Path $specsDir $branchName
 New-Item -ItemType Directory -Path $featureDir -Force | Out-Null
+
+if ((Get-Command python3 -ErrorAction SilentlyContinue) -and (Test-Path $branchPolicyScript -PathType Leaf)) {
+    $registerOutput = & python3 $branchPolicyScript register-feature `
+        --repo-root $repoRoot `
+        --branch $branchName `
+        --feature-id $branchName `
+        --scope-mode feature `
+        --source-decision feature_mode 2>&1
+
+    if ($LASTEXITCODE -ne 0) {
+        if (Test-Path $featureDir -PathType Container) {
+            Remove-Item -Path $featureDir -Recurse -Force
+        }
+        if ($hasGit -and $branchCreated -and $previousBranch) {
+            try { git checkout $previousBranch 2>$null | Out-Null } catch {}
+            try { git branch -D $branchName 2>$null | Out-Null } catch {}
+        }
+        Write-Error "Error: Failed to register canonical branch metadata. $registerOutput"
+        exit 1
+    }
+}
 
 $template = Join-Path $repoRoot '.specify/templates/spec-template.md'
 $specFile = Join-Path $featureDir 'spec.md'
@@ -322,4 +354,3 @@ if ($Json) {
     Write-Output "HAS_GIT: $hasGit"
     Write-Output "SPECIFY_FEATURE environment variable set to: $branchName"
 }
-

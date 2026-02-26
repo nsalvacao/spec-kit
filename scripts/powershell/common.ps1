@@ -1,6 +1,8 @@
 #!/usr/bin/env pwsh
 # Common PowerShell functions analogous to common.sh
 
+$script:BranchPolicyScript = Join-Path $PSScriptRoot '../python/branch-policy.py'
+
 function Get-RepoRoot {
     try {
         $result = git rev-parse --show-toplevel 2>$null
@@ -78,10 +80,18 @@ function Test-FeatureBranch {
         Write-Warning "[specify] Warning: Git repository not detected; skipped branch validation"
         return $true
     }
-    
-    if ($Branch -notmatch '^[0-9]{3}-') {
+
+    if ((Get-Command python3 -ErrorAction SilentlyContinue) -and (Test-Path $script:BranchPolicyScript -PathType Leaf)) {
+        & python3 $script:BranchPolicyScript validate --branch $Branch > $null
+        if ($LASTEXITCODE -ne 0) {
+            return $false
+        }
+        return $true
+    }
+
+    if ($Branch -notmatch '^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$') {
         Write-Output "ERROR: Not on a feature branch. Current branch: $Branch"
-        Write-Output "Feature branches should be named like: 001-feature-name"
+        Write-Output "Feature branches must follow canonical pattern: 001-feature-name"
         return $false
     }
     return $true
@@ -89,7 +99,36 @@ function Test-FeatureBranch {
 
 function Get-FeatureDir {
     param([string]$RepoRoot, [string]$Branch)
-    Join-Path $RepoRoot "specs/$Branch"
+
+    $specsDir = Join-Path $RepoRoot 'specs'
+    if ((Get-Command python3 -ErrorAction SilentlyContinue) -and (Test-Path $script:BranchPolicyScript -PathType Leaf)) {
+        $resolvedPath = & python3 $script:BranchPolicyScript resolve-feature-dir --repo-root $RepoRoot --branch $Branch --path-only
+        if ($LASTEXITCODE -eq 0 -and $resolvedPath) {
+            return $resolvedPath.Trim()
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "Branch policy helper failed to resolve feature directory."
+        }
+    }
+
+    if ($Branch -match '^(\d{3})-') {
+        $prefix = $matches[1]
+        $matchesByPrefix = @()
+        if (Test-Path $specsDir -PathType Container) {
+            $matchesByPrefix = Get-ChildItem -Path $specsDir -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match "^$prefix-" }
+        }
+
+        if ($matchesByPrefix.Count -eq 1) {
+            return (Join-Path $specsDir $matchesByPrefix[0].Name)
+        }
+        if ($matchesByPrefix.Count -gt 1) {
+            $dirNames = ($matchesByPrefix | ForEach-Object { $_.Name }) -join ', '
+            throw "Multiple spec directories found with prefix '$prefix': $dirNames"
+        }
+    }
+
+    return (Join-Path $RepoRoot "specs/$Branch")
 }
 
 function Get-FeaturePathsEnv {
@@ -134,4 +173,3 @@ function Test-DirHasFiles {
         return $false
     }
 }
-

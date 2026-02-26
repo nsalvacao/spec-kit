@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Common functions and variables for all scripts
 
+branch_policy_script_path() {
+    local script_dir
+    script_dir="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    echo "$script_dir/../python/branch-policy.py"
+}
+
 # Get repository root, with fallback for non-git repositories
 get_repo_root() {
     if git rev-parse --show-toplevel >/dev/null 2>&1; then
@@ -65,6 +71,8 @@ has_git() {
 check_feature_branch() {
     local branch="$1"
     local has_git_repo="$2"
+    local policy_script
+    policy_script="$(branch_policy_script_path)"
 
     # For non-git repos, we can't enforce branch naming but still provide output
     if [[ "$has_git_repo" != "true" ]]; then
@@ -72,9 +80,14 @@ check_feature_branch() {
         return 0
     fi
 
-    if [[ ! "$branch" =~ ^[0-9]{3}- ]]; then
+    if command -v python3 >/dev/null 2>&1 && [[ -f "$policy_script" ]]; then
+        python3 "$policy_script" validate --branch "$branch" >/dev/null || return 1
+        return 0
+    fi
+
+    if [[ ! "$branch" =~ ^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
         echo "ERROR: Not on a feature branch. Current branch: $branch" >&2
-        echo "Feature branches should be named like: 001-feature-name" >&2
+        echo "Feature branches must follow canonical pattern: 001-feature-name" >&2
         return 1
     fi
 
@@ -89,6 +102,15 @@ find_feature_dir_by_prefix() {
     local repo_root="$1"
     local branch_name="$2"
     local specs_dir="$repo_root/specs"
+    local policy_script
+    policy_script="$(branch_policy_script_path)"
+
+    if command -v python3 >/dev/null 2>&1 && [[ -f "$policy_script" ]]; then
+        local feature_dir
+        feature_dir="$(python3 "$policy_script" resolve-feature-dir --repo-root "$repo_root" --branch "$branch_name" --path-only)" || return 1
+        echo "$feature_dir"
+        return
+    fi
 
     # Extract numeric prefix from branch (e.g., "004" from "004-whatever")
     if [[ ! "$branch_name" =~ ^([0-9]{3})- ]]; then
@@ -120,7 +142,7 @@ find_feature_dir_by_prefix() {
         # Multiple matches - this shouldn't happen with proper naming convention
         echo "ERROR: Multiple spec directories found with prefix '$prefix': ${matches[*]}" >&2
         echo "Please ensure only one spec directory exists per numeric prefix." >&2
-        echo "$specs_dir/$branch_name"  # Return something to avoid breaking the script
+        return 1
     fi
 }
 
@@ -134,7 +156,8 @@ get_feature_paths() {
     fi
 
     # Use prefix-based lookup to support multiple branches per spec
-    local feature_dir=$(find_feature_dir_by_prefix "$repo_root" "$current_branch")
+    local feature_dir
+    feature_dir="$(find_feature_dir_by_prefix "$repo_root" "$current_branch")" || return 1
 
     cat <<EOF
 REPO_ROOT='$repo_root'
@@ -153,4 +176,3 @@ EOF
 
 check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 check_dir() { [[ -d "$1" && -n $(ls -A "$1" 2>/dev/null) ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
-
