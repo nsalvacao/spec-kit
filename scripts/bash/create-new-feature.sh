@@ -166,6 +166,7 @@ clean_branch_name() {
 # to searching for repository markers so the workflow still functions in repositories that
 # were initialised with --no-git.
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BRANCH_POLICY_SCRIPT="$SCRIPT_DIR/../python/branch-policy.py"
 
 if git rev-parse --show-toplevel >/dev/null 2>&1; then
     REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -177,6 +178,11 @@ else
         exit 1
     fi
     HAS_GIT=false
+fi
+
+PREVIOUS_BRANCH=""
+if [ "$HAS_GIT" = true ]; then
+    PREVIOUS_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
 fi
 
 cd "$REPO_ROOT"
@@ -313,6 +319,24 @@ fi
 
 FEATURE_DIR="$SPECS_DIR/$BRANCH_NAME"
 mkdir -p "$FEATURE_DIR"
+
+if command -v python3 >/dev/null 2>&1 && [ -f "$BRANCH_POLICY_SCRIPT" ]; then
+    registration_output="$(python3 "$BRANCH_POLICY_SCRIPT" register-feature \
+        --repo-root "$REPO_ROOT" \
+        --branch "$BRANCH_NAME" \
+        --feature-id "$BRANCH_NAME" \
+        --scope-mode feature \
+        --source-decision feature_mode 2>&1)" || {
+            >&2 echo "Error: Failed to register canonical branch metadata."
+            >&2 echo "$registration_output"
+            rm -rf "$FEATURE_DIR"
+            if [ "$HAS_GIT" = true ] && [ -n "$PREVIOUS_BRANCH" ]; then
+                git checkout "$PREVIOUS_BRANCH" >/dev/null 2>&1 || true
+                git branch -D "$BRANCH_NAME" >/dev/null 2>&1 || true
+            fi
+            exit 1
+        }
+fi
 
 TEMPLATE="$REPO_ROOT/.specify/templates/spec-template.md"
 SPEC_FILE="$FEATURE_DIR/spec.md"
