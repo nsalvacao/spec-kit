@@ -20,6 +20,8 @@ import yaml
 SEMVER_PATTERN = re.compile(
     r"^(?P<major>[0-9]+)\.(?P<minor>[0-9]+)\.(?P<patch>[0-9]+)(?:-fork\.(?P<fork>[0-9]+))?$"
 )
+ALLOWED_RUNTIME_COMMAND = ("uv", "run", "specify", "version")
+MAX_DIFF_PREVIEW_CHARS = 200_000
 
 
 class VersionOrchestrationError(ValueError):
@@ -109,7 +111,14 @@ def _load_version_map(repo_root: Path, map_path: str | Path) -> VersionMap:
         raise VersionOrchestrationError(f"Version map file not found: {path}")
 
     try:
-        payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        raw_content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise VersionOrchestrationError(
+            f"Failed to read version map file '{path}': {exc}"
+        ) from exc
+
+    try:
+        payload = yaml.safe_load(raw_content) or {}
     except yaml.YAMLError as exc:
         raise VersionOrchestrationError(f"Invalid YAML in version map '{path}': {exc}") from exc
 
@@ -189,14 +198,20 @@ def _load_version_map(repo_root: Path, map_path: str | Path) -> VersionMap:
         raise VersionOrchestrationError("Runtime rule requires non-empty list 'command'.")
     if not runtime_pattern:
         raise VersionOrchestrationError("Runtime rule requires 'version_pattern'.")
-    runtime_executable = str(runtime_command[0]).strip()
+    normalized_runtime_command = tuple(str(item).strip() for item in runtime_command)
+    runtime_executable = normalized_runtime_command[0]
     if "/" in runtime_executable or "\\" in runtime_executable:
         raise VersionOrchestrationError(
             "Runtime command executable must be a tool name, not a path."
         )
-    if any("\n" in str(item) or "\r" in str(item) for item in runtime_command):
+    if any("\n" in item or "\r" in item for item in normalized_runtime_command):
         raise VersionOrchestrationError(
             "Runtime command arguments must not contain newline characters."
+        )
+    if normalized_runtime_command != ALLOWED_RUNTIME_COMMAND:
+        raise VersionOrchestrationError(
+            "Runtime command must match allowlisted prefix: "
+            + " ".join(ALLOWED_RUNTIME_COMMAND)
         )
 
     tag_pattern = str(tagging_cfg.get("tag_pattern", "")).strip()
@@ -226,7 +241,7 @@ def _load_version_map(repo_root: Path, map_path: str | Path) -> VersionMap:
             scaffold_placeholder=scaffold_placeholder,
         ),
         runtime=RuntimeRule(
-            command=tuple(str(item).strip() for item in runtime_command),
+            command=normalized_runtime_command,
             version_pattern=runtime_pattern,
         ),
         tag_pattern=tag_pattern,
@@ -273,7 +288,10 @@ def _read_required_file(repo_root: Path, relative_path: str) -> tuple[Path, str]
     file_path = _resolve_repo_file(repo_root, relative_path)
     if not file_path.exists() or not file_path.is_file():
         raise VersionOrchestrationError(f"Required file not found: {file_path}")
-    return file_path, file_path.read_text(encoding="utf-8")
+    try:
+        return file_path, file_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise VersionOrchestrationError(f"Failed to read required file '{file_path}': {exc}") from exc
 
 
 def _has_release_heading(changelog_content: str, heading_pattern: str, version: str) -> bool:
@@ -430,7 +448,15 @@ def _build_diff_preview(
             tofile=f"b/{rel_path}",
         )
         chunks.append("".join(diff))
-    return "\n".join(chunk for chunk in chunks if chunk)
+    combined = "\n".join(chunk for chunk in chunks if chunk)
+    if len(combined) <= MAX_DIFF_PREVIEW_CHARS:
+        return combined
+    truncated = combined[:MAX_DIFF_PREVIEW_CHARS]
+    return (
+        truncated
+        + "\n\n... [diff truncated: exceeded "
+        + f"{MAX_DIFF_PREVIEW_CHARS} characters]"
+    )
 
 
 def check_version_coherence(
@@ -598,7 +624,12 @@ def _apply_target_version(
     if not dry_run:
         for rel_path in changed_files:
             resolved = _resolve_repo_file(repo_root, rel_path)
-            resolved.write_text(new_contents[rel_path], encoding="utf-8")
+            try:
+                resolved.write_text(new_contents[rel_path], encoding="utf-8")
+            except OSError as exc:
+                raise VersionOrchestrationError(
+                    f"Failed to write updated file '{rel_path}': {exc}"
+                ) from exc
 
     return {
         "ok": True,

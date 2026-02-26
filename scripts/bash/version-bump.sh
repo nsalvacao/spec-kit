@@ -91,9 +91,27 @@ if [[ -z "$PART" ]]; then
     usage >&2
     exit 1
 fi
+case "$PART" in
+    patch|minor|major)
+        ;;
+    *)
+        echo "ERROR: --part must be one of: patch, minor, major." >&2
+        exit 1
+        ;;
+esac
+
+PYTHON_BIN=""
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+else
+    echo "ERROR: Python interpreter not found (expected 'python3' or 'python')." >&2
+    exit 1
+fi
 
 cmd=(
-    python3
+    "$PYTHON_BIN"
     scripts/python/version-orchestrator.py
     bump
     --repo-root "$REPO_ROOT"

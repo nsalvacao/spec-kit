@@ -276,3 +276,26 @@ def test_check_rejects_runtime_command_with_path_executable(tmp_path: Path) -> N
 
     assert result.returncode != 0
     assert "Runtime command executable must be a tool name, not a path." in result.stderr
+
+
+def test_check_rejects_runtime_command_not_in_allowlist(tmp_path: Path) -> None:
+    seed_repo(tmp_path, canonical_version="0.0.53", target_version="0.0.53")
+    map_path = tmp_path / ".github" / "version-map.yml"
+    map_path.write_text(
+        map_path.read_text(encoding="utf-8").replace('- "uv"', '- "python3"'),
+        encoding="utf-8",
+    )
+
+    result = run_script(
+        tmp_path,
+        "check",
+        "--repo-root",
+        str(tmp_path),
+        "--map",
+        ".github/version-map.yml",
+        "--skip-runtime",
+        "--json",
+    )
+
+    assert result.returncode != 0
+    assert "Runtime command must match allowlisted prefix: uv run specify version" in result.stderr
