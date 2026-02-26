@@ -167,6 +167,21 @@ if (-not (Test-FeatureBranch -Branch $paths.CURRENT_BRANCH -HasGit:$paths.HAS_GI
     exit 1 
 }
 
+$taskPolicyScript = Join-Path $PSScriptRoot "../python/task-artifact-policy.py"
+if (-not (Test-Path $taskPolicyScript -PathType Leaf)) {
+    Write-Output "ERROR: Task artifact policy script not found: $taskPolicyScript"
+    exit 1
+}
+
+$pythonRunner = Get-Command python3 -ErrorAction SilentlyContinue
+if (-not $pythonRunner) {
+    $pythonRunner = Get-Command python -ErrorAction SilentlyContinue
+}
+if (-not $pythonRunner) {
+    Write-Output "ERROR: Python is required to validate canonical tasks artifact policy."
+    exit 1
+}
+
 # If paths-only mode, output paths and exit (support combined -Json -PathsOnly)
 if ($PathsOnly) {
     if ($Json) {
@@ -200,6 +215,14 @@ if (-not (Test-Path $paths.FEATURE_DIR -PathType Container)) {
 if (-not (Test-Path $paths.IMPL_PLAN -PathType Leaf)) {
     Write-Output "ERROR: plan.md not found in $($paths.FEATURE_DIR)"
     Write-Output "Run /speckit.plan first to create the implementation plan."
+    exit 1
+}
+
+& $pythonRunner.Source $taskPolicyScript validate `
+    --repo-root $paths.REPO_ROOT `
+    --feature-dir $paths.FEATURE_DIR `
+    --tasks-path $paths.TASKS | Out-Null
+if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
