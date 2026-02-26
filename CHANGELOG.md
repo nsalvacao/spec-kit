@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added regression tests for outside-root and symlink-escape scenarios in `tests/test_hierarchy_contract_cli.py`.
 - **Version metadata**:
   - Bumped CLI package version to `0.0.53` in `pyproject.toml` and aligned local package entry in `uv.lock`.
+- **CI resilience for Dependabot contexts (`#161`)**:
+  - Added preflight policy in `ai-review.yml` to gracefully skip model inference when `MODELS_PAT` is unavailable in bot/untrusted contexts.
+  - Kept strict failure behavior for missing `MODELS_PAT` in trusted internal contexts.
+  - Added explicit skip timeline/summary notes so skipped inference is traceable in workflow logs.
+  - Added protection to skip inference for `dependabot[bot]` PRs that modify `.github/workflows/**`.
+- **Dependabot policy alignment (`#161`)**:
+  - Expanded `.github/dependabot.yml` with explicit cadence window (Europe/Lisbon), PR limits, labels, and target branch.
+  - Added conservative minor/patch grouping for `github-actions` and `pip` plus direct-dependency focus for Python updates.
 
 ## [0.0.52] - 2026-02-19
 
