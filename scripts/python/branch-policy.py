@@ -80,7 +80,12 @@ def _read_contract(repo_root: Path) -> dict[str, Any]:
         return _default_contract()
 
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        raw_payload = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BranchPolicyError(f"Unable to read branch policy contract at '{path}': {exc}") from exc
+
+    try:
+        payload = json.loads(raw_payload)
     except json.JSONDecodeError as exc:
         raise BranchPolicyError(f"Invalid branch policy JSON at '{path}': {exc}") from exc
 
@@ -103,8 +108,16 @@ def _write_contract(repo_root: Path, contract: dict[str, Any]) -> Path:
     contract_path.parent.mkdir(parents=True, exist_ok=True)
     contract["updated_at"] = _utc_now()
     temp_path = contract_path.with_suffix(".json.tmp")
-    temp_path.write_text(json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    temp_path.replace(contract_path)
+    try:
+        temp_path.write_text(json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temp_path.replace(contract_path)
+    except OSError as exc:
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+        except OSError:
+            pass
+        raise BranchPolicyError(f"Failed to write branch policy contract at '{contract_path}': {exc}") from exc
     return contract_path
 
 
@@ -173,7 +186,7 @@ def resolve_feature_dir(*, repo_root: str | Path, branch: str) -> dict[str, Any]
     specs_dir = root / "specs"
     default_dir = specs_dir / branch_name
 
-    if not specs_dir.exists():
+    if not specs_dir.exists() or not specs_dir.is_dir():
         return {
             "feature_dir": str(default_dir),
             "resolution": "default",
