@@ -17,6 +17,9 @@
 #   Model IDs should match runtime catalog: https://models.github.ai/catalog/models
 #   Review timeline logs are append-only per run (UTC timestamps)
 #   and exported to the workflow summary for easier debugging.
+#   Missing MODELS_PAT in dependabot/fork contexts now degrades gracefully
+#   (skip + explicit reason) instead of failing the whole job.
+#   Dependabot PRs that modify workflow files are inference-protected and skipped.
 # =============================================================================
 name: AI Review
 
@@ -60,8 +63,50 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Preflight context and token policy
+        id: preflight
+        env:
+          GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
+        run: |
+          set -euo pipefail
+          ACTOR="${{ github.actor }}"
+          BASE_REPO="${{ github.repository }}"
+          HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+          CONTEXT="trusted"
+          if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            CONTEXT="untrusted"
+          fi
+
+          WORKFLOW_CHANGED="false"
+          if git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} | grep -q '^\.github/workflows/'; then
+            WORKFLOW_CHANGED="true"
+          fi
+
+          SKIP_REASON=""
+          if [ -z "${GH_MODELS_TOKEN:-}" ]; then
+            if [ "$CONTEXT" = "trusted" ] && [ "$ACTOR" != "dependabot[bot]" ]; then
+              echo "::error::Missing MODELS_PAT secret in trusted context. Configure repository secret MODELS_PAT (models:read)."
+              exit 1
+            fi
+            SKIP_REASON="missing_models_pat_${CONTEXT}_context"
+          elif [ "$ACTOR" = "dependabot[bot]" ] && [ "$WORKFLOW_CHANGED" = "true" ]; then
+            SKIP_REASON="dependabot_workflow_change_protection"
+          fi
+
+          if [ -n "$SKIP_REASON" ]; then
+            echo "skip_inference=true" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=$SKIP_REASON" >> "$GITHUB_OUTPUT"
+            echo "workflow_changed=$WORKFLOW_CHANGED" >> "$GITHUB_OUTPUT"
+            echo "::notice::AI inference skipped ($SKIP_REASON)."
+          else
+            echo "skip_inference=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=" >> "$GITHUB_OUTPUT"
+            echo "workflow_changed=$WORKFLOW_CHANGED" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Get PR diff
         id: diff
+        if: steps.preflight.outputs.skip_inference != 'true'
         run: |
           set -euo pipefail
           git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
@@ -85,20 +130,17 @@ jobs:
           fi
 
       - name: AI Review via GitHub Models (with retry)
-        if: steps.diff.outputs.skip != 'true'
+        if: steps.preflight.outputs.skip_inference != 'true' && steps.diff.outputs.skip != 'true'
         id: review
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          if [ -z "${GH_MODELS_TOKEN:-}" ]; then
-            echo "::error::Missing MODELS_PAT secret. Configure it with a GitHub Models token (models:read)."
-            exit 1
-          fi
-
           # Mask token to prevent accidental log exposure
-          echo "::add-mask::$GH_MODELS_TOKEN"
+          if [ -n "${GH_MODELS_TOKEN:-}" ]; then
+            echo "::add-mask::$GH_MODELS_TOKEN"
+          fi
 
           SYSTEM_PROMPT="You are a senior code reviewer. Review this diff for: 1) Security vulnerabilities 2) Bugs 3) Best practice violations. Use markdown with severity: 🔴 Critical, 🟡 Warning, 🔵 Info. Be concise but thorough."
           CHUNK_REQUIRED=${{ steps.diff.outputs.chunk_required == 'true' && '1' || '0' }}
@@ -362,7 +404,7 @@ jobs:
           timeline "chunked_review_completed model=$USED_MODEL total_tokens=$TOTAL_TOKENS"
 
       - name: Append AI review timeline to workflow summary
-        if: steps.diff.outputs.skip != 'true'
+        if: steps.preflight.outputs.skip_inference != 'true' && steps.diff.outputs.skip != 'true'
         run: |
           {
             echo "## AI Review Timeline"
@@ -373,7 +415,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post review comment
-        if: steps.diff.outputs.skip != 'true'
+        if: steps.preflight.outputs.skip_inference != 'true' && steps.diff.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -397,8 +439,23 @@ jobs:
             });
 
       - name: Skip notice
-        if: steps.diff.outputs.skip == 'true'
+        if: steps.preflight.outputs.skip_inference != 'true' && steps.diff.outputs.skip == 'true'
         run: echo "::notice::No diff detected — skipping AI review"
+
+      - name: Skip inference notice
+        if: steps.preflight.outputs.skip_inference == 'true'
+        run: |
+          TIMELINE_FILE="review_timeline.md"
+          printf '%s | %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            "inference_skipped reason=${{ steps.preflight.outputs.skip_reason }} actor=${{ github.actor }} workflow_changed=${{ steps.preflight.outputs.workflow_changed }}" > "$TIMELINE_FILE"
+          {
+            echo "## AI Review Timeline"
+            echo
+            echo '```text'
+            cat "$TIMELINE_FILE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::AI review skipped: ${{ steps.preflight.outputs.skip_reason }}"
 
   pr-summary:
     name: AI PR Summary
@@ -418,8 +475,50 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Preflight context and token policy
+        id: preflight
+        env:
+          GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
+        run: |
+          set -euo pipefail
+          ACTOR="${{ github.actor }}"
+          BASE_REPO="${{ github.repository }}"
+          HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+          CONTEXT="trusted"
+          if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            CONTEXT="untrusted"
+          fi
+
+          WORKFLOW_CHANGED="false"
+          if git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} | grep -q '^\.github/workflows/'; then
+            WORKFLOW_CHANGED="true"
+          fi
+
+          SKIP_REASON=""
+          if [ -z "${GH_MODELS_TOKEN:-}" ]; then
+            if [ "$CONTEXT" = "trusted" ] && [ "$ACTOR" != "dependabot[bot]" ]; then
+              echo "::error::Missing MODELS_PAT secret in trusted context. Configure repository secret MODELS_PAT (models:read)."
+              exit 1
+            fi
+            SKIP_REASON="missing_models_pat_${CONTEXT}_context"
+          elif [ "$ACTOR" = "dependabot[bot]" ] && [ "$WORKFLOW_CHANGED" = "true" ]; then
+            SKIP_REASON="dependabot_workflow_change_protection"
+          fi
+
+          if [ -n "$SKIP_REASON" ]; then
+            echo "skip_inference=true" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=$SKIP_REASON" >> "$GITHUB_OUTPUT"
+            echo "workflow_changed=$WORKFLOW_CHANGED" >> "$GITHUB_OUTPUT"
+            echo "::notice::AI summary inference skipped ($SKIP_REASON)."
+          else
+            echo "skip_inference=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=" >> "$GITHUB_OUTPUT"
+            echo "workflow_changed=$WORKFLOW_CHANGED" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Get PR info
         id: info
+        if: steps.preflight.outputs.skip_inference != 'true'
         run: |
           set -euo pipefail
           git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} > diff_full.txt
@@ -433,14 +532,16 @@ jobs:
           fi
 
       - name: Generate summary (with retry)
-        if: steps.info.outputs.skip != 'true'
+        if: steps.preflight.outputs.skip_inference != 'true' && steps.info.outputs.skip != 'true'
         id: summary
         env:
           GH_MODELS_TOKEN: ${{ secrets.MODELS_PAT }}
         run: |
           set -euo pipefail
           # Mask token to prevent accidental log exposure
-          echo "::add-mask::$GH_MODELS_TOKEN"
+          if [ -n "${GH_MODELS_TOKEN:-}" ]; then
+            echo "::add-mask::$GH_MODELS_TOKEN"
+          fi
 
           SYSTEM="Generate a concise PR summary in markdown. Include: ## Summary (1-2 sentences), ## Changes (list key changes), ## Impact (what's affected). Be concise."
           FILES=$(cat files.txt)
@@ -518,7 +619,7 @@ jobs:
           echo "model=$USED_MODEL" >> "$GITHUB_OUTPUT"
 
       - name: Post summary
-        if: steps.info.outputs.skip != 'true'
+        if: steps.preflight.outputs.skip_inference != 'true' && steps.info.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -531,3 +632,18 @@ jobs:
               issue_number: context.issue.number,
               body: `## 📝 AI PR Summary\n\n${summary}\n\n---\n*🤖 Auto-generated · ${model} · GitHub Models free tier · 0 premium requests*`
             });
+
+      - name: Skip summary notice (no diff)
+        if: steps.preflight.outputs.skip_inference != 'true' && steps.info.outputs.skip == 'true'
+        run: echo "::notice::No diff detected — skipping AI PR summary"
+
+      - name: Skip summary inference notice
+        if: steps.preflight.outputs.skip_inference == 'true'
+        run: |
+          {
+            echo "## AI PR Summary"
+            echo
+            echo "Model inference skipped: \`${{ steps.preflight.outputs.skip_reason }}\`"
+            echo "Actor: \`${{ github.actor }}\`, workflow_changed: \`${{ steps.preflight.outputs.workflow_changed }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::AI PR summary skipped: ${{ steps.preflight.outputs.skip_reason }}"
