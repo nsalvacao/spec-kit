@@ -44,6 +44,7 @@ HANDOFF_ALLOWED_TRANSITIONS = frozenset(
         ("select", "structure"),
         ("structure", "validate"),
         ("validate", "sdd"),
+        ("sdd", "specify"),
         ("specify", "clarify"),
         ("specify", "plan"),
         ("clarify", "plan"),

@@ -117,9 +117,14 @@ def validate_template_handoffs(repo_root: Path) -> list[HandoffLintError]:
     return errors
 
 
-def validate_payload_file(payload_path: Path, *, strict: bool = False) -> tuple[dict[str, Any], int]:
+def validate_payload_file(
+    payload_path: Path,
+    *,
+    strict: bool = False,
+    _parsed: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], int]:
     """Validate handoff payload file and return normalized payload + exit code."""
-    raw = json.loads(payload_path.read_text(encoding="utf-8"))
+    raw = _parsed if _parsed is not None else json.loads(payload_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError("Payload file must contain a JSON object.")
 
