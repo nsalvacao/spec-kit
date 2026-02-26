@@ -228,10 +228,13 @@ run_tasks_artifact_policy_guard() {
         exit 1
     fi
 
-    "$python_cmd" "$TASK_POLICY_SCRIPT" validate \
+    if ! "$python_cmd" "$TASK_POLICY_SCRIPT" validate \
         --repo-root "$REPO_ROOT" \
         --feature-dir "$FEATURE_DIR" \
-        --tasks-path "$TASKS" >/dev/null
+        --tasks-path "$TASKS" >/dev/null; then
+        # task-artifact-policy.py already emits actionable stderr output.
+        exit 1
+    fi
 }
 
 # If paths-only mode, output paths and exit (support JSON + paths-only combined)

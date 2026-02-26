@@ -181,6 +181,7 @@ if (-not $pythonRunner) {
     Write-Output "ERROR: Python is required to validate canonical tasks artifact policy."
     exit 1
 }
+$pythonExecutable = if ($pythonRunner.Path) { $pythonRunner.Path } else { $pythonRunner.Source }
 
 # If paths-only mode, output paths and exit (support combined -Json -PathsOnly)
 if ($PathsOnly) {
@@ -218,7 +219,7 @@ if (-not (Test-Path $paths.IMPL_PLAN -PathType Leaf)) {
     exit 1
 }
 
-& $pythonRunner.Source $taskPolicyScript validate `
+& $pythonExecutable $taskPolicyScript validate `
     --repo-root $paths.REPO_ROOT `
     --feature-dir $paths.FEATURE_DIR `
     --tasks-path $paths.TASKS | Out-Null
