@@ -87,10 +87,28 @@ jobs:
             echo "Unable to resolve release tag. No published release found; provide 'release_tag' for workflow_dispatch." >&2
             exit 1
           fi
-          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
-            echo "Resolved tag '$tag' is invalid. Expected format like vMAJOR.MINOR.PATCH." >&2
-            exit 1
-          fi
+          python - "$tag" <<'PY'
+          import re
+          import sys
+
+          import yaml
+
+          tag = sys.argv[1]
+          with open(".github/version-map.yml", encoding="utf-8") as f:
+              payload = yaml.safe_load(f) or {}
+
+          pattern = str((payload.get("tagging") or {}).get("tag_pattern", "")).strip()
+          if not pattern:
+              print("Missing tagging.tag_pattern in .github/version-map.yml.", file=sys.stderr)
+              sys.exit(1)
+
+          if re.fullmatch(pattern, tag) is None:
+              print(
+                  f"Resolved tag '{tag}' does not match tagging.tag_pattern '{pattern}'.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "source=$source" >> "$GITHUB_OUTPUT"
 
