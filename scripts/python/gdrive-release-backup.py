@@ -27,6 +27,7 @@ DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files"
 OAUTH_TOKEN_API = "https://oauth2.googleapis.com/token"
 RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 FOLDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{10,}$")
+MAX_MULTIPART_UPLOAD_BYTES = 128 * 1024 * 1024
 SENSITIVE_JSON_PATTERN = re.compile(
     r'(?i)("?(?:access_token|refresh_token|client_secret|id_token)"?\s*[:=]\s*")([^"]+)(")'
 )
@@ -252,6 +253,12 @@ def _mime_for(path: Path, fallback: str) -> str:
 
 
 def _multipart_body(metadata: dict[str, Any], path: Path, mime_type: str) -> tuple[bytes, str]:
+    artifact_size = path.stat().st_size
+    if artifact_size > MAX_MULTIPART_UPLOAD_BYTES:
+        raise DriveBackupError(
+            "artifact is too large for multipart upload buffer "
+            f"({artifact_size} bytes > {MAX_MULTIPART_UPLOAD_BYTES} bytes)."
+        )
     boundary = "===============%s==" % "".join(random.choices(string.ascii_letters + string.digits, k=24))
     metadata_bytes = json.dumps(metadata, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     file_bytes = path.read_bytes()

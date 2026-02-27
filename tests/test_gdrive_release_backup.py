@@ -90,3 +90,11 @@ def test_redact_sensitive_text_masks_known_keys():
     assert "abc123" not in redacted
     assert "xyz" not in redacted
     assert "qwerty" not in redacted
+
+
+def test_multipart_body_rejects_oversized_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    artifact = tmp_path / "big.tar.gz"
+    artifact.write_bytes(b"0123456789")
+    monkeypatch.setitem(mod._multipart_body.__globals__, "MAX_MULTIPART_UPLOAD_BYTES", 4)
+    with pytest.raises(mod.DriveBackupError, match="too large for multipart upload buffer"):
+        mod._multipart_body({"name": "big.tar.gz"}, artifact, "application/gzip")

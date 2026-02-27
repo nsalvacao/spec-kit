@@ -90,6 +90,7 @@ It also uploads local run artifacts:
 - `insufficientPermissions`: OAuth scope/config mismatch for Drive API.
 - `404 notFound`: folder ID is invalid or inaccessible by authenticated user.
 - `429/5xx`: workflow applies retry/backoff automatically.
+- `artifact is too large for multipart upload buffer`: current uploader guards memory usage for very large archives.
 
 ## Internal runbook
 
