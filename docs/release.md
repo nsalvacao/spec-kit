@@ -19,6 +19,9 @@ Release metadata consistency is governed by:
   - `scripts/powershell/version-bump.ps1`
 
 The guard validates release metadata coherence. The version coherence workflow validates canonical version propagation using the manifest map. The sync workflow opens a PR (never pushes directly to `main`) when metadata drift is detected.
+The release workflow now explicitly triggers metadata sync via `workflow_dispatch`
+after creating a release to keep canonical metadata aligned with the newly
+published tag.
 The deploy workflow installs `specify-cli` on a configured VM whenever a GitHub Release is published.
 
 Authority split:
@@ -30,6 +33,8 @@ Authority split:
 
 - Use SemVer in `pyproject.toml` (for example: `0.0.35`).
 - Keep release tags aligned with published template bundles (`vX.Y.Z`).
+- Do not keep divergent "tag vs canonical" versions; release metadata must be
+  synchronized to the released tag.
 - Do not use the legacy `-fork.N` suffix for new releases.
 
 ## 2) Changelog Rules (Keep a Changelog)

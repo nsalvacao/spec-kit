@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Release automation now triggers `Release Metadata Sync` via `workflow_dispatch`
+  after each successful release creation to keep canonical metadata aligned with
+  published release tags.
+- Removed the `pyproject.toml` update step that only mutated release-runner
+  artifacts to avoid non-persistent version changes and future drift.
+
+## [0.0.70] - 2026-02-27
+
 ### Added
 
 - **#35 (P030): Full scoring coverage validation in `validate-airice.sh` / `validate-airice.ps1`**
