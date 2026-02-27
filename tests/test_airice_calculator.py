@@ -249,6 +249,36 @@ class TestSensitivityAnalysisBash:
         assert result.returncode == 0
         assert "+0.00" in result.stdout
 
+    def test_sensitivity_clamped_at_confidence_min(self):
+        # Confidence at 0: -1% should be clamped → Δ+0.00
+        result = run_bash(["1000", "2.0", "0", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_data_readiness_max(self):
+        # Data_Readiness at 100: +1% should be clamped → Δ+0.00
+        result = run_bash(["1000", "2.0", "70", "100", "4", "5"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_data_readiness_min(self):
+        # Data_Readiness at 0: -1% should be clamped → Δ+0.00
+        result = run_bash(["1000", "2.0", "70", "0", "4", "5"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_reach_min(self):
+        # Reach at 1: -1 should be clamped to 1 → Δ+0.00
+        result = run_bash(["1", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_effort_min(self):
+        # Effort at 1: -1 wk should be clamped to 1 → Δ+0.00
+        result = run_bash(["1000", "2.0", "70", "80", "1", "5"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
     def test_sensitivity_deterministic(self):
         # Running twice should produce identical output
         args = ["1000", "2.0", "70", "80", "4", "5"]
