@@ -41,6 +41,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added regression test: `tests/test_command_discoverability.py`.
   - Added audit report: `docs/command-discoverability-audit.md`.
 
+- **#162: Auto-deploy latest release to Always Free VM**
+  - Added `.github/workflows/deploy.yml` triggered on `release: published`
+    and `workflow_dispatch`.
+  - Added tag validation and deployment summary for traceable operations.
+  - Added remote smoke-test step (`~/.local/bin/specify --help`) after install.
+  - Hardened SSH deployment path:
+    - switched to native runner `ssh` flow (removed third-party SSH action dependency)
+    - added VM host-key fingerprint verification (`DEPLOY_VM_HOST_FINGERPRINT`)
+    - enabled deploy concurrency cancellation to avoid overlapping deployments
+    - added explicit secret validation and key parsing checks before SSH key use
+    - switched key/known_hosts artifacts to isolated temp paths with cleanup
+    - added support for comma-separated host fingerprints during key rotation windows
+    - added required `DEPLOY_VM_KNOWN_HOSTS` host-key pinning variable (no runtime `ssh-keyscan` fallback)
+    - added optional `DEPLOY_VM_PORT` workflow variable for non-default SSH ports
+    - added strict `known_hosts` entry validation (one or more entries, non-hashed host, `ssh-ed25519`, host-field sanity checks)
+    - improved remote diagnostics for missing `uv`/`specify` binaries during deploy
+    - added explicit smoke-test status and exit-code reporting in deployment job summary
+    - switched SSH artifact cleanup to best-effort secure deletion (`shred`) with safe fallback
+
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.
   - Added orchestration engine: `scripts/python/version-orchestrator.py` with `check`, `bump`, and `sync`.

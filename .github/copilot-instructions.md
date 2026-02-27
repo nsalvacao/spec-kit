@@ -270,6 +270,7 @@ When choosing what to work on, apply this order:
 | `test.yml` | ✅ Active | Push/PR — `uv run pytest` |
 | `release.yml` | ✅ Active | Push to `main` — semantic versioning (latest tag from repo releases) |
 | `baseline-auto-sync.yml` | ✅ Active | Push to `main` + baseline PR events — auto-sync `baseline/* -> main` branches |
+| `deploy.yml` | ✅ Active | Release published/manual — deploy latest tag to configured VM |
 
 ### Known CI Status
 
