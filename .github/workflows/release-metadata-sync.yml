@@ -3,6 +3,11 @@ name: Release Metadata Sync
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ["Create Release"]
+    types: [completed]
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       release_tag:
@@ -15,19 +20,36 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: release-metadata-sync-${{ github.event.release.tag_name || github.event.inputs.release_tag || github.run_id }}
+  group: release-metadata-sync-${{ github.event_name }}-rel-${{ github.event.release.tag_name }}-inp-${{ github.event.inputs.release_tag }}-wr-${{ github.event.workflow_run.id }}-ref-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   sync-release-metadata:
+    if: >-
+      ${{
+        !(github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success')
+        && !(github.event_name == 'release' && github.event.release.author.login == 'github-actions[bot]')
+      }}
     runs-on: ubuntu-latest
-    env:
-      DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
     steps:
+      - name: Resolve default branch
+        id: default_branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="${{ github.event.repository.default_branch }}"
+          if [[ -z "$branch" || "$branch" == "null" ]]; then
+            branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
+          fi
+          if [[ -z "$branch" || "$branch" == "null" ]]; then
+            branch="main"
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
       - name: Checkout default branch
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.DEFAULT_BRANCH }}
+          ref: ${{ steps.default_branch.outputs.branch }}
           fetch-depth: 0
 
       - name: Setup Python
@@ -43,11 +65,65 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${{ github.event.release.tag_name || github.event.inputs.release_tag }}"
-          if [[ -z "$tag" ]]; then
-            tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+          source=""
+          tag="${{ github.event.release.tag_name }}"
+          if [[ -n "$tag" ]]; then
+            source="release_event"
           fi
+          if [[ -z "$tag" ]]; then
+            tag="${{ github.event.inputs.release_tag }}"
+            if [[ -n "$tag" ]]; then
+              source="workflow_dispatch_input"
+            fi
+          fi
+          if [[ -z "$tag" ]]; then
+            if ! tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"; then
+              echo "::error::Failed to fetch latest release via API. Provide 'release_tag' when running workflow_dispatch." >&2
+              exit 1
+            fi
+            source="latest_release_api_fallback"
+          fi
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "::error::Unable to resolve release tag. No published release found; provide 'release_tag' for workflow_dispatch." >&2
+            exit 1
+          fi
+          python - "$tag" <<'PY'
+          import re
+          import sys
+
+          import yaml
+
+          tag = sys.argv[1]
+          try:
+              with open(".github/version-map.yml", encoding="utf-8") as f:
+                  payload = yaml.safe_load(f) or {}
+          except FileNotFoundError:
+              print("::error::Missing .github/version-map.yml required for tag validation.", file=sys.stderr)
+              sys.exit(1)
+          except yaml.YAMLError as exc:
+              print(f"::error::Invalid YAML in .github/version-map.yml: {exc}", file=sys.stderr)
+              sys.exit(1)
+
+          pattern = str((payload.get("tagging") or {}).get("tag_pattern", "")).strip()
+          if not pattern:
+              print("::error::Missing tagging.tag_pattern in .github/version-map.yml.", file=sys.stderr)
+              sys.exit(1)
+
+          if re.fullmatch(pattern, tag) is None:
+              print(
+                  f"::error::Resolved tag '{tag}' does not match tagging.tag_pattern '{pattern}'.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Release Tag Resolution"
+            echo "- tag: \`$tag\`"
+            echo "- source: \`$source\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Synchronize metadata files
         id: sync
@@ -163,11 +239,11 @@ jobs:
           EOF
           )
 
-          pr_number="$(gh pr list --head "$BRANCH" --base "$DEFAULT_BRANCH" --state open --json number --jq '.[0].number // ""')"
+          pr_number="$(gh pr list --head "$BRANCH" --base "${{ steps.default_branch.outputs.branch }}" --state open --json number --jq '.[0].number // ""')"
           if [[ -n "$pr_number" ]]; then
             gh pr edit "$pr_number" --title "$title" --body "$body"
           else
-            gh pr create --base "$DEFAULT_BRANCH" --head "$BRANCH" --title "$title" --body "$body"
+            gh pr create --base "${{ steps.default_branch.outputs.branch }}" --head "$BRANCH" --title "$title" --body "$body"
           fi
 
       - name: No drift detected
