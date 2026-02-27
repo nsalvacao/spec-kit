@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - switched to native runner `ssh` flow (removed third-party SSH action dependency)
     - added VM host-key fingerprint verification (`DEPLOY_VM_HOST_FINGERPRINT`)
     - enabled deploy concurrency cancellation to avoid overlapping deployments
+    - added explicit secret validation and key parsing checks before SSH key use
+    - switched key/known_hosts artifacts to isolated temp paths with cleanup
+    - added support for comma-separated host fingerprints during key rotation windows
 
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.

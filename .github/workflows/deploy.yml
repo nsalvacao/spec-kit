@@ -46,6 +46,7 @@ jobs:
           echo "Resolved tag: $TAG" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare SSH key
+        id: prepare_ssh_key
         shell: bash
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -62,17 +63,19 @@ jobs:
             exit 1
           fi
 
-          mkdir -p "$HOME/.ssh"
-          chmod 700 "$HOME/.ssh"
-          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_vm_ed25519"
-          chmod 600 "$HOME/.ssh/deploy_vm_ed25519"
+          KEY_PATH="$(mktemp "$RUNNER_TEMP/deploy_vm_ed25519.XXXXXX")"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
 
-          if ! ssh-keygen -y -f "$HOME/.ssh/deploy_vm_ed25519" >/dev/null 2>&1; then
+          if ! ssh-keygen -y -f "$KEY_PATH" >/dev/null 2>&1; then
             echo "ERROR: DEPLOY_SSH_KEY could not be parsed (encrypted or malformed key)." >&2
             exit 1
           fi
 
+          echo "key_path=$KEY_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Verify VM host key fingerprint
+        id: verify_host_key
         shell: bash
         env:
           DEPLOY_VM_HOST: ${{ secrets.DEPLOY_VM_HOST }}
@@ -84,52 +87,67 @@ jobs:
             echo "ERROR: repository variable DEPLOY_VM_HOST_FINGERPRINT is required." >&2
             echo "Set it in: Settings -> Secrets and variables -> Actions -> Variables." >&2
             echo "Suggested value (ED25519): ssh-keyscan -T 10 -p 22 -t ed25519 -H <DEPLOY_VM_HOST> | ssh-keygen -lf - -E sha256 | awk '{print \$2}'" >&2
+            echo "You may provide multiple fingerprints separated by commas during key rotation windows." >&2
             exit 1
           fi
 
-          ssh-keyscan -T 10 -p 22 -t ed25519 -H "$DEPLOY_VM_HOST" > "$HOME/.ssh/known_hosts.candidate"
-          if [[ ! -s "$HOME/.ssh/known_hosts.candidate" ]]; then
+          KNOWN_HOSTS_PATH="$(mktemp "$RUNNER_TEMP/deploy_known_hosts.XXXXXX")"
+          ssh-keyscan -T 10 -p 22 -t ed25519 -H "$DEPLOY_VM_HOST" > "$KNOWN_HOSTS_PATH"
+          if [[ ! -s "$KNOWN_HOSTS_PATH" ]]; then
             echo "ERROR: failed to capture VM host key via ssh-keyscan." >&2
             exit 1
           fi
 
+          EXPECTED_FINGERPRINTS="$(
+            echo "$DEPLOY_VM_HOST_FINGERPRINT" \
+              | tr ',;' '\n' \
+              | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+              | sed '/^$/d' \
+              | sort -u
+          )"
+
           OBSERVED_FINGERPRINTS="$(
-            ssh-keygen -lf "$HOME/.ssh/known_hosts.candidate" -E sha256 \
+            ssh-keygen -lf "$KNOWN_HOSTS_PATH" -E sha256 \
               | awk '{print $2}' \
               | sort -u
           )"
           echo "Observed host fingerprints:"
           echo "$OBSERVED_FINGERPRINTS"
 
-          if ! grep -Fxq "$DEPLOY_VM_HOST_FINGERPRINT" <<< "$OBSERVED_FINGERPRINTS"; then
+          if ! grep -Fxf <(printf '%s\n' "$EXPECTED_FINGERPRINTS") <(printf '%s\n' "$OBSERVED_FINGERPRINTS") >/dev/null; then
             echo "ERROR: VM host fingerprint mismatch." >&2
-            echo "Expected: $DEPLOY_VM_HOST_FINGERPRINT" >&2
+            echo "Expected (allowed): $EXPECTED_FINGERPRINTS" >&2
             exit 1
           fi
 
-          mv "$HOME/.ssh/known_hosts.candidate" "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
+          chmod 600 "$KNOWN_HOSTS_PATH"
+          echo "known_hosts_path=$KNOWN_HOSTS_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Deploy via native SSH
+        id: deploy_native
         shell: bash
         env:
           DEPLOY_VM_HOST: ${{ secrets.DEPLOY_VM_HOST }}
           DEPLOY_VM_USER: ${{ secrets.DEPLOY_VM_USER }}
           DEPLOY_TAG: ${{ steps.tag.outputs.tag }}
           REPOSITORY: ${{ github.repository }}
+          DEPLOY_KEY_PATH: ${{ steps.prepare_ssh_key.outputs.key_path }}
+          KNOWN_HOSTS_PATH: ${{ steps.verify_host_key.outputs.known_hosts_path }}
         run: |
           set -euo pipefail
 
-          if [[ -z "${DEPLOY_VM_HOST:-}" || -z "${DEPLOY_VM_USER:-}" ]]; then
-            echo "ERROR: missing required secrets DEPLOY_VM_HOST and/or DEPLOY_VM_USER." >&2
+          if [[ -z "${DEPLOY_VM_HOST:-}" || -z "${DEPLOY_VM_USER:-}" || -z "${DEPLOY_KEY_PATH:-}" || -z "${KNOWN_HOSTS_PATH:-}" ]]; then
+            echo "ERROR: missing required deploy inputs (host/user/key/known_hosts)." >&2
             exit 1
           fi
 
+          DEPLOY_LOG_PATH="$RUNNER_TEMP/deploy-vm-ssh.log"
+          set +e
           ssh \
-            -i "$HOME/.ssh/deploy_vm_ed25519" \
+            -i "$DEPLOY_KEY_PATH" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_PATH" \
             -o ConnectTimeout=10 \
             "${DEPLOY_VM_USER}@${DEPLOY_VM_HOST}" \
             "set -eu; \
@@ -137,10 +155,37 @@ jobs:
             \"\$HOME/.local/bin/uv\" tool install --reinstall \"git+https://github.com/${REPOSITORY}@${DEPLOY_TAG}\"; \
             test -x \"\$HOME/.local/bin/specify\"; \
             \"\$HOME/.local/bin/specify\" --help > /tmp/specify-help.txt; \
-            head -n 20 /tmp/specify-help.txt"
+            head -n 20 /tmp/specify-help.txt" \
+            > "$DEPLOY_LOG_PATH" 2>&1
+          SSH_EXIT_CODE=$?
+          set -e
+
+          echo "ssh_exit_code=$SSH_EXIT_CODE" >> "$GITHUB_OUTPUT"
+          echo "deploy_log_path=$DEPLOY_LOG_PATH" >> "$GITHUB_OUTPUT"
+
+          if [[ "$SSH_EXIT_CODE" -ne 0 ]]; then
+            echo "ERROR: remote deployment command failed (exit $SSH_EXIT_CODE)." >&2
+            tail -n 80 "$DEPLOY_LOG_PATH" >&2 || true
+            exit "$SSH_EXIT_CODE"
+          fi
+
+      - name: Cleanup SSH artifacts
+        if: always()
+        shell: bash
+        env:
+          DEPLOY_KEY_PATH: ${{ steps.prepare_ssh_key.outputs.key_path }}
+          KNOWN_HOSTS_PATH: ${{ steps.verify_host_key.outputs.known_hosts_path }}
+        run: |
+          set -euo pipefail
+          rm -f "${DEPLOY_KEY_PATH:-}" "${KNOWN_HOSTS_PATH:-}" || true
 
       - name: Write deployment summary
+        if: always()
         shell: bash
+        env:
+          SSH_EXIT_CODE: ${{ steps.deploy_native.outputs.ssh_exit_code }}
+          DEPLOY_LOG_PATH: ${{ steps.deploy_native.outputs.deploy_log_path }}
+          DEPLOY_OUTCOME: ${{ steps.deploy_native.outcome }}
         run: |
           {
             echo "## Deploy to VM"
@@ -148,5 +193,14 @@ jobs:
             echo "- Repository: \`${{ github.repository }}\`"
             echo "- Tag: \`${{ steps.tag.outputs.tag }}\`"
             echo "- Target: \`${{ secrets.DEPLOY_VM_USER }}@${{ secrets.DEPLOY_VM_HOST }}\`"
+            echo "- Deploy step outcome: \`${DEPLOY_OUTCOME:-n/a}\`"
+            echo "- SSH exit code: \`${SSH_EXIT_CODE:-n/a}\`"
             echo "- Status: completed"
+            if [[ -n "${DEPLOY_LOG_PATH:-}" && -f "${DEPLOY_LOG_PATH}" ]]; then
+              echo ""
+              echo "### Remote Output (tail)"
+              echo '```text'
+              tail -n 40 "${DEPLOY_LOG_PATH}" || true
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

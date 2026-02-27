@@ -119,12 +119,14 @@ Required repository secrets:
 Required repository variable:
 
 - `DEPLOY_VM_HOST_FINGERPRINT` (for example `SHA256:...`)
+  - Supports one or more comma-separated fingerprints for controlled key-rotation windows.
 
 Notes:
 
 - Deploy uses absolute paths (`~/.local/bin/uv`, `~/.local/bin/specify`) because non-interactive SSH sessions do not load shell profiles.
 - Deploy uses native `ssh` in the runner (no third-party SSH action dependency).
 - Host key is verified by matching scanned fingerprints against `DEPLOY_VM_HOST_FINGERPRINT`.
+- If VM host keys rotate, update `DEPLOY_VM_HOST_FINGERPRINT` before the next release deploy.
 - Manual runs accept an optional `tag` input and validate `vMAJOR.MINOR.PATCH` format.
 - Smoke test runs `specify --help` remotely after install.
 - VM bootstrap must ensure both binaries exist at those paths:
