@@ -18,6 +18,7 @@ Spec-Driven Development **flips the script** on traditional software development
 - [CLI Reference](cli.md)
 - [Supported Agents](agents.md)
 - [Walkthrough](walkthrough.md)
+- [Google Drive Backup](backup-google-drive.md)
 
 ## Core Philosophy
 
