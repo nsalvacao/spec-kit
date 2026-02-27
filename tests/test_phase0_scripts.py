@@ -116,29 +116,34 @@ class TestIdeate:
 
 class TestSelect:
     def test_creates_idea_selection(self, tmp_path):
+        run(IDEATE, str(tmp_path))
         result = run(SELECT, str(tmp_path))
         assert result.returncode == 0, result.stderr
         artifact = tmp_path / ".spec-kit" / "idea_selection.md"
         assert artifact.exists()
 
     def test_idea_selection_has_frontmatter(self, tmp_path):
+        run(IDEATE, str(tmp_path))
         run(SELECT, str(tmp_path))
         content = (tmp_path / ".spec-kit" / "idea_selection.md").read_text()
         assert "artifact: idea_selection" in content
         assert "phase: select" in content
 
     def test_idea_selection_has_airice_table(self, tmp_path):
+        run(IDEATE, str(tmp_path))
         run(SELECT, str(tmp_path))
         content = (tmp_path / ".spec-kit" / "idea_selection.md").read_text()
         assert "AI-RICE" in content
         assert "Reach" in content
 
     def test_idempotent_no_overwrite(self, tmp_path):
+        run(IDEATE, str(tmp_path))
         run(SELECT, str(tmp_path))
         result2 = run(SELECT, str(tmp_path))
         assert result2.returncode != 0
 
     def test_force_flag_overwrites(self, tmp_path):
+        run(IDEATE, str(tmp_path))
         run(SELECT, str(tmp_path))
         result2 = run(SELECT, "--force", str(tmp_path))
         assert result2.returncode == 0
@@ -149,11 +154,13 @@ class TestSelect:
         assert "Usage:" in result.stdout
 
     def test_timestamp_substituted(self, tmp_path):
+        run(IDEATE, str(tmp_path))
         run(SELECT, str(tmp_path))
         content = (tmp_path / ".spec-kit" / "idea_selection.md").read_text()
         assert "[ISO_8601_TIMESTAMP]" not in content
 
     def test_default_dir_is_cwd(self, tmp_path):
+        run(IDEATE, cwd=tmp_path)
         result = run(SELECT, cwd=tmp_path)
         assert result.returncode == 0
         assert (tmp_path / ".spec-kit" / "idea_selection.md").exists()
@@ -239,7 +246,8 @@ class TestDirectoryCollision:
     def test_select_refuses_if_target_is_dir(self, tmp_path):
         target = tmp_path / ".spec-kit" / "idea_selection.md"
         target.parent.mkdir(parents=True)
-        target.mkdir()
+        target.mkdir()  # create as directory instead of file
+        run(IDEATE, str(tmp_path))
         result = run(SELECT, str(tmp_path))
         assert result.returncode != 0
 
@@ -302,21 +310,25 @@ class TestIdeatePowerShell:
 @skip_no_pwsh
 class TestSelectPowerShell:
     def test_creates_idea_selection(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
         result = run_ps1(SELECT_PS1, str(tmp_path))
         assert result.returncode == 0, result.stderr
         assert (tmp_path / ".spec-kit" / "idea_selection.md").exists()
 
     def test_idempotent_no_overwrite(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
         run_ps1(SELECT_PS1, str(tmp_path))
         result2 = run_ps1(SELECT_PS1, str(tmp_path))
         assert result2.returncode != 0
 
     def test_force_flag_overwrites(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
         run_ps1(SELECT_PS1, str(tmp_path))
         result2 = run_ps1(SELECT_PS1, "-Force", str(tmp_path))
         assert result2.returncode == 0
 
     def test_timestamp_substituted(self, tmp_path):
+        run_ps1(IDEATE_PS1, str(tmp_path))
         run_ps1(SELECT_PS1, str(tmp_path))
         content = (tmp_path / ".spec-kit" / "idea_selection.md").read_text()
         assert "[ISO_8601_TIMESTAMP]" not in content
