@@ -215,6 +215,91 @@ $effortClass = Get-EffortClass $effortVal
 $riskClass   = Get-RiskClass   $riskVal
 $rationale   = Build-Rationale $reachVal $impactVal $confVal $drVal $effortVal $riskVal
 
+# --- Sensitivity Analysis ---
+
+$impactScale = @(0.25, 0.5, 1.0, 2.0, 3.0)
+
+function Get-ImpactStepUp([double]$current) {
+    $idx = [Array]::IndexOf($impactScale, $current)
+    if ($idx -ge 0 -and $idx -lt ($impactScale.Length - 1)) { $impactScale[$idx + 1] } else { $current }
+}
+
+function Get-ImpactStepDown([double]$current) {
+    $idx = [Array]::IndexOf($impactScale, $current)
+    if ($idx -gt 0) { $impactScale[$idx - 1] } else { $current }
+}
+
+function Get-ScoreRaw([double]$r, [double]$i, [double]$c, [double]$dr, [double]$e, [double]$risk) {
+    [math]::Round(($r * $i * $c * $dr) / ($e * $risk), 2)
+}
+
+function Format-Delta([double]$newScore, [double]$base) {
+    $d = $newScore - $base
+    if ($d -ge 0) { "+{0:F2}" -f $d } else { "{0:F2}" -f $d }
+}
+
+function Clamp-Pct([int]$v)  { [math]::Max(0,  [math]::Min(100, $v)) }
+function Clamp-Risk([int]$v) { [math]::Max(1,  [math]::Min(10,  $v)) }
+function Clamp-Reach([int]$v){ [math]::Max(1,  $v) }
+
+# Bounded +-1 values per dimension
+$sensRP = Clamp-Reach ($reachVal + 1)
+$sensRM = Clamp-Reach ($reachVal - 1)
+$sensIP = Get-ImpactStepUp   $impactVal
+$sensIM = Get-ImpactStepDown $impactVal
+$sensCP = Clamp-Pct ($confVal + 1)
+$sensCM = Clamp-Pct ($confVal - 1)
+$sensDP = Clamp-Pct ($drVal + 1)
+$sensDM = Clamp-Pct ($drVal - 1)
+$sensEP = $effortVal + 1
+$sensEM = [math]::Max(1.0, $effortVal - 1)
+$sensKP = Clamp-Risk ($riskVal + 1)
+$sensKM = Clamp-Risk ($riskVal - 1)
+
+# Scenario scores
+$scRP = Get-ScoreRaw $sensRP  $impactVal $confVal  $drVal    $effortVal $riskVal
+$scRM = Get-ScoreRaw $sensRM  $impactVal $confVal  $drVal    $effortVal $riskVal
+$scIP = Get-ScoreRaw $reachVal $sensIP   $confVal  $drVal    $effortVal $riskVal
+$scIM = Get-ScoreRaw $reachVal $sensIM   $confVal  $drVal    $effortVal $riskVal
+$scCP = Get-ScoreRaw $reachVal $impactVal $sensCP  $drVal    $effortVal $riskVal
+$scCM = Get-ScoreRaw $reachVal $impactVal $sensCM  $drVal    $effortVal $riskVal
+$scDP = Get-ScoreRaw $reachVal $impactVal $confVal $sensDP   $effortVal $riskVal
+$scDM = Get-ScoreRaw $reachVal $impactVal $confVal $sensDM   $effortVal $riskVal
+$scEP = Get-ScoreRaw $reachVal $impactVal $confVal $drVal    $sensEP    $riskVal
+$scEM = Get-ScoreRaw $reachVal $impactVal $confVal $drVal    $sensEM    $riskVal
+$scKP = Get-ScoreRaw $reachVal $impactVal $confVal $drVal    $effortVal $sensKP
+$scKM = Get-ScoreRaw $reachVal $impactVal $confVal $drVal    $effortVal $sensKM
+
+# Delta strings
+$dRP = Format-Delta $scRP $rawScore; $dRM = Format-Delta $scRM $rawScore
+$dIP = Format-Delta $scIP $rawScore; $dIM = Format-Delta $scIM $rawScore
+$dCP = Format-Delta $scCP $rawScore; $dCM = Format-Delta $scCM $rawScore
+$dDP = Format-Delta $scDP $rawScore; $dDM = Format-Delta $scDM $rawScore
+$dEP = Format-Delta $scEP $rawScore; $dEM = Format-Delta $scEM $rawScore
+$dKP = Format-Delta $scKP $rawScore; $dKM = Format-Delta $scKM $rawScore
+
+# Identify best positive and negative levers
+$posScenarios = @(
+    @{name="Reach +1";          delta=$scRP - $rawScore},
+    @{name="Impact +1 step";    delta=$scIP - $rawScore},
+    @{name="Confidence +1%";    delta=$scCP - $rawScore},
+    @{name="Data_Readiness +1%";delta=$scDP - $rawScore},
+    @{name="Effort -1 wk";      delta=$scEM - $rawScore},
+    @{name="Risk -1";           delta=$scKM - $rawScore}
+)
+$negScenarios = @(
+    @{name="Reach -1";          delta=$scRM - $rawScore},
+    @{name="Impact -1 step";    delta=$scIM - $rawScore},
+    @{name="Confidence -1%";    delta=$scCM - $rawScore},
+    @{name="Data_Readiness -1%";delta=$scDM - $rawScore},
+    @{name="Effort +1 wk";      delta=$scEP - $rawScore},
+    @{name="Risk +1";           delta=$scKP - $rawScore}
+)
+$bestPos = $posScenarios | Sort-Object { $_.delta } -Descending | Select-Object -First 1
+$bestNeg = $negScenarios | Sort-Object { $_.delta } | Select-Object -First 1
+$bestPosDStr = if ($bestPos.delta -ge 0) { "+{0:F2}" -f $bestPos.delta } else { "{0:F2}" -f $bestPos.delta }
+$bestNegDStr = "{0:F2}" -f $bestNeg.delta
+
 # --- Output ---
 Write-Output "+-------------------------------------------------------------+"
 if ($Name) {
@@ -250,6 +335,18 @@ Write-Output "  Effort         -> $effortClass"
 Write-Output "  Risk           -> $riskClass"
 Write-Output ""
 Write-Output "Rationale: $rationale"
+Write-Output ""
+Write-Output "Sensitivity Analysis (what-if +-1 per dimension):"
+Write-Output ("  {0,-18} +1 -> {1} (D{2}) | -1 -> {3} (D{4})" -f "Reach:", $scRP, $dRP, $scRM, $dRM)
+Write-Output ("  {0,-18} +1 step -> {1} (D{2}) | -1 step -> {3} (D{4})" -f "Impact:", $scIP, $dIP, $scIM, $dIM)
+Write-Output ("  {0,-18} +1% -> {1} (D{2}) | -1% -> {3} (D{4})" -f "Confidence:", $scCP, $dCP, $scCM, $dCM)
+Write-Output ("  {0,-18} +1% -> {1} (D{2}) | -1% -> {3} (D{4})" -f "Data_Readiness:", $scDP, $dDP, $scDM, $dDM)
+Write-Output ("  {0,-18} +1 wk -> {1} (D{2}) | -1 wk -> {3} (D{4})" -f "Effort:", $scEP, $dEP, $scEM, $dEM)
+Write-Output ("  {0,-18} +1 -> {1} (D{2}) | -1 -> {3} (D{4})" -f "Risk:", $scKP, $dKP, $scKM, $dKM)
+Write-Output ""
+Write-Output "Levers summary:"
+Write-Output "  ^ Best upside:  $($bestPos.name) -> D$bestPosDStr"
+Write-Output "  v Biggest risk: $($bestNeg.name) -> D$bestNegDStr"
 Write-Output ""
 Write-Output "Note: To compare across ideas in a session:"
 Write-Output "  Norm_Score = (raw_score / session_max_raw) x 100"

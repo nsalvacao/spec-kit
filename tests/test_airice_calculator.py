@@ -175,6 +175,96 @@ class TestCalculateAIRiceBash:
 
 
 # ---------------------------------------------------------------------------
+# Tests: sensitivity analysis in calculate-ai-rice.sh (issue #30)
+# ---------------------------------------------------------------------------
+
+class TestSensitivityAnalysisBash:
+    """Tests for what-if sensitivity analysis in scripts/bash/calculate-ai-rice.sh."""
+
+    def test_sensitivity_section_present(self):
+        result = run_bash(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "Sensitivity Analysis" in result.stdout
+
+    def test_sensitivity_all_dimensions_listed(self):
+        result = run_bash(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        for dim in ("Reach", "Impact", "Confidence", "Data_Readiness", "Effort", "Risk"):
+            assert dim in result.stdout
+
+    def test_sensitivity_delta_values_correct(self):
+        # Baseline: (1000 * 2.0 * 70 * 80) / (4 * 5) = 560000.00
+        # Confidence +1% → (1000 * 2.0 * 71 * 80) / (4 * 5) = 568000.00, Δ+8000.00
+        result = run_bash(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "568000.00" in result.stdout
+        assert "+8000.00" in result.stdout
+
+    def test_sensitivity_impact_step_up(self):
+        # Impact 2.0 → 3.0: (1000 * 3.0 * 70 * 80) / 20 = 840000.00, Δ+280000.00
+        result = run_bash(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "840000.00" in result.stdout
+        assert "+280000.00" in result.stdout
+
+    def test_sensitivity_impact_step_down(self):
+        # Impact 2.0 → 1.0: (1000 * 1.0 * 70 * 80) / 20 = 280000.00, Δ-280000.00
+        result = run_bash(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "280000.00" in result.stdout
+
+    def test_sensitivity_levers_summary_present(self):
+        result = run_bash(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "Levers summary" in result.stdout
+
+    def test_sensitivity_clamped_at_impact_max(self):
+        # Impact at max (3.0): +1 step should be clamped → Δ+0.00
+        result = run_bash(["1000", "3.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        # The +1 step should produce zero delta (already at max)
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_impact_min(self):
+        # Impact at min (0.25): -1 step should be clamped → Δ+0.00
+        result = run_bash(["1000", "0.25", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_risk_max(self):
+        # Risk at max (10): +1 should be clamped → Δ+0.00
+        result = run_bash(["1000", "2.0", "70", "80", "4", "10"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_risk_min(self):
+        # Risk at min (1): -1 should be clamped → Δ+0.00
+        result = run_bash(["1000", "2.0", "70", "80", "4", "1"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_clamped_at_confidence_max(self):
+        # Confidence at 100: +1% should be clamped → Δ+0.00
+        result = run_bash(["1000", "2.0", "100", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "+0.00" in result.stdout
+
+    def test_sensitivity_deterministic(self):
+        # Running twice should produce identical output
+        args = ["1000", "2.0", "70", "80", "4", "5"]
+        r1 = run_bash(args)
+        r2 = run_bash(args)
+        assert r1.stdout == r2.stdout
+
+    def test_sensitivity_effort_decrease_positive_delta(self):
+        # Effort -1 wk always increases score (denominator decreases)
+        result = run_bash(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        # Effort -1 wk: (1000*2.0*70*80)/(3*5) = 746666.67
+        assert "746666.67" in result.stdout
+
+
+# ---------------------------------------------------------------------------
 # Tests: calculate-ai-rice.ps1 (PowerShell)
 # ---------------------------------------------------------------------------
 
@@ -212,6 +302,25 @@ class TestCalculateAIRicePS1:
     def test_risk_over_10_is_invalid(self):
         result = run_ps1(["1000", "2.0", "70", "80", "4", "11"])
         assert result.returncode != 0
+
+    @skip_no_pwsh
+    def test_sensitivity_section_present(self):
+        result = run_ps1(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "Sensitivity Analysis" in result.stdout
+
+    @skip_no_pwsh
+    def test_sensitivity_delta_values_correct(self):
+        # Confidence +1% → 568000.00, Δ+8000.00
+        result = run_ps1(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "568000" in result.stdout.replace(",", "")
+
+    @skip_no_pwsh
+    def test_sensitivity_levers_summary_present(self):
+        result = run_ps1(["1000", "2.0", "70", "80", "4", "5"])
+        assert result.returncode == 0
+        assert "Levers summary" in result.stdout
 
 
 # ---------------------------------------------------------------------------
