@@ -2,6 +2,7 @@
 set -euo pipefail
 
 FILE_PATH="${1:-.spec-kit/idea_selection.md}"
+BACKLOG_PATH="${2:-.spec-kit/ideas_backlog.md}"
 STATE_LOG="scripts/bash/state-log-violation.sh"
 
 if [ ! -f "$FILE_PATH" ]; then
@@ -127,6 +128,43 @@ if [ "$semantic_errors" -gt 0 ]; then
     "$STATE_LOG" "select" "Framework-Driven Development" "AI-RICE semantic validation failed ($semantic_errors errors)" "high" "validate-airice"
   fi
   exit 1
+fi
+
+# --- Coverage validation: verify all backlog ideas are scored (issue #35) ---
+if [ -f "$BACKLOG_PATH" ]; then
+  backlog_ids=()
+  while IFS= read -r id; do
+    [ -n "$id" ] && backlog_ids+=("$id")
+  done < <(grep -E "^### Idea " "$BACKLOG_PATH" | sed 's/^### Idea //; s/[[:space:]]*$//' | tr -d '\r' 2>/dev/null || true)
+  backlog_count=${#backlog_ids[@]}
+
+  scored_ids=()
+  while IFS= read -r row; do
+    id=$(echo "$row" | awk -F'|' 'NF >= 3 {print $2}' | sed -E 's/^ *\[([^]]+)\].*$/\1/; s/^ *//; s/ *$//')
+    [ -n "$id" ] && [[ ! "$id" =~ ^[-:]+$ ]] && scored_ids+=("$id")
+  done < <(grep "^|" "$FILE_PATH" | tail -n +3)
+  scored_count=${#scored_ids[@]}
+
+  if [ "$backlog_count" -gt 0 ] && [ "$scored_count" -lt "$backlog_count" ]; then
+    echo "Error: Incomplete scoring coverage: $scored_count/$backlog_count ideas scored"
+    echo "  Backlog: $backlog_count ideas"
+    echo "  Scored:  $scored_count ideas"
+    missing=()
+    for bid in "${backlog_ids[@]}"; do
+      found=false
+      for sid in "${scored_ids[@]}"; do
+        [ "$bid" = "$sid" ] && found=true && break
+      done
+      [ "$found" = "false" ] && missing+=("$bid")
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+      echo "  Missing IDs: ${missing[*]}"
+    fi
+    if [ -x "$STATE_LOG" ]; then
+      "$STATE_LOG" "select" "Traceability First" "Incomplete scoring: $scored_count/$backlog_count ideas scored" "high" "validate-airice"
+    fi
+    exit 1
+  fi
 fi
 
 echo "AI-RICE validation passed"

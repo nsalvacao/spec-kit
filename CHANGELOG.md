@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **#35 (P030): Full scoring coverage validation in `validate-airice.sh` / `validate-airice.ps1`**
+  - Added second optional argument `BACKLOG_PATH` (default: `.spec-kit/ideas_backlog.md`)
+    to both bash and PowerShell validators.
+  - When the backlog file exists, the validator now checks that every idea listed in
+    `ideas_backlog.md` has a corresponding row in the `idea_selection.md` scoring table.
+  - On failure, the error output shows: total ideas in backlog, total scored rows,
+    and the list of missing idea IDs.
+  - Coverage check is skipped gracefully when the backlog file is absent.
+  - Added test coverage in `tests/test_airice_calculator.py`:
+    `TestValidateAIRiceCoverageBash` and `TestValidateAIRiceCoveragePS1`.
+
 - **#171: Branch policy lineage metadata + inconsistency/rollback regressions**
   - Added optional lineage fields to branch metadata contract registration:
     - `parent_epic_id`
