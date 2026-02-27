@@ -123,6 +123,8 @@ Required repository variable:
 - `DEPLOY_VM_KNOWN_HOSTS` (pre-pinned known_hosts content for the target VM)
   - Example generator: `ssh-keyscan -T 10 -p 22 -t ed25519 <DEPLOY_VM_HOST> | sed '/^#/d' | head -n 1`
   - Must be a non-hashed host entry (for deterministic host-field validation).
+  - Supports one or more entries during controlled host-key rotation windows.
+  - Every entry must match `DEPLOY_VM_HOST` (or `[host]:port`) and use `ssh-ed25519`.
 
 Optional repository variables:
 
@@ -139,6 +141,7 @@ Notes:
 - VM bootstrap must ensure both binaries exist at those paths:
   - `~/.local/bin/uv`
   - `~/.local/bin/specify`
+- SSH artifacts are removed after deploy using best-effort secure deletion (`shred` when available, `rm` fallback).
 
 ## 7) Local Main Hygiene
 
