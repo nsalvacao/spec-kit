@@ -75,6 +75,7 @@ def _default_contract() -> dict[str, Any]:
 
 
 def _normalize_optional_metadata_field(value: Any, field_name: str) -> str | None:
+    """Normalize optional metadata fields to None or a non-empty stripped string."""
     if value is None:
         return None
     if not isinstance(value, str):
@@ -97,8 +98,19 @@ def _validate_contract_entries(entries: dict[str, Any]) -> None:
             raise BranchPolicyError(f"Invalid branch policy entry key '{branch_key}': {exc}") from exc
 
         entry_branch = _normalize_optional_metadata_field(raw_entry.get("branch"), "branch")
+        if entry_branch is None:
+            entry_branch = branch_key
+            raw_entry["branch"] = entry_branch
+
         entry_feature_id = _normalize_optional_metadata_field(raw_entry.get("feature_id"), "feature_id")
+        if entry_feature_id is None:
+            entry_feature_id = branch_key
+            raw_entry["feature_id"] = entry_feature_id
+
         entry_prefix = _normalize_optional_metadata_field(raw_entry.get("feature_prefix"), "feature_prefix")
+        if entry_prefix is None:
+            entry_prefix = validated_branch.feature_prefix
+            raw_entry["feature_prefix"] = entry_prefix
 
         if entry_branch != branch_key:
             raise BranchPolicyError(
@@ -116,8 +128,21 @@ def _validate_contract_entries(entries: dict[str, Any]) -> None:
                 f"'feature_prefix' must be '{validated_branch.feature_prefix}'."
             )
 
-        _normalize_optional_metadata_field(raw_entry.get("parent_epic_id"), "parent_epic_id")
-        _normalize_optional_metadata_field(raw_entry.get("parent_program_id"), "parent_program_id")
+        normalized_parent_epic_id = _normalize_optional_metadata_field(
+            raw_entry.get("parent_epic_id"), "parent_epic_id"
+        )
+        if normalized_parent_epic_id is None:
+            raw_entry.pop("parent_epic_id", None)
+        else:
+            raw_entry["parent_epic_id"] = normalized_parent_epic_id
+
+        normalized_parent_program_id = _normalize_optional_metadata_field(
+            raw_entry.get("parent_program_id"), "parent_program_id"
+        )
+        if normalized_parent_program_id is None:
+            raw_entry.pop("parent_program_id", None)
+        else:
+            raw_entry["parent_program_id"] = normalized_parent_program_id
 
         mapped_branch = feature_to_branch.get(entry_feature_id)
         if mapped_branch and mapped_branch != branch_key:

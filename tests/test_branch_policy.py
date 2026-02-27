@@ -125,6 +125,48 @@ def test_register_feature_preserves_existing_parent_lineage_when_re_registering(
     assert entry["parent_program_id"] == "program-foundation"
 
 
+def test_register_feature_repairs_legacy_contract_entries_missing_identity_fields(tmp_path: Path) -> None:
+    policy_dir = tmp_path / ".spec-kit"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "branch-policy.json").write_text(
+        json.dumps(
+            {
+                "contract_version": "branch-feature.v1",
+                "generated_by": "tests",
+                "updated_at": "2026-02-27T12:00:00Z",
+                "entries": {
+                    "009-legacy-metadata": {
+                        "scope_mode": "feature",
+                        "source_decision": "legacy",
+                        "parent_epic_id": None,
+                        "created_at": "2026-02-27T12:00:00Z",
+                        "updated_at": "2026-02-27T12:00:00Z",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_policy(
+        "register-feature",
+        "--repo-root",
+        str(tmp_path),
+        "--branch",
+        "009-legacy-metadata",
+        "--feature-id",
+        "009-legacy-metadata",
+    )
+    assert result.returncode == 0, result.stderr
+
+    payload = json.loads((tmp_path / ".spec-kit" / "branch-policy.json").read_text(encoding="utf-8"))
+    entry = payload["entries"]["009-legacy-metadata"]
+    assert entry["branch"] == "009-legacy-metadata"
+    assert entry["feature_id"] == "009-legacy-metadata"
+    assert entry["feature_prefix"] == "009"
+    assert "parent_epic_id" not in entry
+
+
 def test_register_feature_rejects_prefix_collision(tmp_path: Path) -> None:
     repo_root = tmp_path
 

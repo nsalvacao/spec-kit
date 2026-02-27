@@ -54,6 +54,9 @@ Shape:
 - Branch validation rejects non-canonical branch patterns for feature workflows.
 - Branch metadata contract validation rejects inconsistent entry state
   (entry key vs `branch`/`feature_id`/`feature_prefix` mismatch).
+- Legacy entries missing `branch`/`feature_id`/`feature_prefix` are normalized to canonical values.
+- Optional metadata (`parent_epic_id`, `parent_program_id`) accepts missing/null values and requires
+  non-empty strings when provided.
 - Prefix collisions are blocked (for example, `021-a` and `021-b` for different features).
 - Feature directory resolution prefers:
   1. exact match (`specs/<branch>/`);
@@ -81,6 +84,8 @@ python3 scripts/python/branch-policy.py register-feature --repo-root . --branch 
 - Non-git mode still works with `SPECIFY_FEATURE`.
 - Existing commands keep the same interfaces.
 - Policy enforcement is applied where feature-context scripts require a canonical feature branch.
+- Re-registering the same branch preserves existing lineage metadata when parent ids are omitted.
+  To refresh lineage explicitly, pass `--parent-epic-id` and/or `--parent-program-id`.
 
 ## Recovery
 
