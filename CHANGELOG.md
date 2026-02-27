@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **#171: Branch policy lineage metadata + inconsistency/rollback regressions**
+  - Added optional lineage fields to branch metadata contract registration:
+    - `parent_epic_id`
+    - `parent_program_id`
+  - Added contract consistency checks to fail fast when metadata diverges from canonical branch identity.
+  - Added rollback regression tests for feature creation flows:
+    - `tests/test_create_new_feature_rollback.py` (bash + PowerShell parity)
+  - Extended branch policy tests for lineage and inconsistency scenarios:
+    - `tests/test_branch_policy.py`
+
 - **#176: Command discoverability audit — amend + global coverage**
   - Added `/speckit.amend`, `/speckit.validate`, `/speckit.taskstoissues` to
     the "Next Steps" panel shown after `specify init`.
