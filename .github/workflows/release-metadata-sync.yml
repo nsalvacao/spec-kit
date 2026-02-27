@@ -78,13 +78,13 @@ jobs:
           fi
           if [[ -z "$tag" ]]; then
             if ! tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"; then
-              echo "Failed to fetch latest release via API. Provide 'release_tag' when running workflow_dispatch." >&2
+              echo "::error::Failed to fetch latest release via API. Provide 'release_tag' when running workflow_dispatch." >&2
               exit 1
             fi
             source="latest_release_api_fallback"
           fi
           if [[ -z "$tag" || "$tag" == "null" ]]; then
-            echo "Unable to resolve release tag. No published release found; provide 'release_tag' for workflow_dispatch." >&2
+            echo "::error::Unable to resolve release tag. No published release found; provide 'release_tag' for workflow_dispatch." >&2
             exit 1
           fi
           python - "$tag" <<'PY'
@@ -94,17 +94,24 @@ jobs:
           import yaml
 
           tag = sys.argv[1]
-          with open(".github/version-map.yml", encoding="utf-8") as f:
-              payload = yaml.safe_load(f) or {}
+          try:
+              with open(".github/version-map.yml", encoding="utf-8") as f:
+                  payload = yaml.safe_load(f) or {}
+          except FileNotFoundError:
+              print("::error::Missing .github/version-map.yml required for tag validation.", file=sys.stderr)
+              sys.exit(1)
+          except yaml.YAMLError as exc:
+              print(f"::error::Invalid YAML in .github/version-map.yml: {exc}", file=sys.stderr)
+              sys.exit(1)
 
           pattern = str((payload.get("tagging") or {}).get("tag_pattern", "")).strip()
           if not pattern:
-              print("Missing tagging.tag_pattern in .github/version-map.yml.", file=sys.stderr)
+              print("::error::Missing tagging.tag_pattern in .github/version-map.yml.", file=sys.stderr)
               sys.exit(1)
 
           if re.fullmatch(pattern, tag) is None:
               print(
-                  f"Resolved tag '{tag}' does not match tagging.tag_pattern '{pattern}'.",
+                  f"::error::Resolved tag '{tag}' does not match tagging.tag_pattern '{pattern}'.",
                   file=sys.stderr,
               )
               sys.exit(1)
