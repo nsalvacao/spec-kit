@@ -20,7 +20,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: release-metadata-sync-${{ github.event_name }}-${{ github.event.release.tag_name }}${{ github.event.inputs.release_tag }}${{ github.event.workflow_run.id }}${{ github.ref_name }}
+  group: release-metadata-sync-${{ github.event_name }}-rel-${{ github.event.release.tag_name }}-inp-${{ github.event.inputs.release_tag }}-wr-${{ github.event.workflow_run.id }}-ref-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -65,6 +65,10 @@ jobs:
           if [[ -z "$tag" ]]; then
             tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
             source="latest_release_api_fallback"
+          fi
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "Unable to resolve release tag from release event, workflow_dispatch input, or latest release API." >&2
+            exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "source=$source" >> "$GITHUB_OUTPUT"
