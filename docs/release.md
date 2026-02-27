@@ -122,6 +122,7 @@ Required repository variable:
   - Supports one or more comma-separated fingerprints for controlled key-rotation windows.
 - `DEPLOY_VM_KNOWN_HOSTS` (pre-pinned known_hosts content for the target VM)
   - Example generator: `ssh-keyscan -T 10 -p 22 -t ed25519 <DEPLOY_VM_HOST> | sed '/^#/d' | head -n 1`
+  - Must be a non-hashed host entry (for deterministic host-field validation).
 
 Optional repository variables:
 
@@ -132,8 +133,7 @@ Notes:
 - Deploy uses absolute paths (`~/.local/bin/uv`, `~/.local/bin/specify`) because non-interactive SSH sessions do not load shell profiles.
 - Deploy uses native `ssh` in the runner (no third-party SSH action dependency).
 - Host key is verified by matching pre-pinned known_hosts content against `DEPLOY_VM_HOST_FINGERPRINT`.
-- If VM host keys rotate, update `DEPLOY_VM_HOST_FINGERPRINT` before the next release deploy.
-- If VM host keys rotate, update `DEPLOY_VM_KNOWN_HOSTS` before the next release deploy.
+- If VM host keys rotate, update `DEPLOY_VM_HOST_FINGERPRINT` and `DEPLOY_VM_KNOWN_HOSTS` together before the next release deploy.
 - Manual runs accept an optional `tag` input and validate `vMAJOR.MINOR.PATCH` format.
 - Smoke test runs `specify --help` remotely after install.
 - VM bootstrap must ensure both binaries exist at those paths:

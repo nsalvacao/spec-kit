@@ -63,6 +63,7 @@ jobs:
             exit 1
           fi
 
+          # Store key in runner temp; cleanup step removes the file after deploy.
           KEY_PATH="$(mktemp "$RUNNER_TEMP/deploy_vm_ed25519.XXXXXX")"
           cleanup_on_error() {
             rm -f "$KEY_PATH" || true
@@ -70,6 +71,7 @@ jobs:
           trap cleanup_on_error ERR
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$KEY_PATH"
           chmod 600 "$KEY_PATH"
+          unset DEPLOY_SSH_KEY
 
           if ! ssh-keygen -y -f "$KEY_PATH" >/dev/null 2>&1; then
             echo "ERROR: DEPLOY_SSH_KEY could not be parsed (encrypted or malformed key)." >&2
@@ -131,8 +133,13 @@ jobs:
             exit 1
           fi
 
-          if [[ "$KNOWN_HOST_FIELD" != "$DEPLOY_VM_HOST" && "$KNOWN_HOST_FIELD" != "[$DEPLOY_VM_HOST]:$DEPLOY_PORT" && "$KNOWN_HOST_FIELD" != "|1|"* ]]; then
-            echo "ERROR: DEPLOY_VM_KNOWN_HOSTS host field does not match DEPLOY_VM_HOST." >&2
+          if [[ "$KNOWN_HOST_FIELD" == "|1|"* ]]; then
+            echo "ERROR: DEPLOY_VM_KNOWN_HOSTS must use a non-hashed host entry for deterministic validation." >&2
+            exit 1
+          fi
+
+          if [[ "$KNOWN_HOST_FIELD" != "$DEPLOY_VM_HOST" && "$KNOWN_HOST_FIELD" != "[$DEPLOY_VM_HOST]:$DEPLOY_PORT" ]]; then
+            echo "ERROR: DEPLOY_VM_KNOWN_HOSTS host field does not match DEPLOY_VM_HOST/DEPLOY_VM_PORT." >&2
             exit 1
           fi
 
@@ -200,14 +207,37 @@ jobs:
             if [ ! -x \"\$HOME/.local/bin/uv\" ]; then echo \"ERROR: missing remote binary \$HOME/.local/bin/uv\" >&2; exit 21; fi; \
             \"\$HOME/.local/bin/uv\" tool install --reinstall \"git+https://github.com/${REPOSITORY}@${DEPLOY_TAG}\"; \
             if [ ! -x \"\$HOME/.local/bin/specify\" ]; then echo \"ERROR: missing remote binary \$HOME/.local/bin/specify\" >&2; exit 22; fi; \
-            \"\$HOME/.local/bin/specify\" --help > /tmp/specify-help.txt; \
-            head -n 20 /tmp/specify-help.txt" \
+            if \"\$HOME/.local/bin/specify\" --help > /tmp/specify-help.txt 2>/tmp/specify-help.err; then \
+              echo \"__SMOKE_STATUS__:passed\"; \
+              echo \"__SMOKE_EXIT__:0\"; \
+              head -n 20 /tmp/specify-help.txt; \
+            else \
+              smoke_exit=\$?; \
+              echo \"__SMOKE_STATUS__:failed\"; \
+              echo \"__SMOKE_EXIT__:\$smoke_exit\"; \
+              cat /tmp/specify-help.err >&2 || true; \
+              exit \$smoke_exit; \
+            fi" \
             > "$DEPLOY_LOG_PATH" 2>&1
           SSH_EXIT_CODE=$?
           set -e
 
+          SMOKE_STATUS="not_reached"
+          SMOKE_EXIT_CODE="n/a"
+          if [[ -f "$DEPLOY_LOG_PATH" ]]; then
+            if grep -q "^__SMOKE_STATUS__:passed$" "$DEPLOY_LOG_PATH"; then
+              SMOKE_STATUS="passed"
+              SMOKE_EXIT_CODE="0"
+            elif grep -q "^__SMOKE_STATUS__:failed$" "$DEPLOY_LOG_PATH"; then
+              SMOKE_STATUS="failed"
+              SMOKE_EXIT_CODE="$(awk -F: '/^__SMOKE_EXIT__:/ {print $2; exit}' "$DEPLOY_LOG_PATH")"
+            fi
+          fi
+
           echo "ssh_exit_code=$SSH_EXIT_CODE" >> "$GITHUB_OUTPUT"
           echo "deploy_log_path=$DEPLOY_LOG_PATH" >> "$GITHUB_OUTPUT"
+          echo "smoke_status=$SMOKE_STATUS" >> "$GITHUB_OUTPUT"
+          echo "smoke_exit_code=$SMOKE_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
           if [[ "$SSH_EXIT_CODE" -ne 0 ]]; then
             echo "ERROR: remote deployment command failed (exit $SSH_EXIT_CODE)." >&2
@@ -224,10 +254,18 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "${DEPLOY_KEY_PATH:-}" && -f "${DEPLOY_KEY_PATH}" ]]; then
-            rm -f "${DEPLOY_KEY_PATH}"
+            if command -v shred >/dev/null 2>&1; then
+              shred -u "${DEPLOY_KEY_PATH}" || rm -f "${DEPLOY_KEY_PATH}"
+            else
+              rm -f "${DEPLOY_KEY_PATH}"
+            fi
           fi
           if [[ -n "${KNOWN_HOSTS_PATH:-}" && -f "${KNOWN_HOSTS_PATH}" ]]; then
-            rm -f "${KNOWN_HOSTS_PATH}"
+            if command -v shred >/dev/null 2>&1; then
+              shred -u "${KNOWN_HOSTS_PATH}" || rm -f "${KNOWN_HOSTS_PATH}"
+            else
+              rm -f "${KNOWN_HOSTS_PATH}"
+            fi
           fi
 
       - name: Write deployment summary
@@ -237,6 +275,8 @@ jobs:
           SSH_EXIT_CODE: ${{ steps.deploy_native.outputs.ssh_exit_code }}
           DEPLOY_LOG_PATH: ${{ steps.deploy_native.outputs.deploy_log_path }}
           DEPLOY_OUTCOME: ${{ steps.deploy_native.outcome }}
+          SMOKE_STATUS: ${{ steps.deploy_native.outputs.smoke_status }}
+          SMOKE_EXIT_CODE: ${{ steps.deploy_native.outputs.smoke_exit_code }}
           DEPLOY_VM_PORT: ${{ vars.DEPLOY_VM_PORT }}
         run: |
           {
@@ -248,6 +288,8 @@ jobs:
             echo "- Target: \`${{ secrets.DEPLOY_VM_USER }}@${{ secrets.DEPLOY_VM_HOST }}:${DEPLOY_PORT}\`"
             echo "- Deploy step outcome: \`${DEPLOY_OUTCOME:-n/a}\`"
             echo "- SSH exit code: \`${SSH_EXIT_CODE:-n/a}\`"
+            echo "- Smoke test status: \`${SMOKE_STATUS:-n/a}\`"
+            echo "- Smoke test exit code: \`${SMOKE_EXIT_CODE:-n/a}\`"
             echo "- Status: completed"
             if [[ -n "${DEPLOY_LOG_PATH:-}" && -f "${DEPLOY_LOG_PATH}" ]]; then
               echo ""
