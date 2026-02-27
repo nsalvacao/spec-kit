@@ -12,11 +12,14 @@ Release metadata consistency is governed by:
 - Coherence workflow: `.github/workflows/version-coherence.yml`
 - Sync workflow: `.github/workflows/release-metadata-sync.yml`
 - Hygiene workflow: `.github/workflows/branch-hygiene.yml`
+- Baseline sync workflow: `.github/workflows/baseline-auto-sync.yml`
+- Deploy workflow: `.github/workflows/deploy.yml`
 - Bump helpers:
   - `scripts/bash/version-bump.sh`
   - `scripts/powershell/version-bump.ps1`
 
 The guard validates release metadata coherence. The version coherence workflow validates canonical version propagation using the manifest map. The sync workflow opens a PR (never pushes directly to `main`) when metadata drift is detected.
+The deploy workflow installs `specify-cli` on a configured VM whenever a GitHub Release is published.
 
 Authority split:
 
@@ -99,7 +102,48 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 - The sync workflow enforces file safety using `allowlist` from `.github/version-map.yml`.
 - `release-consistency-guard.yml` blocks PRs to `main` when coherence fails.
 - `version-coherence.yml` blocks PRs to `main` when mapped version drift is detected.
+- `baseline-auto-sync.yml` auto-triggers "Update branch" for open `baseline/* -> main`
+  PRs when `main` moves ahead, reducing manual sync drift in parallel work.
 - Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.
+
+### 6.1) Release Deploy to VM
+
+The deploy workflow can be triggered automatically on `release: published` or manually (`workflow_dispatch`).
+
+Required repository secrets:
+
+- `DEPLOY_VM_HOST`
+- `DEPLOY_VM_USER`
+- `DEPLOY_SSH_KEY`
+
+Required repository variable:
+
+- `DEPLOY_VM_HOST_FINGERPRINT` (for example `SHA256:...`)
+  - Supports one or more comma-separated fingerprints for controlled key-rotation windows.
+- `DEPLOY_VM_KNOWN_HOSTS` (pre-pinned known_hosts content for the target VM)
+  - Example generator: `ssh-keyscan -T 10 -p 22 -t ed25519 <DEPLOY_VM_HOST> | sed '/^#/d' | head -n 1`
+  - Must be a non-hashed host entry (for deterministic host-field validation).
+  - Supports one or more entries during controlled host-key rotation windows.
+  - Every entry must match `DEPLOY_VM_HOST` (or `[host]:port`) and use `ssh-ed25519`.
+  - Wildcards and multi-host entries are rejected (for example `*`, `?`, `host1,host2`).
+
+Optional repository variables:
+
+- `DEPLOY_VM_PORT` (defaults to `22`)
+
+Notes:
+
+- Deploy uses absolute paths (`~/.local/bin/uv`, `~/.local/bin/specify`) because non-interactive SSH sessions do not load shell profiles.
+- Deploy uses native `ssh` in the runner (no third-party SSH action dependency).
+- Host key is verified by matching pre-pinned known_hosts content against `DEPLOY_VM_HOST_FINGERPRINT`.
+- `DEPLOY_VM_HOST` must be a concrete host value (wildcard/ambiguous values are rejected).
+- If VM host keys rotate, update `DEPLOY_VM_HOST_FINGERPRINT` and `DEPLOY_VM_KNOWN_HOSTS` together before the next release deploy.
+- Manual runs accept an optional `tag` input and validate `vMAJOR.MINOR.PATCH` format.
+- Smoke test runs `specify --help` remotely after install.
+- VM bootstrap must ensure both binaries exist at those paths:
+  - `~/.local/bin/uv`
+  - `~/.local/bin/specify`
+- SSH artifacts are removed after deploy using best-effort secure deletion (`shred` when available, `rm` fallback).
 
 ## 7) Local Main Hygiene
 

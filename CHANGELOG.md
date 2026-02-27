@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **#35 (P030): Full scoring coverage validation in `validate-airice.sh` / `validate-airice.ps1`**
+  - Added second optional argument `BACKLOG_PATH` (default: `.spec-kit/ideas_backlog.md`)
+    to both bash and PowerShell validators.
+  - When the backlog file exists, the validator now checks that every idea listed in
+    `ideas_backlog.md` has a corresponding row in the `idea_selection.md` scoring table.
+  - On failure, the error output shows: total ideas in backlog, total scored rows,
+    and the list of missing idea IDs.
+  - Coverage check is skipped gracefully when the backlog file is absent.
+  - Added test coverage in `tests/test_airice_calculator.py`:
+    `TestValidateAIRiceCoverageBash` and `TestValidateAIRiceCoveragePS1`.
+
 - **#171: Branch policy lineage metadata + inconsistency/rollback regressions**
   - Added optional lineage fields to branch metadata contract registration:
     - `parent_epic_id`
@@ -29,6 +40,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     taskstoissues.
   - Added regression test: `tests/test_command_discoverability.py`.
   - Added audit report: `docs/command-discoverability-audit.md`.
+
+- **#162: Auto-deploy latest release to Always Free VM**
+  - Added `.github/workflows/deploy.yml` triggered on `release: published`
+    and `workflow_dispatch`.
+  - Added tag validation and deployment summary for traceable operations.
+  - Added remote smoke-test step (`~/.local/bin/specify --help`) after install.
+  - Hardened SSH deployment path:
+    - switched to native runner `ssh` flow (removed third-party SSH action dependency)
+    - added VM host-key fingerprint verification (`DEPLOY_VM_HOST_FINGERPRINT`)
+    - enabled deploy concurrency cancellation to avoid overlapping deployments
+    - added explicit secret validation and key parsing checks before SSH key use
+    - switched key/known_hosts artifacts to isolated temp paths with cleanup
+    - added support for comma-separated host fingerprints during key rotation windows
+    - added required `DEPLOY_VM_KNOWN_HOSTS` host-key pinning variable (no runtime `ssh-keyscan` fallback)
+    - added optional `DEPLOY_VM_PORT` workflow variable for non-default SSH ports
+    - added strict `known_hosts` entry validation (one or more entries, non-hashed host, `ssh-ed25519`, host-field sanity checks)
+    - rejected wildcard/ambiguous host values in deploy host pinning validation
+    - improved remote diagnostics for missing `uv`/`specify` binaries during deploy
+    - added explicit smoke-test status and exit-code reporting in deployment job summary
+    - switched SSH artifact cleanup to best-effort secure deletion (`shred`) with safe fallback
 
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.
@@ -76,6 +107,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release metadata sync automation**
   - Updated `.github/workflows/release-metadata-sync.yml` to use `version-orchestrator.py sync`.
   - Metadata sync now propagates to `uv.lock` in addition to `pyproject.toml` and `CHANGELOG.md`.
+- **Baseline promotion sync automation**
+  - Added `.github/workflows/baseline-auto-sync.yml` to detect open `baseline/* -> main`
+    PRs and auto-trigger GitHub's "Update branch" when `main` moves ahead.
+  - Added manual entry point (`workflow_dispatch`) with optional PR number targeting.
+  - Added release-process and Copilot workflow documentation for the new sync behavior.
 
 ## [0.0.53] - 2026-02-26
 

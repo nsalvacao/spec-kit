@@ -269,6 +269,8 @@ When choosing what to work on, apply this order:
 | `ai-review.yml` | ✅ Active | PR — GitHub Models code review (long-context + fallback chain) |
 | `test.yml` | ✅ Active | Push/PR — `uv run pytest` |
 | `release.yml` | ✅ Active | Push to `main` — semantic versioning (latest tag from repo releases) |
+| `baseline-auto-sync.yml` | ✅ Active | Push to `main` + baseline PR events — auto-sync `baseline/* -> main` branches |
+| `deploy.yml` | ✅ Active | Release published/manual — deploy latest tag to configured VM |
 
 ### Known CI Status
 
@@ -278,6 +280,8 @@ Current baseline (latest published release tag):
 - `ai-triage.yml` was intentionally removed (obsolete/unused).
 - `ai-review.yml` now validates token presence, checks tenant model catalog availability, supports configurable A/B model pools, and appends timeline logs to workflow summaries.
 - `ai-review.yml` defaults are designed for large diffs (chunking enabled; no global diff truncation in normal path).
+- `baseline-auto-sync.yml` automatically triggers "Update branch" for open `baseline/* -> main`
+  PRs when `main` advances, reducing manual merge drift during parallel lanes.
 
 ### AI Review Runtime Configuration (Repository Variables)
 

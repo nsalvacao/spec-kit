@@ -300,3 +300,143 @@ class TestValidateAIRiceSemanticPS1:
         ])
         result = self._run(path)
         assert result.returncode != 0
+
+
+# ---------------------------------------------------------------------------
+# Helper: build ideas_backlog.md
+# ---------------------------------------------------------------------------
+
+
+def _make_backlog_md(tmp_path, idea_ids):
+    """Create a minimal ideas_backlog.md listing the given idea IDs."""
+    ideas_text = "\n\n---\n\n".join(
+        f"### Idea {iid}\n\n**Text**: Description of {iid}\n**Tag**: SEED\n**Generated**: 2026-01-01T00:00:00Z"
+        for iid in idea_ids
+    )
+    content = f"""---
+artifact: ideas_backlog
+phase: ideate
+schema_version: "1.0"
+generated: 2026-01-01T00:00:00Z
+---
+
+# Ideas Backlog
+
+{ideas_text}
+"""
+    path = tmp_path / ".spec-kit" / "ideas_backlog.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    return path
+
+
+# ---------------------------------------------------------------------------
+# Tests: validate-airice.sh coverage validation (issue #35)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateAIRiceCoverageBash:
+    """Coverage validation tests for validate-airice.sh (issue #35)."""
+
+    def _run(self, selection_path, backlog_path=None):
+        args = ["bash", str(VALIDATE_BASH), str(selection_path)]
+        if backlog_path is not None:
+            args.append(str(backlog_path))
+        return subprocess.run(args, capture_output=True, text=True)
+
+    def _scored_row(self, iid):
+        score = (1000 * 2.0 * 70 * 80) / (4 * 5)
+        return {"id": iid, "reach": 1000, "impact": 2.0, "conf": 70, "dr": 80, "effort": 4, "risk": 5, "score": score}
+
+    def test_full_coverage_passes(self, tmp_path):
+        """All backlog ideas scored -> validation passes."""
+        idea_ids = ["S1", "S2", "S3"]
+        selection = _make_selection_md(tmp_path, [self._scored_row(i) for i in idea_ids])
+        backlog = _make_backlog_md(tmp_path, idea_ids)
+        result = self._run(selection, backlog)
+        assert result.returncode == 0
+        assert "passed" in result.stdout.lower()
+
+    def test_partial_scoring_fails(self, tmp_path):
+        """Fewer scored rows than backlog ideas -> validation fails."""
+        all_ids = [f"S{i}" for i in range(1, 16)]
+        scored_ids = all_ids[:8]
+        selection = _make_selection_md(tmp_path, [self._scored_row(i) for i in scored_ids])
+        backlog = _make_backlog_md(tmp_path, all_ids)
+        result = self._run(selection, backlog)
+        assert result.returncode != 0
+        combined = result.stdout + result.stderr
+        assert "8/15" in combined or "Incomplete" in combined or "coverage" in combined.lower()
+
+    def test_partial_scoring_shows_counts(self, tmp_path):
+        """Error output includes backlog count and scored count."""
+        all_ids = ["S1", "S2", "S3"]
+        selection = _make_selection_md(tmp_path, [self._scored_row("S1")])
+        backlog = _make_backlog_md(tmp_path, all_ids)
+        result = self._run(selection, backlog)
+        assert result.returncode != 0
+        combined = result.stdout + result.stderr
+        assert "1/3" in combined or ("1" in combined and "3" in combined)
+
+    def test_partial_scoring_shows_missing_ids(self, tmp_path):
+        """Error output lists missing idea IDs."""
+        all_ids = ["S1", "S2", "S3"]
+        selection = _make_selection_md(tmp_path, [self._scored_row("S1")])
+        backlog = _make_backlog_md(tmp_path, all_ids)
+        result = self._run(selection, backlog)
+        combined = result.stdout + result.stderr
+        assert "S2" in combined and "S3" in combined
+
+    def test_no_backlog_skips_coverage_check(self, tmp_path):
+        """If backlog file is absent, coverage check is skipped -> validation passes."""
+        selection = _make_selection_md(tmp_path, [self._scored_row("S1")])
+        absent_backlog = tmp_path / "nonexistent" / "ideas_backlog.md"
+        result = self._run(selection, absent_backlog)
+        assert result.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: validate-airice.ps1 coverage validation (issue #35)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateAIRiceCoveragePS1:
+    """Coverage validation tests for validate-airice.ps1 (issue #35)."""
+
+    def _run(self, selection_path, backlog_path=None):
+        args = ["pwsh", "-NoLogo", "-NonInteractive", "-File", str(VALIDATE_PS1), str(selection_path)]
+        if backlog_path is not None:
+            args.append(str(backlog_path))
+        return subprocess.run(args, capture_output=True, text=True)
+
+    def _scored_row(self, iid):
+        score = (1000 * 2.0 * 70 * 80) / (4 * 5)
+        return {"id": iid, "reach": 1000, "impact": 2.0, "conf": 70, "dr": 80, "effort": 4, "risk": 5, "score": score}
+
+    @skip_no_pwsh
+    def test_full_coverage_passes(self, tmp_path):
+        """All backlog ideas scored -> validation passes."""
+        idea_ids = ["S1", "S2", "S3"]
+        selection = _make_selection_md(tmp_path, [self._scored_row(i) for i in idea_ids])
+        backlog = _make_backlog_md(tmp_path, idea_ids)
+        result = self._run(selection, backlog)
+        assert result.returncode == 0
+
+    @skip_no_pwsh
+    def test_partial_scoring_fails(self, tmp_path):
+        """Fewer scored rows than backlog ideas -> validation fails."""
+        all_ids = [f"S{i}" for i in range(1, 16)]
+        scored_ids = all_ids[:8]
+        selection = _make_selection_md(tmp_path, [self._scored_row(i) for i in scored_ids])
+        backlog = _make_backlog_md(tmp_path, all_ids)
+        result = self._run(selection, backlog)
+        assert result.returncode != 0
+        assert "Incomplete scoring coverage: 8/15" in result.stderr
+
+    @skip_no_pwsh
+    def test_no_backlog_skips_coverage_check(self, tmp_path):
+        """If backlog file is absent, coverage check is skipped."""
+        selection = _make_selection_md(tmp_path, [self._scored_row("S1")])
+        absent_backlog = tmp_path / "nonexistent" / "ideas_backlog.md"
+        result = self._run(selection, absent_backlog)
+        assert result.returncode == 0

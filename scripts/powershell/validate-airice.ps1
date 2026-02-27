@@ -1,5 +1,6 @@
 param(
-    [string]$FilePath = '.spec-kit/idea_selection.md'
+    [string]$FilePath = '.spec-kit/idea_selection.md',
+    [string]$BacklogPath = '.spec-kit/ideas_backlog.md'
 )
 
 $stateLog = 'scripts/powershell/state-log-violation.ps1'
@@ -112,6 +113,36 @@ foreach ($row in $dataRows) {
 if ($semanticErrors -gt 0) {
     if (Test-Path $stateLog) { & $stateLog 'select' 'Framework-Driven Development' "AI-RICE semantic validation failed ($semanticErrors errors)" 'high' 'validate-airice' }
     exit 1
+}
+
+# --- Coverage validation: verify all backlog ideas are scored (issue #35) ---
+if (Test-Path $BacklogPath) {
+    $backlogIds = @(Select-String -Path $BacklogPath -Pattern '^### Idea (.+)' | ForEach-Object {
+        $_.Matches[0].Groups[1].Value.Trim()
+    })
+    $backlogCount = $backlogIds.Count
+
+    $scoredIds = @($tableLines | Select-Object -Skip 2 | ForEach-Object {
+        $parts = $_ -split '\|'
+        if ($parts.Count -ge 3) {
+            $col = $parts[1].Trim()
+            if ($col -match '^\[([^\]]+)\]') { $Matches[1] } else { $col }
+        }
+    } | Where-Object { $_ -and $_ -notmatch '^[-:]+$' })
+    $scoredCount = $scoredIds.Count
+
+    if ($backlogCount -gt 0 -and $scoredCount -lt $backlogCount) {
+        Write-Error "Incomplete scoring coverage: $scoredCount/$backlogCount ideas scored"
+        Write-Error "  Backlog: $backlogCount ideas"
+        Write-Error "  Scored:  $scoredCount ideas"
+        $scoredIdSet = [System.Collections.Generic.HashSet[string]]::new($scoredIds, [System.StringComparer]::Ordinal)
+        $missing = $backlogIds | Where-Object { -not $scoredIdSet.Contains($_) }
+        if ($missing) {
+            Write-Error "  Missing IDs: $($missing -join ', ')"
+        }
+        if (Test-Path $stateLog) { & $stateLog 'select' 'Traceability First' "Incomplete scoring: $scoredCount/$backlogCount ideas scored" 'high' 'validate-airice' }
+        exit 1
+    }
 }
 
 Write-Output 'AI-RICE validation passed'
