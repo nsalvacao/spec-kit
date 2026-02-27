@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - added explicit secret validation and key parsing checks before SSH key use
     - switched key/known_hosts artifacts to isolated temp paths with cleanup
     - added support for comma-separated host fingerprints during key rotation windows
+    - added optional `DEPLOY_VM_PORT` and `DEPLOY_VM_KNOWN_HOSTS` workflow variables
+      for non-default SSH ports and pre-pinned host-key sources
 
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.
