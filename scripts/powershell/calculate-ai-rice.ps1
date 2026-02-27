@@ -270,30 +270,32 @@ $scEM = Get-ScoreRaw $reachVal $impactVal $confVal $drVal    $sensEM    $riskVal
 $scKP = Get-ScoreRaw $reachVal $impactVal $confVal $drVal    $effortVal $sensKP
 $scKM = Get-ScoreRaw $reachVal $impactVal $confVal $drVal    $effortVal $sensKM
 
+$baselineScore = [math]::Round($rawScore, 2)
+
 # Delta strings
-$dRP = Format-Delta $scRP $rawScore; $dRM = Format-Delta $scRM $rawScore
-$dIP = Format-Delta $scIP $rawScore; $dIM = Format-Delta $scIM $rawScore
-$dCP = Format-Delta $scCP $rawScore; $dCM = Format-Delta $scCM $rawScore
-$dDP = Format-Delta $scDP $rawScore; $dDM = Format-Delta $scDM $rawScore
-$dEP = Format-Delta $scEP $rawScore; $dEM = Format-Delta $scEM $rawScore
-$dKP = Format-Delta $scKP $rawScore; $dKM = Format-Delta $scKM $rawScore
+$dRP = Format-Delta $scRP $baselineScore; $dRM = Format-Delta $scRM $baselineScore
+$dIP = Format-Delta $scIP $baselineScore; $dIM = Format-Delta $scIM $baselineScore
+$dCP = Format-Delta $scCP $baselineScore; $dCM = Format-Delta $scCM $baselineScore
+$dDP = Format-Delta $scDP $baselineScore; $dDM = Format-Delta $scDM $baselineScore
+$dEP = Format-Delta $scEP $baselineScore; $dEM = Format-Delta $scEM $baselineScore
+$dKP = Format-Delta $scKP $baselineScore; $dKM = Format-Delta $scKM $baselineScore
 
 # Identify best positive and negative levers
 $posScenarios = @(
-    @{name="Reach +1";          delta=$scRP - $rawScore},
-    @{name="Impact +1 step";    delta=$scIP - $rawScore},
-    @{name="Confidence +1%";    delta=$scCP - $rawScore},
-    @{name="Data_Readiness +1%";delta=$scDP - $rawScore},
-    @{name="Effort -1 wk";      delta=$scEM - $rawScore},
-    @{name="Risk -1";           delta=$scKM - $rawScore}
+    @{name="Reach +1";          delta=$scRP - $baselineScore},
+    @{name="Impact +1 step";    delta=$scIP - $baselineScore},
+    @{name="Confidence +1%";    delta=$scCP - $baselineScore},
+    @{name="Data_Readiness +1%";delta=$scDP - $baselineScore},
+    @{name="Effort -1 wk";      delta=$scEM - $baselineScore},
+    @{name="Risk -1";           delta=$scKM - $baselineScore}
 )
 $negScenarios = @(
-    @{name="Reach -1";          delta=$scRM - $rawScore},
-    @{name="Impact -1 step";    delta=$scIM - $rawScore},
-    @{name="Confidence -1%";    delta=$scCM - $rawScore},
-    @{name="Data_Readiness -1%";delta=$scDM - $rawScore},
-    @{name="Effort +1 wk";      delta=$scEP - $rawScore},
-    @{name="Risk +1";           delta=$scKP - $rawScore}
+    @{name="Reach -1";          delta=$scRM - $baselineScore},
+    @{name="Impact -1 step";    delta=$scIM - $baselineScore},
+    @{name="Confidence -1%";    delta=$scCM - $baselineScore},
+    @{name="Data_Readiness -1%";delta=$scDM - $baselineScore},
+    @{name="Effort +1 wk";      delta=$scEP - $baselineScore},
+    @{name="Risk +1";           delta=$scKP - $baselineScore}
 )
 $bestPos = $posScenarios | Sort-Object { $_.delta } -Descending | Select-Object -First 1
 $bestNeg = $negScenarios | Sort-Object { $_.delta } | Select-Object -First 1
