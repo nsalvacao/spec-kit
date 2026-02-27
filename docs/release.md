@@ -14,6 +14,7 @@ Release metadata consistency is governed by:
 - Hygiene workflow: `.github/workflows/branch-hygiene.yml`
 - Baseline sync workflow: `.github/workflows/baseline-auto-sync.yml`
 - Deploy workflow: `.github/workflows/deploy.yml`
+- Google Drive backup workflow: `.github/workflows/backup-gdrive.yml`
 - Bump helpers:
   - `scripts/bash/version-bump.sh`
   - `scripts/powershell/version-bump.ps1`
@@ -23,6 +24,7 @@ Release metadata sync runs automatically on `release: published` and also when
 the `Create Release` workflow completes (`workflow_run`) so canonical metadata
 stays aligned with published tags even when release events are action-originated.
 The deploy workflow installs `specify-cli` on a configured VM whenever a GitHub Release is published.
+The Google Drive backup workflow stores a deterministic source archive, checksum, and manifest for each published release.
 
 Authority split:
 
@@ -149,6 +151,34 @@ Notes:
   - `~/.local/bin/uv`
   - `~/.local/bin/specify`
 - SSH artifacts are removed after deploy using best-effort secure deletion (`shred` when available, `rm` fallback).
+
+### 6.2) Release Backup to Google Drive
+
+The backup workflow is triggered automatically on `release: published` and can also be run manually with `workflow_dispatch`.
+
+Required repository secrets:
+
+- `GDRIVE_OAUTH_CLIENT_ID`
+- `GDRIVE_OAUTH_CLIENT_SECRET`
+- `GDRIVE_OAUTH_REFRESH_TOKEN`
+
+Required repository variable:
+
+- `GDRIVE_BACKUP_FOLDER_ID`
+
+Optional repository variable:
+
+- `GDRIVE_BACKUP_RETENTION_COUNT` (default: `30`)
+
+Notes:
+
+- Backups are uploaded by Drive folder ID (not name lookup).
+- Manual runs default to `dry_run=true`; release-triggered runs execute real upload.
+- The workflow is append-only in step summary and stores `backup-result.json` as a run artifact.
+- Upsert behavior makes re-runs idempotent for the same release tag.
+- Retention deletes oldest backup sets based on manifest ordering.
+
+For setup/operations details, see: `docs/backup-google-drive.md`.
 
 ## 7) Local Main Hygiene
 

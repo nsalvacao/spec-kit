@@ -1,0 +1,275 @@
+name: Release Backup to Google Drive
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to back up (example: v0.0.71). Defaults to latest published release."
+        required: false
+        type: string
+      dry_run:
+        description: "Run upload/retention in dry-run mode."
+        required: false
+        default: true
+        type: boolean
+      retention_count:
+        description: "How many release backup sets to retain (manifest-based)."
+        required: false
+        default: "30"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-gdrive-${{ github.event_name }}-${{ github.event.release.tag_name }}-${{ github.event.inputs.release_tag }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  release-backup:
+    runs-on: ubuntu-latest
+    env:
+      BACKUP_PREFIX: spec-kit-release-backup
+      DEFAULT_RETENTION_COUNT: "30"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Resolve release target
+        id: release_target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          tag="${{ github.event.release.tag_name }}"
+          source="release_event"
+
+          if [[ -z "$tag" ]]; then
+            tag="${{ github.event.inputs.release_tag }}"
+            if [[ -n "$tag" ]]; then
+              source="workflow_dispatch_input"
+            fi
+          fi
+
+          if [[ -z "$tag" ]]; then
+            tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+            source="latest_release_api_fallback"
+          fi
+
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "::error::Unable to resolve release tag (provide workflow_dispatch input 'release_tag')." >&2
+            exit 1
+          fi
+
+          python - "$tag" <<'PY'
+          import re
+          import sys
+
+          tag = sys.argv[1]
+          if re.fullmatch(r"^v[0-9]+\.[0-9]+\.[0-9]+(?:-fork\.[0-9]+)?$", tag) is None:
+              raise SystemExit(
+                  f"Resolved tag '{tag}' is invalid. Expected format: vMAJOR.MINOR.PATCH"
+              )
+          PY
+
+          if ! git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            git fetch --force --tags origin
+          fi
+
+          sha="$(git rev-list -n 1 "$tag" || true)"
+          if [[ -z "$sha" ]]; then
+            echo "::error::Could not resolve commit SHA for tag '$tag'." >&2
+            exit 1
+          fi
+
+          published_at="${{ github.event.release.published_at }}"
+          if [[ -z "$published_at" || "$published_at" == "null" ]]; then
+            published_at="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq '.published_at // ""' 2>/dev/null || true)"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "published_at=$published_at" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Google Drive Backup Timeline ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+            echo "- release_target.tag: \`$tag\`"
+            echo "- release_target.sha: \`$sha\`"
+            echo "- release_target.source: \`$source\`"
+            if [[ -n "$published_at" ]]; then
+              echo "- release_target.published_at: \`$published_at\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate backup configuration
+        id: config
+        env:
+          GDRIVE_BACKUP_FOLDER_ID: ${{ vars.GDRIVE_BACKUP_FOLDER_ID }}
+          GDRIVE_BACKUP_RETENTION_COUNT: ${{ vars.GDRIVE_BACKUP_RETENTION_COUNT }}
+          GDRIVE_OAUTH_CLIENT_ID: ${{ secrets.GDRIVE_OAUTH_CLIENT_ID }}
+          GDRIVE_OAUTH_CLIENT_SECRET: ${{ secrets.GDRIVE_OAUTH_CLIENT_SECRET }}
+          GDRIVE_OAUTH_REFRESH_TOKEN: ${{ secrets.GDRIVE_OAUTH_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for key in GDRIVE_BACKUP_FOLDER_ID GDRIVE_OAUTH_CLIENT_ID GDRIVE_OAUTH_CLIENT_SECRET GDRIVE_OAUTH_REFRESH_TOKEN; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::$key is required. Configure repository variables/secrets before enabling automated backups." >&2
+              missing=1
+            fi
+          done
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+          # Defensive masking in case future edits accidentally echo variables.
+          echo "::add-mask::$GDRIVE_OAUTH_CLIENT_ID"
+          echo "::add-mask::$GDRIVE_OAUTH_CLIENT_SECRET"
+          echo "::add-mask::$GDRIVE_OAUTH_REFRESH_TOKEN"
+          echo "::add-mask::$GDRIVE_BACKUP_FOLDER_ID"
+
+          if ! [[ "$GDRIVE_BACKUP_FOLDER_ID" =~ ^[A-Za-z0-9_-]{10,}$ ]]; then
+            echo "::error::GDRIVE_BACKUP_FOLDER_ID does not look valid (expected a Drive folder ID)." >&2
+            exit 1
+          fi
+
+          retention="${{ github.event.inputs.retention_count }}"
+          if [[ -z "$retention" || "$retention" == "null" ]]; then
+            retention="$GDRIVE_BACKUP_RETENTION_COUNT"
+          fi
+          if [[ -z "$retention" || "$retention" == "null" ]]; then
+            retention="$DEFAULT_RETENTION_COUNT"
+          fi
+          if ! [[ "$retention" =~ ^[0-9]+$ ]] || [[ "$retention" -lt 1 ]]; then
+            echo "::error::Retention count must be a positive integer. Resolved value: '$retention'." >&2
+            exit 1
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            dry_run="${{ github.event.inputs.dry_run }}"
+            if [[ -z "$dry_run" || "$dry_run" == "null" ]]; then
+              dry_run="true"
+            fi
+          else
+            dry_run="false"
+          fi
+
+          echo "retention_count=$retention" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "folder_id_suffix=${GDRIVE_BACKUP_FOLDER_ID: -8}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "- config.retention_count: \`$retention\`"
+            echo "- config.dry_run: \`$dry_run\`"
+            echo "- config.folder_id_suffix: \`${GDRIVE_BACKUP_FOLDER_ID: -8}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package release source archive
+        id: package
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.release_target.outputs.tag }}"
+          mkdir -p .backup
+          artifact=".backup/${BACKUP_PREFIX}-${tag}.tar.gz"
+          prefix_dir="spec-kit-${tag#v}/"
+          git archive --format=tar.gz --prefix="$prefix_dir" -o "$artifact" "$tag"
+          tar -tzf "$artifact" >/dev/null
+          first_entry="$(tar -tzf "$artifact" | head -n 1 || true)"
+          if [[ -z "$first_entry" || "$first_entry" != "${prefix_dir}"* ]]; then
+            echo "::error::Archive integrity check failed (unexpected first entry: '$first_entry')." >&2
+            exit 1
+          fi
+          size_bytes="$(wc -c < "$artifact" | tr -d ' ')"
+
+          echo "artifact_path=$artifact" >> "$GITHUB_OUTPUT"
+          echo "size_bytes=$size_bytes" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "- package.artifact: \`$artifact\`"
+            echo "- package.size_bytes: \`$size_bytes\`"
+            echo "- package.prefix: \`$prefix_dir\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload backup to Google Drive
+        id: upload
+        env:
+          GDRIVE_BACKUP_FOLDER_ID: ${{ vars.GDRIVE_BACKUP_FOLDER_ID }}
+          GDRIVE_OAUTH_CLIENT_ID: ${{ secrets.GDRIVE_OAUTH_CLIENT_ID }}
+          GDRIVE_OAUTH_CLIENT_SECRET: ${{ secrets.GDRIVE_OAUTH_CLIENT_SECRET }}
+          GDRIVE_OAUTH_REFRESH_TOKEN: ${{ secrets.GDRIVE_OAUTH_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          cmd=(
+            python scripts/python/gdrive-release-backup.py
+            --artifact-path "${{ steps.package.outputs.artifact_path }}"
+            --tag "${{ steps.release_target.outputs.tag }}"
+            --commit-sha "${{ steps.release_target.outputs.sha }}"
+            --folder-id "$GDRIVE_BACKUP_FOLDER_ID"
+            --artifact-prefix "$BACKUP_PREFIX"
+            --retention-count "${{ steps.config.outputs.retention_count }}"
+            --summary-file "$GITHUB_STEP_SUMMARY"
+            --release-published-at "${{ steps.release_target.outputs.published_at }}"
+          )
+
+          if [[ "${{ steps.config.outputs.dry_run }}" == "true" ]]; then
+            cmd+=(--dry-run)
+          fi
+
+          "${cmd[@]}" | tee backup-result.json
+
+          python - <<'PY'
+          import json
+
+          with open("backup-result.json", encoding="utf-8") as handle:
+              payload = json.load(handle)
+
+          uploaded = payload.get("uploaded")
+          if not isinstance(uploaded, list) or len(uploaded) != 3:
+              raise SystemExit("backup-result.json missing expected uploaded entries (expected 3).")
+          for item in uploaded:
+              if not isinstance(item, dict):
+                  raise SystemExit("backup-result.json contains malformed uploaded item.")
+              if not item.get("name"):
+                  raise SystemExit("backup-result.json uploaded item missing name.")
+              if not item.get("id"):
+                  raise SystemExit("backup-result.json uploaded item missing id.")
+          if not payload.get("artifact_sha256"):
+              raise SystemExit("backup-result.json missing artifact_sha256.")
+          if not payload.get("manifest_name"):
+              raise SystemExit("backup-result.json missing manifest_name.")
+
+          print(f"artifact_sha256={payload.get('artifact_sha256', '')}")
+          print(f"manifest_name={payload.get('manifest_name', '')}")
+          PY >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Backup Result"
+            echo ""
+            echo '```json'
+            cat backup-result.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload backup metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdrive-backup-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            backup-result.json
+            .backup/*.sha256
+            .backup/*.manifest.json
+          if-no-files-found: error

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **#142: Automated Google Drive release backup (OAuth refresh-token model)**
+  - Added workflow `.github/workflows/backup-gdrive.yml` (release-triggered + manual dispatch).
+  - Added uploader utility `scripts/python/gdrive-release-backup.py`:
+    - OAuth refresh-token exchange to short-lived access token
+    - deterministic archive checksum/manifest generation
+    - Drive upsert by folder ID
+    - manifest-based retention with retry/backoff handling
+  - Added operations documentation: `docs/backup-google-drive.md`.
+  - Updated release process documentation for backup prerequisites and behavior.
+
 ## [0.0.71] - 2026-02-27
 
 ### Added
