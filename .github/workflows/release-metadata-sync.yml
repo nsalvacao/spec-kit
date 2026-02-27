@@ -20,12 +20,16 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: release-metadata-sync-${{ github.run_id }}
+  group: release-metadata-sync-${{ github.event_name }}-${{ github.event.release.tag_name }}${{ github.event.inputs.release_tag }}${{ github.event.workflow_run.id }}${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   sync-release-metadata:
-    if: ${{ !(github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success') }}
+    if: >-
+      ${{
+        !(github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success')
+        && !(github.event_name == 'release' && github.event.release.author.login == 'github-actions[bot]')
+      }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout default branch
@@ -47,14 +51,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          source=""
           tag="${{ github.event.release.tag_name }}"
+          if [[ -n "$tag" ]]; then
+            source="release_event"
+          fi
           if [[ -z "$tag" ]]; then
             tag="${{ github.event.inputs.release_tag }}"
+            if [[ -n "$tag" ]]; then
+              source="workflow_dispatch_input"
+            fi
           fi
           if [[ -z "$tag" ]]; then
             tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+            source="latest_release_api_fallback"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Release Tag Resolution"
+            echo "- tag: \`$tag\`"
+            echo "- source: \`$source\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Synchronize metadata files
         id: sync
