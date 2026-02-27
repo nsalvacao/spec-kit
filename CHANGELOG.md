@@ -76,6 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release metadata sync automation**
   - Updated `.github/workflows/release-metadata-sync.yml` to use `version-orchestrator.py sync`.
   - Metadata sync now propagates to `uv.lock` in addition to `pyproject.toml` and `CHANGELOG.md`.
+- **Baseline promotion sync automation**
+  - Added `.github/workflows/baseline-auto-sync.yml` to detect open `baseline/* -> main`
+    PRs and auto-trigger GitHub's "Update branch" when `main` moves ahead.
+  - Added manual entry point (`workflow_dispatch`) with optional PR number targeting.
+  - Added release-process and Copilot workflow documentation for the new sync behavior.
 
 ## [0.0.53] - 2026-02-26
 
