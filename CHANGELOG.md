@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.71] - 2026-02-27
+
+### Added
+
+- *No changes documented yet.*
+
 ### Changed
 
 - Release automation now keeps metadata aligned by running
