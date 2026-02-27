@@ -47,12 +47,30 @@ jobs:
 
       - name: Prepare SSH key
         shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           set -euo pipefail
+          if [[ -z "${DEPLOY_SSH_KEY:-}" ]]; then
+            echo "ERROR: missing required secret DEPLOY_SSH_KEY." >&2
+            echo "Configure it in: Settings -> Secrets and variables -> Actions -> Secrets." >&2
+            exit 1
+          fi
+
+          if ! grep -Eq '-----BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY-----' <<< "$DEPLOY_SSH_KEY"; then
+            echo "ERROR: DEPLOY_SSH_KEY does not appear to be a valid private key payload." >&2
+            exit 1
+          fi
+
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > "$HOME/.ssh/deploy_vm_ed25519"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_vm_ed25519"
           chmod 600 "$HOME/.ssh/deploy_vm_ed25519"
+
+          if ! ssh-keygen -y -f "$HOME/.ssh/deploy_vm_ed25519" >/dev/null 2>&1; then
+            echo "ERROR: DEPLOY_SSH_KEY could not be parsed (encrypted or malformed key)." >&2
+            exit 1
+          fi
 
       - name: Verify VM host key fingerprint
         shell: bash
@@ -64,6 +82,8 @@ jobs:
 
           if [[ -z "${DEPLOY_VM_HOST_FINGERPRINT:-}" ]]; then
             echo "ERROR: repository variable DEPLOY_VM_HOST_FINGERPRINT is required." >&2
+            echo "Set it in: Settings -> Secrets and variables -> Actions -> Variables." >&2
+            echo "Suggested value (ED25519): ssh-keyscan -T 10 -p 22 -t ed25519 -H <DEPLOY_VM_HOST> | ssh-keygen -lf - -E sha256 | awk '{print \$2}'" >&2
             exit 1
           fi
 
@@ -99,6 +119,11 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+
+          if [[ -z "${DEPLOY_VM_HOST:-}" || -z "${DEPLOY_VM_USER:-}" ]]; then
+            echo "ERROR: missing required secrets DEPLOY_VM_HOST and/or DEPLOY_VM_USER." >&2
+            exit 1
+          fi
 
           ssh \
             -i "$HOME/.ssh/deploy_vm_ed25519" \

@@ -127,6 +127,9 @@ Notes:
 - Host key is verified by matching scanned fingerprints against `DEPLOY_VM_HOST_FINGERPRINT`.
 - Manual runs accept an optional `tag` input and validate `vMAJOR.MINOR.PATCH` format.
 - Smoke test runs `specify --help` remotely after install.
+- VM bootstrap must ensure both binaries exist at those paths:
+  - `~/.local/bin/uv`
+  - `~/.local/bin/specify`
 
 ## 7) Local Main Hygiene
 
