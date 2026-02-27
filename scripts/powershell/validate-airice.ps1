@@ -117,8 +117,8 @@ if ($semanticErrors -gt 0) {
 
 # --- Coverage validation: verify all backlog ideas are scored (issue #35) ---
 if (Test-Path $BacklogPath) {
-    $backlogIds = @(Get-Content $BacklogPath | Where-Object { $_ -match '^### Idea (.+)' } | ForEach-Object {
-        if ($_ -match '^### Idea (.+)') { $Matches[1].Trim() }
+    $backlogIds = @(Select-String -Path $BacklogPath -Pattern '^### Idea (.+)' | ForEach-Object {
+        $_.Matches[0].Groups[1].Value.Trim()
     })
     $backlogCount = $backlogIds.Count
 
@@ -135,7 +135,8 @@ if (Test-Path $BacklogPath) {
         Write-Error "Incomplete scoring coverage: $scoredCount/$backlogCount ideas scored"
         Write-Error "  Backlog: $backlogCount ideas"
         Write-Error "  Scored:  $scoredCount ideas"
-        $missing = $backlogIds | Where-Object { $_ -notin $scoredIds }
+        $scoredIdSet = [System.Collections.Generic.HashSet[string]]::new($scoredIds, [System.StringComparer]::Ordinal)
+        $missing = $backlogIds | Where-Object { -not $scoredIdSet.Contains($_) }
         if ($missing) {
             Write-Error "  Missing IDs: $($missing -join ', ')"
         }

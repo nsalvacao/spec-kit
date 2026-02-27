@@ -385,7 +385,7 @@ class TestValidateAIRiceCoverageBash:
         backlog = _make_backlog_md(tmp_path, all_ids)
         result = self._run(selection, backlog)
         combined = result.stdout + result.stderr
-        assert "S2" in combined or "S3" in combined
+        assert "S2" in combined and "S3" in combined
 
     def test_no_backlog_skips_coverage_check(self, tmp_path):
         """If backlog file is absent, coverage check is skipped -> validation passes."""
@@ -431,6 +431,7 @@ class TestValidateAIRiceCoveragePS1:
         backlog = _make_backlog_md(tmp_path, all_ids)
         result = self._run(selection, backlog)
         assert result.returncode != 0
+        assert "Incomplete scoring coverage: 8/15" in result.stderr
 
     @skip_no_pwsh
     def test_no_backlog_skips_coverage_check(self, tmp_path):
