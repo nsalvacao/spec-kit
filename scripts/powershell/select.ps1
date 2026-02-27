@@ -57,6 +57,13 @@ $specKitDir = Join-Path $ProjectDir '.spec-kit'
 $target = Join-Path $specKitDir 'idea_selection.md'
 $timestamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
+# Check prerequisite: ideas_backlog.md must exist before running select
+$ideasBacklog = Join-Path $specKitDir 'ideas_backlog.md'
+if (-not (Test-Path $ideasBacklog -PathType Leaf)) {
+    Write-Error "Error: .spec-kit/ideas_backlog.md not found. Run ideate.ps1 first to create the ideas backlog."
+    exit 1
+}
+
 # Check idempotency
 if ((Test-Path $target -PathType Container)) {
     Write-Error "Error: $target is a directory, not a file. Remove it manually before proceeding."

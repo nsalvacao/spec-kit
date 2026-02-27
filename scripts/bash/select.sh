@@ -94,6 +94,13 @@ SPEC_KIT_DIR="$PROJECT_DIR/.spec-kit"
 TARGET="$SPEC_KIT_DIR/idea_selection.md"
 TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# Check prerequisite: ideas_backlog.md must exist before running select
+IDEAS_BACKLOG="$SPEC_KIT_DIR/ideas_backlog.md"
+if [ ! -f "$IDEAS_BACKLOG" ]; then
+    echo "Error: .spec-kit/ideas_backlog.md not found. Run ideate.sh first to create the ideas backlog." >&2
+    exit 1
+fi
+
 # Refuse to overwrite symlinks
 if [ -L "$TARGET" ]; then
     echo "Error: $TARGET is a symlink. Remove it manually before proceeding." >&2
