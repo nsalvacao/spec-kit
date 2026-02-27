@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - added required `DEPLOY_VM_KNOWN_HOSTS` host-key pinning variable (no runtime `ssh-keyscan` fallback)
     - added optional `DEPLOY_VM_PORT` workflow variable for non-default SSH ports
     - added strict `known_hosts` entry validation (one or more entries, non-hashed host, `ssh-ed25519`, host-field sanity checks)
+    - rejected wildcard/ambiguous host values in deploy host pinning validation
     - improved remote diagnostics for missing `uv`/`specify` binaries during deploy
     - added explicit smoke-test status and exit-code reporting in deployment job summary
     - switched SSH artifact cleanup to best-effort secure deletion (`shred`) with safe fallback

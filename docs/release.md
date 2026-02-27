@@ -125,6 +125,7 @@ Required repository variable:
   - Must be a non-hashed host entry (for deterministic host-field validation).
   - Supports one or more entries during controlled host-key rotation windows.
   - Every entry must match `DEPLOY_VM_HOST` (or `[host]:port`) and use `ssh-ed25519`.
+  - Wildcards and multi-host entries are rejected (for example `*`, `?`, `host1,host2`).
 
 Optional repository variables:
 
@@ -135,6 +136,7 @@ Notes:
 - Deploy uses absolute paths (`~/.local/bin/uv`, `~/.local/bin/specify`) because non-interactive SSH sessions do not load shell profiles.
 - Deploy uses native `ssh` in the runner (no third-party SSH action dependency).
 - Host key is verified by matching pre-pinned known_hosts content against `DEPLOY_VM_HOST_FINGERPRINT`.
+- `DEPLOY_VM_HOST` must be a concrete host value (wildcard/ambiguous values are rejected).
 - If VM host keys rotate, update `DEPLOY_VM_HOST_FINGERPRINT` and `DEPLOY_VM_KNOWN_HOSTS` together before the next release deploy.
 - Manual runs accept an optional `tag` input and validate `vMAJOR.MINOR.PATCH` format.
 - Smoke test runs `specify --help` remotely after install.
