@@ -106,7 +106,7 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
   PRs when `main` moves ahead, reducing manual sync drift in parallel work.
 - Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.
 
-## 6.1) Release Deploy to VM
+### 6.1) Release Deploy to VM
 
 The deploy workflow can be triggered automatically on `release: published` or manually (`workflow_dispatch`).
 
@@ -116,9 +116,15 @@ Required repository secrets:
 - `DEPLOY_VM_USER`
 - `DEPLOY_SSH_KEY`
 
+Required repository variable:
+
+- `DEPLOY_VM_HOST_FINGERPRINT` (for example `SHA256:...`)
+
 Notes:
 
 - Deploy uses absolute paths (`~/.local/bin/uv`, `~/.local/bin/specify`) because non-interactive SSH sessions do not load shell profiles.
+- Deploy uses native `ssh` in the runner (no third-party SSH action dependency).
+- Host key is verified by matching scanned fingerprints against `DEPLOY_VM_HOST_FINGERPRINT`.
 - Manual runs accept an optional `tag` input and validate `vMAJOR.MINOR.PATCH` format.
 - Smoke test runs `specify --help` remotely after install.
 

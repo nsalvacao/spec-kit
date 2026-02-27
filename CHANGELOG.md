@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and `workflow_dispatch`.
   - Added tag validation and deployment summary for traceable operations.
   - Added remote smoke-test step (`~/.local/bin/specify --help`) after install.
+  - Hardened SSH deployment path:
+    - switched to native runner `ssh` flow (removed third-party SSH action dependency)
+    - added VM host-key fingerprint verification (`DEPLOY_VM_HOST_FINGERPRINT`)
+    - enabled deploy concurrency cancellation to avoid overlapping deployments
 
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.

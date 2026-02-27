@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: deploy-vm
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -45,22 +45,74 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Resolved tag: $TAG" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.DEPLOY_VM_HOST }}
-          username: ${{ secrets.DEPLOY_VM_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          command_timeout: 5m
-          script_stop: true
-          script: |
-            set -eu
-            test -x "$HOME/.local/bin/uv"
-            "$HOME/.local/bin/uv" tool install --reinstall \
-              "git+https://github.com/${{ github.repository }}@${{ steps.tag.outputs.tag }}"
-            test -x "$HOME/.local/bin/specify"
-            "$HOME/.local/bin/specify" --help > /tmp/specify-help.txt
-            head -n 20 /tmp/specify-help.txt
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > "$HOME/.ssh/deploy_vm_ed25519"
+          chmod 600 "$HOME/.ssh/deploy_vm_ed25519"
+
+      - name: Verify VM host key fingerprint
+        shell: bash
+        env:
+          DEPLOY_VM_HOST: ${{ secrets.DEPLOY_VM_HOST }}
+          DEPLOY_VM_HOST_FINGERPRINT: ${{ vars.DEPLOY_VM_HOST_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DEPLOY_VM_HOST_FINGERPRINT:-}" ]]; then
+            echo "ERROR: repository variable DEPLOY_VM_HOST_FINGERPRINT is required." >&2
+            exit 1
+          fi
+
+          ssh-keyscan -T 10 -p 22 -t ed25519 -H "$DEPLOY_VM_HOST" > "$HOME/.ssh/known_hosts.candidate"
+          if [[ ! -s "$HOME/.ssh/known_hosts.candidate" ]]; then
+            echo "ERROR: failed to capture VM host key via ssh-keyscan." >&2
+            exit 1
+          fi
+
+          OBSERVED_FINGERPRINTS="$(
+            ssh-keygen -lf "$HOME/.ssh/known_hosts.candidate" -E sha256 \
+              | awk '{print $2}' \
+              | sort -u
+          )"
+          echo "Observed host fingerprints:"
+          echo "$OBSERVED_FINGERPRINTS"
+
+          if ! grep -Fxq "$DEPLOY_VM_HOST_FINGERPRINT" <<< "$OBSERVED_FINGERPRINTS"; then
+            echo "ERROR: VM host fingerprint mismatch." >&2
+            echo "Expected: $DEPLOY_VM_HOST_FINGERPRINT" >&2
+            exit 1
+          fi
+
+          mv "$HOME/.ssh/known_hosts.candidate" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Deploy via native SSH
+        shell: bash
+        env:
+          DEPLOY_VM_HOST: ${{ secrets.DEPLOY_VM_HOST }}
+          DEPLOY_VM_USER: ${{ secrets.DEPLOY_VM_USER }}
+          DEPLOY_TAG: ${{ steps.tag.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i "$HOME/.ssh/deploy_vm_ed25519" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o ConnectTimeout=10 \
+            "${DEPLOY_VM_USER}@${DEPLOY_VM_HOST}" \
+            "set -eu; \
+            test -x \"\$HOME/.local/bin/uv\"; \
+            \"\$HOME/.local/bin/uv\" tool install --reinstall \"git+https://github.com/${REPOSITORY}@${DEPLOY_TAG}\"; \
+            test -x \"\$HOME/.local/bin/specify\"; \
+            \"\$HOME/.local/bin/specify\" --help > /tmp/specify-help.txt; \
+            head -n 20 /tmp/specify-help.txt"
 
       - name: Write deployment summary
         shell: bash
