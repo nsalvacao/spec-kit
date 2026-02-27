@@ -74,6 +74,60 @@ def _default_contract() -> dict[str, Any]:
     }
 
 
+def _normalize_optional_metadata_field(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise BranchPolicyError(f"Branch policy field '{field_name}' must be a string when provided.")
+    normalized = value.strip()
+    if not normalized:
+        raise BranchPolicyError(f"Branch policy field '{field_name}' cannot be empty when provided.")
+    return normalized
+
+
+def _validate_contract_entries(entries: dict[str, Any]) -> None:
+    feature_to_branch: dict[str, str] = {}
+    for branch_key, raw_entry in entries.items():
+        if not isinstance(raw_entry, dict):
+            raise BranchPolicyError(f"Invalid contract entry format for branch '{branch_key}'.")
+
+        try:
+            validated_branch = validate_feature_branch(branch_key)
+        except BranchPolicyError as exc:
+            raise BranchPolicyError(f"Invalid branch policy entry key '{branch_key}': {exc}") from exc
+
+        entry_branch = _normalize_optional_metadata_field(raw_entry.get("branch"), "branch")
+        entry_feature_id = _normalize_optional_metadata_field(raw_entry.get("feature_id"), "feature_id")
+        entry_prefix = _normalize_optional_metadata_field(raw_entry.get("feature_prefix"), "feature_prefix")
+
+        if entry_branch != branch_key:
+            raise BranchPolicyError(
+                f"Inconsistent branch policy entry for '{branch_key}': "
+                f"'branch' must match entry key '{branch_key}'."
+            )
+        if entry_feature_id != branch_key:
+            raise BranchPolicyError(
+                f"Inconsistent branch policy entry for '{branch_key}': "
+                f"'feature_id' must match canonical branch '{branch_key}'."
+            )
+        if entry_prefix != validated_branch.feature_prefix:
+            raise BranchPolicyError(
+                f"Inconsistent branch policy entry for '{branch_key}': "
+                f"'feature_prefix' must be '{validated_branch.feature_prefix}'."
+            )
+
+        _normalize_optional_metadata_field(raw_entry.get("parent_epic_id"), "parent_epic_id")
+        _normalize_optional_metadata_field(raw_entry.get("parent_program_id"), "parent_program_id")
+
+        mapped_branch = feature_to_branch.get(entry_feature_id)
+        if mapped_branch and mapped_branch != branch_key:
+            raise BranchPolicyError(
+                f"Inconsistent branch policy contract: feature '{entry_feature_id}' "
+                f"is mapped to multiple branches ('{mapped_branch}', '{branch_key}')."
+            )
+        feature_to_branch[entry_feature_id] = branch_key
+
+
 def _read_contract(repo_root: Path) -> dict[str, Any]:
     path = _contract_path(repo_root)
     if not path.exists():
@@ -98,6 +152,7 @@ def _read_contract(repo_root: Path) -> dict[str, Any]:
     entries = payload.get("entries")
     if not isinstance(entries, dict):
         raise BranchPolicyError("Branch policy 'entries' must be a JSON object.")
+    _validate_contract_entries(entries)
     payload.setdefault("generated_by", "scripts/python/branch-policy.py")
     payload.setdefault("updated_at", _utc_now())
     return payload
@@ -128,6 +183,8 @@ def register_feature_branch(
     feature_id: str,
     scope_mode: str = "feature",
     source_decision: str = "feature_mode",
+    parent_epic_id: str | None = None,
+    parent_program_id: str | None = None,
 ) -> dict[str, Any]:
     root = _as_repo_root(repo_root)
     branch_info = validate_feature_branch(branch)
@@ -140,6 +197,11 @@ def register_feature_branch(
         raise BranchPolicyError(
             "branch and feature_id must be identical for canonical one-branch-per-feature policy."
         )
+
+    normalized_parent_epic_id = _normalize_optional_metadata_field(parent_epic_id, "parent_epic_id")
+    normalized_parent_program_id = _normalize_optional_metadata_field(
+        parent_program_id, "parent_program_id"
+    )
 
     contract = _read_contract(root)
     entries: dict[str, Any] = contract["entries"]
@@ -161,7 +223,7 @@ def register_feature_branch(
     now = _utc_now()
     previous = entries.get(branch_info.branch, {})
     created_at = previous.get("created_at", now) if isinstance(previous, dict) else now
-    entries[branch_info.branch] = {
+    entry = {
         "branch": branch_info.branch,
         "feature_id": feature_info.feature_id,
         "feature_prefix": branch_info.feature_prefix,
@@ -170,6 +232,25 @@ def register_feature_branch(
         "created_at": created_at,
         "updated_at": now,
     }
+    if normalized_parent_epic_id is not None:
+        entry["parent_epic_id"] = normalized_parent_epic_id
+    elif isinstance(previous, dict):
+        existing_parent_epic_id = _normalize_optional_metadata_field(
+            previous.get("parent_epic_id"), "parent_epic_id"
+        )
+        if existing_parent_epic_id is not None:
+            entry["parent_epic_id"] = existing_parent_epic_id
+
+    if normalized_parent_program_id is not None:
+        entry["parent_program_id"] = normalized_parent_program_id
+    elif isinstance(previous, dict):
+        existing_parent_program_id = _normalize_optional_metadata_field(
+            previous.get("parent_program_id"), "parent_program_id"
+        )
+        if existing_parent_program_id is not None:
+            entry["parent_program_id"] = existing_parent_program_id
+
+    entries[branch_info.branch] = entry
     contract_path = _write_contract(root, contract)
     return {
         "ok": True,
@@ -180,6 +261,7 @@ def register_feature_branch(
 
 def resolve_feature_dir(*, repo_root: str | Path, branch: str) -> dict[str, Any]:
     root = _as_repo_root(repo_root)
+    _read_contract(root)
     branch_name = (branch or "").strip()
     if not branch_name:
         raise BranchPolicyError("Branch must be a non-empty string.")
@@ -254,6 +336,8 @@ def _cmd_register_feature(args: argparse.Namespace) -> int:
         feature_id=args.feature_id,
         scope_mode=args.scope_mode,
         source_decision=args.source_decision,
+        parent_epic_id=args.parent_epic_id,
+        parent_program_id=args.parent_program_id,
     )
     print(json.dumps(result))
     return 0
@@ -291,6 +375,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--source-decision",
         default="feature_mode",
         help="Origin of decision that produced this branch mapping.",
+    )
+    register_parser.add_argument(
+        "--parent-epic-id",
+        default=None,
+        help="Optional parent epic identifier for lineage metadata.",
+    )
+    register_parser.add_argument(
+        "--parent-program-id",
+        default=None,
+        help="Optional parent program identifier for lineage metadata.",
     )
     register_parser.set_defaults(handler=_cmd_register_feature)
 

@@ -40,6 +40,8 @@ Shape:
       "feature_prefix": "021",
       "scope_mode": "feature",
       "source_decision": "feature_mode",
+      "parent_epic_id": "epic-authentication",
+      "parent_program_id": "program-core-platform",
       "created_at": "2026-02-26T10:00:00Z",
       "updated_at": "2026-02-26T10:00:00Z"
     }
@@ -50,6 +52,8 @@ Shape:
 ## Guardrails
 
 - Branch validation rejects non-canonical branch patterns for feature workflows.
+- Branch metadata contract validation rejects inconsistent entry state
+  (entry key vs `branch`/`feature_id`/`feature_prefix` mismatch).
 - Prefix collisions are blocked (for example, `021-a` and `021-b` for different features).
 - Feature directory resolution prefers:
   1. exact match (`specs/<branch>/`);
@@ -69,6 +73,7 @@ Commands:
 python3 scripts/python/branch-policy.py validate --branch 021-user-onboarding
 python3 scripts/python/branch-policy.py resolve-feature-dir --repo-root . --branch 021-user-onboarding
 python3 scripts/python/branch-policy.py register-feature --repo-root . --branch 021-user-onboarding --feature-id 021-user-onboarding
+python3 scripts/python/branch-policy.py register-feature --repo-root . --branch 021-user-onboarding --feature-id 021-user-onboarding --parent-epic-id epic-authentication --parent-program-id program-core-platform
 ```
 
 ## Backward Compatibility
@@ -82,10 +87,10 @@ python3 scripts/python/branch-policy.py register-feature --repo-root . --branch 
 If `.spec-kit/branch-policy.json` is missing or corrupted:
 
 1. Fix or remove the corrupted file.
-2. Re-run feature creation for the active branch (or register manually):
+1. Re-run feature creation for the active branch (or register manually):
 
 ```bash
 python3 scripts/python/branch-policy.py register-feature --repo-root . --branch 021-user-onboarding --feature-id 021-user-onboarding
 ```
 
-3. Re-run the command that failed (`/speckit.specify`, `/speckit.plan`, or prerequisite checks).
+1. Re-run the command that failed (`/speckit.specify`, `/speckit.plan`, or prerequisite checks).

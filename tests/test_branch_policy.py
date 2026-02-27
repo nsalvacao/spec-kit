@@ -70,6 +70,61 @@ def test_register_feature_writes_contract_and_is_idempotent(tmp_path: Path) -> N
     assert payload["entries"]["002-payment-retry"]["feature_prefix"] == "002"
 
 
+def test_register_feature_supports_optional_parent_lineage_fields(tmp_path: Path) -> None:
+    result = run_policy(
+        "register-feature",
+        "--repo-root",
+        str(tmp_path),
+        "--branch",
+        "006-account-settings",
+        "--feature-id",
+        "006-account-settings",
+        "--parent-epic-id",
+        "epic-authentication",
+        "--parent-program-id",
+        "program-core-platform",
+    )
+    assert result.returncode == 0, result.stderr
+
+    payload = json.loads((tmp_path / ".spec-kit" / "branch-policy.json").read_text(encoding="utf-8"))
+    entry = payload["entries"]["006-account-settings"]
+    assert entry["parent_epic_id"] == "epic-authentication"
+    assert entry["parent_program_id"] == "program-core-platform"
+
+
+def test_register_feature_preserves_existing_parent_lineage_when_re_registering(tmp_path: Path) -> None:
+    first = run_policy(
+        "register-feature",
+        "--repo-root",
+        str(tmp_path),
+        "--branch",
+        "007-feature-flags",
+        "--feature-id",
+        "007-feature-flags",
+        "--parent-epic-id",
+        "epic-rollout",
+        "--parent-program-id",
+        "program-foundation",
+    )
+    assert first.returncode == 0, first.stderr
+
+    second = run_policy(
+        "register-feature",
+        "--repo-root",
+        str(tmp_path),
+        "--branch",
+        "007-feature-flags",
+        "--feature-id",
+        "007-feature-flags",
+    )
+    assert second.returncode == 0, second.stderr
+
+    payload = json.loads((tmp_path / ".spec-kit" / "branch-policy.json").read_text(encoding="utf-8"))
+    entry = payload["entries"]["007-feature-flags"]
+    assert entry["parent_epic_id"] == "epic-rollout"
+    assert entry["parent_program_id"] == "program-foundation"
+
+
 def test_register_feature_rejects_prefix_collision(tmp_path: Path) -> None:
     repo_root = tmp_path
 
@@ -140,6 +195,42 @@ def test_resolve_feature_dir_fails_on_prefix_ambiguity(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "multiple spec directories" in result.stderr.lower()
+
+
+def test_resolve_feature_dir_fails_on_metadata_branch_inconsistency(tmp_path: Path) -> None:
+    policy_dir = tmp_path / ".spec-kit"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / "branch-policy.json").write_text(
+        json.dumps(
+            {
+                "contract_version": "branch-feature.v1",
+                "generated_by": "tests",
+                "updated_at": "2026-02-27T12:00:00Z",
+                "entries": {
+                    "008-canonical-feature": {
+                        "branch": "008-canonical-feature",
+                        "feature_id": "999-other-feature",
+                        "feature_prefix": "008",
+                        "scope_mode": "feature",
+                        "source_decision": "feature_mode",
+                        "created_at": "2026-02-27T12:00:00Z",
+                        "updated_at": "2026-02-27T12:00:00Z",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_policy(
+        "resolve-feature-dir",
+        "--repo-root",
+        str(tmp_path),
+        "--branch",
+        "008-canonical-feature",
+    )
+    assert result.returncode != 0
+    assert "inconsistent branch policy entry" in result.stderr.lower()
 
 
 def test_validate_rejects_empty_branch_argument() -> None:
