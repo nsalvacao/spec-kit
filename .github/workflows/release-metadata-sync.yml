@@ -87,6 +87,10 @@ jobs:
             echo "Unable to resolve release tag. No published release found; provide 'release_tag' for workflow_dispatch." >&2
             exit 1
           fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
+            echo "Resolved tag '$tag' is invalid. Expected format like vMAJOR.MINOR.PATCH." >&2
+            exit 1
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "source=$source" >> "$GITHUB_OUTPUT"
 
