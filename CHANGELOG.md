@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - added support for comma-separated host fingerprints during key rotation windows
     - added required `DEPLOY_VM_KNOWN_HOSTS` host-key pinning variable (no runtime `ssh-keyscan` fallback)
     - added optional `DEPLOY_VM_PORT` workflow variable for non-default SSH ports
+    - added strict `known_hosts` entry validation (single entry, `ssh-ed25519`, host-field sanity checks)
+    - improved remote diagnostics for missing `uv`/`specify` binaries during deploy
 
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.

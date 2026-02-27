@@ -118,6 +118,24 @@ jobs:
             exit 1
           fi
 
+          KNOWN_HOSTS_ENTRY_COUNT="$(grep -Evc '^[[:space:]]*($|#)' "$KNOWN_HOSTS_PATH" || true)"
+          if [[ "$KNOWN_HOSTS_ENTRY_COUNT" != "1" ]]; then
+            echo "ERROR: DEPLOY_VM_KNOWN_HOSTS must contain exactly one non-comment host-key entry." >&2
+            exit 1
+          fi
+
+          KNOWN_HOST_FIELD="$(awk '!/^[[:space:]]*#/ && NF {print $1; exit}' "$KNOWN_HOSTS_PATH")"
+          KNOWN_KEY_TYPE="$(awk '!/^[[:space:]]*#/ && NF {print $2; exit}' "$KNOWN_HOSTS_PATH")"
+          if [[ "$KNOWN_KEY_TYPE" != "ssh-ed25519" ]]; then
+            echo "ERROR: DEPLOY_VM_KNOWN_HOSTS must use ssh-ed25519 key type." >&2
+            exit 1
+          fi
+
+          if [[ "$KNOWN_HOST_FIELD" != "$DEPLOY_VM_HOST" && "$KNOWN_HOST_FIELD" != "[$DEPLOY_VM_HOST]:$DEPLOY_PORT" && "$KNOWN_HOST_FIELD" != "|1|"* ]]; then
+            echo "ERROR: DEPLOY_VM_KNOWN_HOSTS host field does not match DEPLOY_VM_HOST." >&2
+            exit 1
+          fi
+
           EXPECTED_FINGERPRINTS="$(
             echo "$DEPLOY_VM_HOST_FINGERPRINT" \
               | tr ',;' '\n' \
@@ -179,9 +197,9 @@ jobs:
             -p "$DEPLOY_PORT" \
             "${DEPLOY_VM_USER}@${DEPLOY_VM_HOST}" \
             "set -eu; \
-            test -x \"\$HOME/.local/bin/uv\"; \
+            if [ ! -x \"\$HOME/.local/bin/uv\" ]; then echo \"ERROR: missing remote binary \$HOME/.local/bin/uv\" >&2; exit 21; fi; \
             \"\$HOME/.local/bin/uv\" tool install --reinstall \"git+https://github.com/${REPOSITORY}@${DEPLOY_TAG}\"; \
-            test -x \"\$HOME/.local/bin/specify\"; \
+            if [ ! -x \"\$HOME/.local/bin/specify\" ]; then echo \"ERROR: missing remote binary \$HOME/.local/bin/specify\" >&2; exit 22; fi; \
             \"\$HOME/.local/bin/specify\" --help > /tmp/specify-help.txt; \
             head -n 20 /tmp/specify-help.txt" \
             > "$DEPLOY_LOG_PATH" 2>&1
@@ -205,7 +223,12 @@ jobs:
           KNOWN_HOSTS_PATH: ${{ steps.verify_host_key.outputs.known_hosts_path }}
         run: |
           set -euo pipefail
-          rm -f "${DEPLOY_KEY_PATH:-}" "${KNOWN_HOSTS_PATH:-}" || true
+          if [[ -n "${DEPLOY_KEY_PATH:-}" && -f "${DEPLOY_KEY_PATH}" ]]; then
+            rm -f "${DEPLOY_KEY_PATH}"
+          fi
+          if [[ -n "${KNOWN_HOSTS_PATH:-}" && -f "${KNOWN_HOSTS_PATH}" ]]; then
+            rm -f "${KNOWN_HOSTS_PATH}"
+          fi
 
       - name: Write deployment summary
         if: always()
