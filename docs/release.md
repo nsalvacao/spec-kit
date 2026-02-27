@@ -13,11 +13,13 @@ Release metadata consistency is governed by:
 - Sync workflow: `.github/workflows/release-metadata-sync.yml`
 - Hygiene workflow: `.github/workflows/branch-hygiene.yml`
 - Baseline sync workflow: `.github/workflows/baseline-auto-sync.yml`
+- Deploy workflow: `.github/workflows/deploy.yml`
 - Bump helpers:
   - `scripts/bash/version-bump.sh`
   - `scripts/powershell/version-bump.ps1`
 
 The guard validates release metadata coherence. The version coherence workflow validates canonical version propagation using the manifest map. The sync workflow opens a PR (never pushes directly to `main`) when metadata drift is detected.
+The deploy workflow installs `specify-cli` on a configured VM whenever a GitHub Release is published.
 
 Authority split:
 
@@ -103,6 +105,22 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 - `baseline-auto-sync.yml` auto-triggers "Update branch" for open `baseline/* -> main`
   PRs when `main` moves ahead, reducing manual sync drift in parallel work.
 - Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.
+
+## 6.1) Release Deploy to VM
+
+The deploy workflow can be triggered automatically on `release: published` or manually (`workflow_dispatch`).
+
+Required repository secrets:
+
+- `DEPLOY_VM_HOST`
+- `DEPLOY_VM_USER`
+- `DEPLOY_SSH_KEY`
+
+Notes:
+
+- Deploy uses absolute paths (`~/.local/bin/uv`, `~/.local/bin/specify`) because non-interactive SSH sessions do not load shell profiles.
+- Manual runs accept an optional `tag` input and validate `vMAJOR.MINOR.PATCH` format.
+- Smoke test runs `specify --help` remotely after install.
 
 ## 7) Local Main Hygiene
 

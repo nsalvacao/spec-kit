@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added regression test: `tests/test_command_discoverability.py`.
   - Added audit report: `docs/command-discoverability-audit.md`.
 
+- **#162: Auto-deploy latest release to Always Free VM**
+  - Added `.github/workflows/deploy.yml` triggered on `release: published`
+    and `workflow_dispatch`.
+  - Added tag validation and deployment summary for traceable operations.
+  - Added remote smoke-test step (`~/.local/bin/specify --help`) after install.
+
 - **#165: Unified version orchestration (manifest + bump engine + coherence gate)**
   - Added manifest source of truth: `.github/version-map.yml`.
   - Added orchestration engine: `scripts/python/version-orchestrator.py` with `check`, `bump`, and `sync`.
