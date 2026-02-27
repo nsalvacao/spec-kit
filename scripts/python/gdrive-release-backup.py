@@ -74,8 +74,9 @@ def _append_summary(summary_file: Path | None, message: str) -> None:
     if summary_file is None:
         return
     summary_file.parent.mkdir(parents=True, exist_ok=True)
+    safe_message = _redact_sensitive_text(message)
     with summary_file.open("a", encoding="utf-8") as handle:
-        handle.write(f"- [{_utc_now()}] {message}\n")
+        handle.write(f"- [{_utc_now()}] {safe_message}\n")
 
 
 def _read_json_bytes(payload: bytes | None) -> dict[str, Any]:
@@ -212,11 +213,21 @@ def _refresh_access_token(
     return token, body
 
 
+def _require_non_empty(value: str, *, field_name: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise DriveBackupError(f"{field_name} is required and cannot be empty.")
+    return normalized
+
+
 def _sha256_hex(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise DriveBackupError(f"failed to read artifact for sha256: {exc}") from exc
     return digest.hexdigest()
 
 
@@ -517,9 +528,21 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tag", required=True, help="Release tag (example: v0.0.71).")
     parser.add_argument("--commit-sha", required=True, help="Commit SHA associated with release tag.")
     parser.add_argument("--folder-id", required=True, help="Google Drive folder ID target.")
-    parser.add_argument("--oauth-client-id", required=True, help="OAuth Client ID.")
-    parser.add_argument("--oauth-client-secret", required=True, help="OAuth Client Secret.")
-    parser.add_argument("--oauth-refresh-token", required=True, help="OAuth refresh token.")
+    parser.add_argument(
+        "--oauth-client-id",
+        default=os.environ.get("GDRIVE_OAUTH_CLIENT_ID", ""),
+        help="OAuth Client ID (or env: GDRIVE_OAUTH_CLIENT_ID).",
+    )
+    parser.add_argument(
+        "--oauth-client-secret",
+        default=os.environ.get("GDRIVE_OAUTH_CLIENT_SECRET", ""),
+        help="OAuth Client Secret (or env: GDRIVE_OAUTH_CLIENT_SECRET).",
+    )
+    parser.add_argument(
+        "--oauth-refresh-token",
+        default=os.environ.get("GDRIVE_OAUTH_REFRESH_TOKEN", ""),
+        help="OAuth refresh token (or env: GDRIVE_OAUTH_REFRESH_TOKEN).",
+    )
     parser.add_argument(
         "--artifact-prefix",
         default="spec-kit-release-backup",
@@ -549,6 +572,13 @@ def main(argv: list[str] | None = None) -> int:
     summary_file = Path(args.summary_file).resolve() if args.summary_file else None
     artifact_path = Path(args.artifact_path).resolve()
     folder_id = _normalize_folder_id(args.folder_id)
+    oauth_client_id = _require_non_empty(args.oauth_client_id, field_name="oauth client id")
+    oauth_client_secret = _require_non_empty(
+        args.oauth_client_secret, field_name="oauth client secret"
+    )
+    oauth_refresh_token = _require_non_empty(
+        args.oauth_refresh_token, field_name="oauth refresh token"
+    )
     _ensure_artifact(artifact_path)
 
     artifact_sha256 = _sha256_hex(artifact_path)
@@ -585,9 +615,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     token, token_response = _refresh_access_token(
-        client_id=args.oauth_client_id,
-        client_secret=args.oauth_client_secret,
-        refresh_token=args.oauth_refresh_token,
+        client_id=oauth_client_id,
+        client_secret=oauth_client_secret,
+        refresh_token=oauth_refresh_token,
         summary_file=summary_file,
     )
     _append_summary(

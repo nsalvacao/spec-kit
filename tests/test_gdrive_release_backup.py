@@ -98,3 +98,34 @@ def test_multipart_body_rejects_oversized_artifact(tmp_path: Path, monkeypatch: 
     monkeypatch.setitem(mod._multipart_body.__globals__, "MAX_MULTIPART_UPLOAD_BYTES", 4)
     with pytest.raises(mod.DriveBackupError, match="too large for multipart upload buffer"):
         mod._multipart_body({"name": "big.tar.gz"}, artifact, "application/gzip")
+
+
+def test_require_non_empty_rejects_blank_values():
+    with pytest.raises(mod.DriveBackupError, match="oauth client id is required"):
+        mod._require_non_empty("   ", field_name="oauth client id")
+
+
+def test_parser_reads_oauth_from_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    artifact = tmp_path / "artifact.tar.gz"
+    artifact.write_bytes(b"ok")
+    monkeypatch.setenv("GDRIVE_OAUTH_CLIENT_ID", "client-id-env")
+    monkeypatch.setenv("GDRIVE_OAUTH_CLIENT_SECRET", "client-secret-env")
+    monkeypatch.setenv("GDRIVE_OAUTH_REFRESH_TOKEN", "refresh-token-env")
+
+    parser = mod._build_parser()
+    args = parser.parse_args(
+        [
+            "--artifact-path",
+            str(artifact),
+            "--tag",
+            "v0.0.1",
+            "--commit-sha",
+            "0123456789abcdef",
+            "--folder-id",
+            "1Vo5am-0R2hjeWnjC2YABmVCM_EwCTITm",
+        ]
+    )
+
+    assert args.oauth_client_id == "client-id-env"
+    assert args.oauth_client_secret == "client-secret-env"
+    assert args.oauth_refresh_token == "refresh-token-env"
