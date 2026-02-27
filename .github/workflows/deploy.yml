@@ -104,14 +104,17 @@ jobs:
             exit 1
           fi
 
-          KNOWN_HOSTS_PATH="$(mktemp "$RUNNER_TEMP/deploy_known_hosts.XXXXXX")"
-          if [[ -n "${DEPLOY_VM_KNOWN_HOSTS:-}" ]]; then
-            printf '%s\n' "$DEPLOY_VM_KNOWN_HOSTS" > "$KNOWN_HOSTS_PATH"
-          else
-            ssh-keyscan -T 10 -p "$DEPLOY_PORT" -t ed25519 -H "$DEPLOY_VM_HOST" > "$KNOWN_HOSTS_PATH"
+          if [[ -z "${DEPLOY_VM_KNOWN_HOSTS:-}" ]]; then
+            echo "ERROR: repository variable DEPLOY_VM_KNOWN_HOSTS is required for host-key pinning." >&2
+            echo "Set it in: Settings -> Secrets and variables -> Actions -> Variables." >&2
+            echo "Suggested value: ssh-keyscan -T 10 -p ${DEPLOY_PORT} -t ed25519 <DEPLOY_VM_HOST> | sed '/^#/d' | head -n 1" >&2
+            exit 1
           fi
+
+          KNOWN_HOSTS_PATH="$(mktemp "$RUNNER_TEMP/deploy_known_hosts.XXXXXX")"
+          printf '%s\n' "$DEPLOY_VM_KNOWN_HOSTS" > "$KNOWN_HOSTS_PATH"
           if [[ ! -s "$KNOWN_HOSTS_PATH" ]]; then
-            echo "ERROR: failed to capture VM host key via ssh-keyscan." >&2
+            echo "ERROR: DEPLOY_VM_KNOWN_HOSTS resolved to an empty value." >&2
             exit 1
           fi
 
