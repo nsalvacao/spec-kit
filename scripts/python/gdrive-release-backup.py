@@ -9,6 +9,7 @@ import json
 import mimetypes
 import os
 import random
+import re
 import string
 import sys
 import time
@@ -25,6 +26,11 @@ DRIVE_FILES_API = "https://www.googleapis.com/drive/v3/files"
 DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files"
 OAUTH_TOKEN_API = "https://oauth2.googleapis.com/token"
 RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+FOLDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{10,}$")
+SENSITIVE_JSON_PATTERN = re.compile(
+    r'(?i)("?(?:access_token|refresh_token|client_secret|id_token)"?\s*[:=]\s*")([^"]+)(")'
+)
+SENSITIVE_QUERY_PATTERN = re.compile(r"(?i)\b(refresh_token|access_token|client_secret)=([^&\s]+)")
 
 
 class DriveBackupError(ValueError):
@@ -38,6 +44,25 @@ class UploadArtifact:
     name: str
     path: Path
     mime_type: str
+
+
+def _redact_sensitive_text(raw: str) -> str:
+    text = SENSITIVE_JSON_PATTERN.sub(r"\1***REDACTED***\3", raw)
+    text = SENSITIVE_QUERY_PATTERN.sub(r"\1=***REDACTED***", text)
+    return text
+
+
+def _escape_drive_query_literal(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def _normalize_folder_id(raw_value: str) -> str:
+    folder_id = raw_value.strip()
+    if FOLDER_ID_PATTERN.fullmatch(folder_id) is None:
+        raise DriveBackupError(
+            "folder id is invalid: expected Google Drive folder ID format ([A-Za-z0-9_-]{10,})."
+        )
+    return folder_id
 
 
 def _utc_now() -> str:
@@ -118,12 +143,16 @@ def _request(
             code = int(exc.code)
             retry_after = _extract_retry_after(response_headers, parsed_error)
             if code in RETRYABLE_STATUS_CODES and attempt <= retries:
-                delay = retry_after if retry_after is not None else min(2 ** attempt, 16)
+                delay = (
+                    float(retry_after)
+                    if retry_after is not None
+                    else min(2 ** attempt, 16) + random.uniform(0.0, 1.0)
+                )
                 _append_summary(
                     summary_file,
                     (
                         f"{context}: HTTP {code} (attempt {attempt}/{retries + 1}) -> "
-                        f"retrying in {delay}s"
+                        f"retrying in {delay:.2f}s"
                     ),
                 )
                 time.sleep(delay)
@@ -134,15 +163,16 @@ def _request(
                 or parsed_error
                 or raw.decode("utf-8", errors="replace")
             )
-            raise DriveBackupError(f"{context}: HTTP {code}: {detail}") from exc
+            redacted_detail = _redact_sensitive_text(str(detail))
+            raise DriveBackupError(f"{context}: HTTP {code}: {redacted_detail}") from exc
         except urllib.error.URLError as exc:
             if attempt <= retries:
-                delay = min(2 ** attempt, 16)
+                delay = min(2 ** attempt, 16) + random.uniform(0.0, 1.0)
                 _append_summary(
                     summary_file,
                     (
                         f"{context}: network error '{exc.reason}' "
-                        f"(attempt {attempt}/{retries + 1}) -> retrying in {delay}s"
+                        f"(attempt {attempt}/{retries + 1}) -> retrying in {delay:.2f}s"
                     ),
                 )
                 time.sleep(delay)
@@ -262,8 +292,9 @@ def _find_files_by_name(
     name: str,
     summary_file: Path | None = None,
 ) -> list[dict[str, str]]:
-    safe_name = name.replace("'", "\\'")
-    query = f"'{folder_id}' in parents and trashed=false and name='{safe_name}'"
+    safe_folder_id = _escape_drive_query_literal(folder_id)
+    safe_name = _escape_drive_query_literal(name)
+    query = f"'{safe_folder_id}' in parents and trashed=false and name='{safe_name}'"
     payload, _, _ = _request(
         method="GET",
         url=_drive_query_url(
@@ -288,6 +319,44 @@ def _find_files_by_name(
             if file_id and file_name:
                 normalized.append({"id": file_id, "name": file_name, "createdTime": created_time})
     return normalized
+
+
+def _assert_folder_access(
+    *,
+    token: str,
+    folder_id: str,
+    summary_file: Path | None = None,
+) -> dict[str, str]:
+    payload, _, _ = _request(
+        method="GET",
+        url=(
+            f"{DRIVE_FILES_API}/{folder_id}"
+            "?supportsAllDrives=true&fields=id,name,mimeType,trashed"
+        ),
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        summary_file=summary_file,
+        context="drive-folder-access-check",
+    )
+    resolved_id = str(payload.get("id", "")).strip()
+    resolved_name = str(payload.get("name", "")).strip()
+    mime_type = str(payload.get("mimeType", "")).strip()
+    trashed = bool(payload.get("trashed", False))
+    if resolved_id != folder_id:
+        raise DriveBackupError(
+            "drive-folder-access-check: resolved folder id mismatch for configured target."
+        )
+    if mime_type != "application/vnd.google-apps.folder":
+        raise DriveBackupError(
+            "drive-folder-access-check: configured folder id does not reference a Drive folder."
+        )
+    if trashed:
+        raise DriveBackupError("drive-folder-access-check: configured folder is in trash.")
+
+    _append_summary(
+        summary_file,
+        f"drive-folder-access-check: ok (folder_name={resolved_name}, folder_id_suffix={folder_id[-8:]})",
+    )
+    return {"id": resolved_id, "name": resolved_name}
 
 
 def _upload_artifact(
@@ -376,9 +445,10 @@ def _apply_retention(
     if keep_count <= 0:
         raise DriveBackupError("retention count must be >= 1")
 
-    safe_prefix = prefix.replace("'", "\\'")
+    safe_prefix = _escape_drive_query_literal(prefix)
+    safe_folder_id = _escape_drive_query_literal(folder_id)
     query = (
-        f"'{folder_id}' in parents and trashed=false and "
+        f"'{safe_folder_id}' in parents and trashed=false and "
         f"name contains '{safe_prefix}' and name contains '.manifest.json'"
     )
     payload, _, _ = _request(
@@ -471,6 +541,7 @@ def main(argv: list[str] | None = None) -> int:
 
     summary_file = Path(args.summary_file).resolve() if args.summary_file else None
     artifact_path = Path(args.artifact_path).resolve()
+    folder_id = _normalize_folder_id(args.folder_id)
     _ensure_artifact(artifact_path)
 
     artifact_sha256 = _sha256_hex(artifact_path)
@@ -488,7 +559,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "backup_kind": "release-source-archive",
         "commit_sha": args.commit_sha,
-        "drive_target_folder_id": args.folder_id,
+        "drive_target_folder_id": folder_id,
         "generated_at_utc": generated_at,
         "release_published_at": args.release_published_at or None,
         "repository": args.repo or None,
@@ -520,6 +591,7 @@ def main(argv: list[str] | None = None) -> int:
             f"expires_in={token_response.get('expires_in', 'n/a')}"
         ),
     )
+    _assert_folder_access(token=token, folder_id=folder_id, summary_file=summary_file)
 
     app_properties = {
         "backup_kind": "release-source-archive",
@@ -539,7 +611,7 @@ def main(argv: list[str] | None = None) -> int:
         upload_results.append(
             _upload_artifact(
                 token=token,
-                folder_id=args.folder_id,
+                folder_id=folder_id,
                 artifact=upload,
                 app_properties=app_properties,
                 dry_run=args.dry_run,
@@ -549,7 +621,7 @@ def main(argv: list[str] | None = None) -> int:
 
     retention = _apply_retention(
         token=token,
-        folder_id=args.folder_id,
+        folder_id=folder_id,
         keep_count=args.retention_count,
         prefix=args.artifact_prefix,
         dry_run=args.dry_run,

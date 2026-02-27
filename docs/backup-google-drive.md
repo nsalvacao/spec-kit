@@ -95,5 +95,5 @@ It also uploads local run artifacts:
 
 For private operational details and environment-specific setup:
 
-- `D:\VM-GCP-Github-Deploy\backup-github-gdrive.md`
-- `D:\VM-GCP-Github-Deploy\` supporting notes/scripts
+- Use the private operations runbook maintained outside this repository.
+- Keep local/operator-specific paths out of public repository documentation.

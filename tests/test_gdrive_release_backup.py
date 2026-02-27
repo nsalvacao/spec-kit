@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
-import sys
+import runpy
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,12 +14,8 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "python" / "gdrive-release-backup.py"
 
 
 def _load_module():
-    spec = importlib.util.spec_from_file_location("gdrive_release_backup", SCRIPT_PATH)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    namespace = runpy.run_path(str(SCRIPT_PATH), run_name="__spec_kit_gdrive_backup_test__")
+    return SimpleNamespace(**namespace)
 
 
 mod = _load_module()
@@ -71,3 +67,26 @@ def test_ensure_artifact_rejects_empty(tmp_path: Path):
     target.write_bytes(b"")
     with pytest.raises(mod.DriveBackupError, match="artifact is empty"):
         mod._ensure_artifact(target)
+
+
+def test_normalize_folder_id_rejects_quote_injection():
+    with pytest.raises(mod.DriveBackupError, match="folder id is invalid"):
+        mod._normalize_folder_id("1Vo5am-0R2hjeWn' or trashed=true")
+
+
+def test_normalize_folder_id_accepts_valid_identifier():
+    resolved = mod._normalize_folder_id("1Vo5am-0R2hjeWnjC2YABmVCM_EwCTITm")
+    assert resolved == "1Vo5am-0R2hjeWnjC2YABmVCM_EwCTITm"
+
+
+def test_escape_drive_query_literal_escapes_single_quote():
+    escaped = mod._escape_drive_query_literal("abc'def")
+    assert escaped == "abc\\'def"
+
+
+def test_redact_sensitive_text_masks_known_keys():
+    sample = 'error={"refresh_token":"abc123","client_secret":"xyz"}?access_token=qwerty'
+    redacted = mod._redact_sensitive_text(sample)
+    assert "abc123" not in redacted
+    assert "xyz" not in redacted
+    assert "qwerty" not in redacted
