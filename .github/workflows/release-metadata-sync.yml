@@ -32,10 +32,24 @@ jobs:
       }}
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve default branch
+        id: default_branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="${{ github.event.repository.default_branch }}"
+          if [[ -z "$branch" || "$branch" == "null" ]]; then
+            branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
+          fi
+          if [[ -z "$branch" || "$branch" == "null" ]]; then
+            branch="main"
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
       - name: Checkout default branch
         uses: actions/checkout@v6
         with:
-          ref: main
+          ref: ${{ steps.default_branch.outputs.branch }}
           fetch-depth: 0
 
       - name: Setup Python
@@ -63,11 +77,14 @@ jobs:
             fi
           fi
           if [[ -z "$tag" ]]; then
-            tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+            if ! tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"; then
+              echo "Failed to fetch latest release via API. Provide 'release_tag' when running workflow_dispatch." >&2
+              exit 1
+            fi
             source="latest_release_api_fallback"
           fi
           if [[ -z "$tag" || "$tag" == "null" ]]; then
-            echo "Unable to resolve release tag from release event, workflow_dispatch input, or latest release API." >&2
+            echo "Unable to resolve release tag. No published release found; provide 'release_tag' for workflow_dispatch." >&2
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -193,11 +210,11 @@ jobs:
           EOF
           )
 
-          pr_number="$(gh pr list --head "$BRANCH" --base "main" --state open --json number --jq '.[0].number // ""')"
+          pr_number="$(gh pr list --head "$BRANCH" --base "${{ steps.default_branch.outputs.branch }}" --state open --json number --jq '.[0].number // ""')"
           if [[ -n "$pr_number" ]]; then
             gh pr edit "$pr_number" --title "$title" --body "$body"
           else
-            gh pr create --base "main" --head "$BRANCH" --title "$title" --body "$body"
+            gh pr create --base "${{ steps.default_branch.outputs.branch }}" --head "$BRANCH" --title "$title" --body "$body"
           fi
 
       - name: No drift detected
