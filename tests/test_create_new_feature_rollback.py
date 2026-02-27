@@ -96,6 +96,7 @@ def test_powershell_create_feature_rolls_back_when_branch_policy_registration_fa
             str(POWERSHELL_CREATE_FEATURE),
             "-ShortName",
             "rollback-test",
+            "-FeatureDescription",
             "Add rollback coverage",
         ],
         cwd=tmp_path,
