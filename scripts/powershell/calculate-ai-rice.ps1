@@ -339,12 +339,12 @@ Write-Output ""
 Write-Output "Rationale: $rationale"
 Write-Output ""
 Write-Output "Sensitivity Analysis (what-if +-1 per dimension):"
-Write-Output ("  {0,-18} +1 -> {1} (D{2}) | -1 -> {3} (D{4})" -f "Reach:", $scRP, $dRP, $scRM, $dRM)
-Write-Output ("  {0,-18} +1 step -> {1} (D{2}) | -1 step -> {3} (D{4})" -f "Impact:", $scIP, $dIP, $scIM, $dIM)
-Write-Output ("  {0,-18} +1% -> {1} (D{2}) | -1% -> {3} (D{4})" -f "Confidence:", $scCP, $dCP, $scCM, $dCM)
-Write-Output ("  {0,-18} +1% -> {1} (D{2}) | -1% -> {3} (D{4})" -f "Data_Readiness:", $scDP, $dDP, $scDM, $dDM)
-Write-Output ("  {0,-18} +1 wk -> {1} (D{2}) | -1 wk -> {3} (D{4})" -f "Effort:", $scEP, $dEP, $scEM, $dEM)
-Write-Output ("  {0,-18} +1 -> {1} (D{2}) | -1 -> {3} (D{4})" -f "Risk:", $scKP, $dKP, $scKM, $dKM)
+Write-Output ("  {0,-18} +1 -> {1:F2} (Δ{2:F2}) | -1 -> {3:F2} (Δ{4:F2})" -f "Reach:", $scRP, $dRP, $scRM, $dRM)
+Write-Output ("  {0,-18} +1 step -> {1:F2} (Δ{2:F2}) | -1 step -> {3:F2} (Δ{4:F2})" -f "Impact:", $scIP, $dIP, $scIM, $dIM)
+Write-Output ("  {0,-18} +1% -> {1:F2} (Δ{2:F2}) | -1% -> {3:F2} (Δ{4:F2})" -f "Confidence:", $scCP, $dCP, $scCM, $dCM)
+Write-Output ("  {0,-18} +1% -> {1:F2} (Δ{2:F2}) | -1% -> {3:F2} (Δ{4:F2})" -f "Data_Readiness:", $scDP, $dDP, $scDM, $dDM)
+Write-Output ("  {0,-18} +1 wk -> {1:F2} (Δ{2:F2}) | -1 wk -> {3:F2} (Δ{4:F2})" -f "Effort:", $scEP, $dEP, $scEM, $dEM)
+Write-Output ("  {0,-18} +1 -> {1:F2} (Δ{2:F2}) | -1 -> {3:F2} (Δ{4:F2})" -f "Risk:", $scKP, $dKP, $scKM, $dKM)
 Write-Output ""
 Write-Output "Levers summary:"
 Write-Output "  ^ Best upside:  $($bestPos.name) -> D$bestPosDStr"
