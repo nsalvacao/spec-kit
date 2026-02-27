@@ -12,6 +12,7 @@ Release metadata consistency is governed by:
 - Coherence workflow: `.github/workflows/version-coherence.yml`
 - Sync workflow: `.github/workflows/release-metadata-sync.yml`
 - Hygiene workflow: `.github/workflows/branch-hygiene.yml`
+- Baseline sync workflow: `.github/workflows/baseline-auto-sync.yml`
 - Bump helpers:
   - `scripts/bash/version-bump.sh`
   - `scripts/powershell/version-bump.ps1`
@@ -99,6 +100,8 @@ Confirm the tag and assets are published to `nsalvacao/spec-kit`.
 - The sync workflow enforces file safety using `allowlist` from `.github/version-map.yml`.
 - `release-consistency-guard.yml` blocks PRs to `main` when coherence fails.
 - `version-coherence.yml` blocks PRs to `main` when mapped version drift is detected.
+- `baseline-auto-sync.yml` auto-triggers "Update branch" for open `baseline/* -> main`
+  PRs when `main` moves ahead, reducing manual sync drift in parallel work.
 - Nightly monitor mode opens/updates a drift issue when metadata remains inconsistent.
 
 ## 7) Local Main Hygiene

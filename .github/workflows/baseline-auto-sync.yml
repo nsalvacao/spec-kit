@@ -1,0 +1,130 @@
+name: Baseline Auto Sync
+
+on:
+  push:
+    branches:
+      - main
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Optional PR number to sync (must be baseline/* -> main)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: baseline-auto-sync
+  cancel-in-progress: false
+
+jobs:
+  baseline-auto-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect and sync baseline PRs behind main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          summary() {
+            echo "$1" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          collect_open_baseline_prs() {
+            gh pr list \
+              --repo "$REPO" \
+              --state open \
+              --base main \
+              --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("baseline/")) | .number'
+          }
+
+          sync_pr_if_behind() {
+            local pr_number="$1"
+            local pr_json head_ref base_ref head_sha pr_url compare_json
+            local behind_by ahead_by compare_status update_output update_exit
+
+            pr_json="$(gh api "repos/${REPO}/pulls/${pr_number}")"
+            head_ref="$(jq -r '.head.ref' <<< "$pr_json")"
+            base_ref="$(jq -r '.base.ref' <<< "$pr_json")"
+            head_sha="$(jq -r '.head.sha' <<< "$pr_json")"
+            pr_url="$(jq -r '.html_url' <<< "$pr_json")"
+
+            if [[ "$base_ref" != "main" || "$head_ref" != baseline/* ]]; then
+              summary "- Skip PR #${pr_number}: not a \`baseline/* -> main\` PR (${head_ref} -> ${base_ref})."
+              return 0
+            fi
+
+            compare_json="$(gh api "repos/${REPO}/compare/${base_ref}...${head_ref}")"
+            behind_by="$(jq -r '.behind_by' <<< "$compare_json")"
+            ahead_by="$(jq -r '.ahead_by' <<< "$compare_json")"
+            compare_status="$(jq -r '.status' <<< "$compare_json")"
+
+            summary "- PR #${pr_number} (${pr_url}): status=\`${compare_status}\`, behind=${behind_by}, ahead=${ahead_by}."
+
+            if [[ "$behind_by" == "0" ]]; then
+              summary "  - No sync needed."
+              return 0
+            fi
+
+            set +e
+            update_output="$(gh api -X PUT "repos/${REPO}/pulls/${pr_number}/update-branch" -f expected_head_sha="${head_sha}" 2>&1)"
+            update_exit=$?
+            set -e
+
+            if [[ "$update_exit" -ne 0 ]]; then
+              summary "  - Sync attempt failed (non-blocking)."
+              summary "  - \`$update_output\`"
+              return 0
+            fi
+
+            summary "  - Sync triggered successfully via Update Branch API."
+            return 0
+          }
+
+          summary "## Baseline Auto Sync"
+          summary ""
+          summary "- Trigger: \`${EVENT_NAME}\`"
+          summary ""
+
+          mapfile -t targets < <(
+            if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
+              if [[ -n "$EVENT_PR_NUMBER" ]]; then
+                echo "$EVENT_PR_NUMBER"
+              fi
+            elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+              if [[ -n "$INPUT_PR_NUMBER" ]]; then
+                echo "$INPUT_PR_NUMBER"
+              else
+                collect_open_baseline_prs
+              fi
+            else
+              collect_open_baseline_prs
+            fi
+          )
+
+          if [[ "${#targets[@]}" -eq 0 ]]; then
+            summary "- No open \`baseline/* -> main\` PRs found."
+            exit 0
+          fi
+
+          declare -A seen=()
+          for pr in "${targets[@]}"; do
+            if [[ -n "${seen[$pr]+x}" ]]; then
+              continue
+            fi
+            seen["$pr"]=1
+            sync_pr_if_behind "$pr"
+          done
