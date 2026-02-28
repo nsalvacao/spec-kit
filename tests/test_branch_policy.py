@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 SCRIPT = Path(__file__).parent.parent / "scripts" / "python" / "branch-policy.py"
 
@@ -92,7 +94,10 @@ def test_register_feature_supports_optional_parent_lineage_fields(tmp_path: Path
     assert entry["parent_program_id"] == "program-core-platform"
 
 
-def test_register_feature_rejects_non_feature_scope_mode(tmp_path: Path) -> None:
+@pytest.mark.parametrize("invalid_scope_mode", ["epic", "program"])
+def test_register_feature_rejects_non_feature_scope_mode(
+    tmp_path: Path, invalid_scope_mode: str
+) -> None:
     result = run_policy(
         "register-feature",
         "--repo-root",
@@ -102,7 +107,7 @@ def test_register_feature_rejects_non_feature_scope_mode(tmp_path: Path) -> None
         "--feature-id",
         "011-canonical-unit",
         "--scope-mode",
-        "epic",
+        invalid_scope_mode,
     )
 
     assert result.returncode != 0
