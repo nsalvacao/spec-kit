@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterator
 
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -22,16 +23,14 @@ FORBIDDEN_EXTERNAL_BASELINE_MARKERS = (
 TEXT_SUFFIXES = {".py", ".sh", ".ps1", ".md", ".yml", ".yaml", ".json", ".toml"}
 
 
-def _iter_runtime_files() -> list[Path]:
-    runtime_files: list[Path] = []
+def _iter_runtime_files() -> Iterator[Path]:
     for relative_root in RUNTIME_ROOTS:
         absolute_root = REPO_ROOT / relative_root
         if not absolute_root.exists():
             continue
         for candidate in absolute_root.rglob("*"):
             if candidate.is_file() and candidate.suffix.lower() in TEXT_SUFFIXES:
-                runtime_files.append(candidate)
-    return runtime_files
+                yield candidate
 
 
 def test_runtime_files_do_not_reference_external_plugin_paths() -> None:
