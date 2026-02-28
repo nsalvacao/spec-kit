@@ -25,6 +25,8 @@
   items:
     - name: Local Development
       href: local-development.md
+    - name: External Baseline Integration
+      href: external-baseline-integration-traceability.md
     - name: Release Process
       href: release.md
     - name: Google Drive Backup

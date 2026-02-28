@@ -16,6 +16,19 @@ The policy keeps Program/Epic/Feature decomposition operationally consistent by:
 - preserving deterministic mapping between branch and feature artifacts;
 - enabling reliable downstream orchestration and validation.
 
+## Native Implementation Boundary
+
+Canonical branch policy is implemented natively in this repository.
+
+- Runtime behavior is sourced from `src/specify_cli/`, `scripts/`, and
+  `templates/commands/`.
+- External plugin paths under `~/.copilot/installed-plugins/...` are treated as
+  design baselines only, never as runtime dependencies.
+
+See the integration traceability matrix:
+
+- `docs/external-baseline-integration-traceability.md`
+
 ## Branch-Feature Metadata Contract
 
 The create-feature scripts register branch metadata in:
@@ -52,6 +65,8 @@ Shape:
 ## Guardrails
 
 - Branch validation rejects non-canonical branch patterns for feature workflows.
+- Registration rejects non-feature scope modes (`epic`/`program`) for execution
+  units.
 - Branch metadata contract validation rejects inconsistent entry state
   (entry key vs `branch`/`feature_id`/`feature_prefix` mismatch).
 - Legacy entries missing `branch`/`feature_id`/`feature_prefix` are normalized to canonical values.
