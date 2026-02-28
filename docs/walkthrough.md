@@ -33,6 +33,24 @@ Phase 0 generates the artifacts that justify the project before specs are writte
 
    Output: `.spec-kit/idea_selection.md`
 
+   **AI-RICE Sensitivity Analysis**: The `calculate-ai-rice.sh` / `calculate-ai-rice.ps1`
+   scripts include a built-in what-if sensitivity analysis. For each dimension, the output
+   shows how the score changes with a ±1 variation, clamped to valid bounds:
+
+   | Dimension | Bound |
+   | --- | --- |
+   | Reach | ≥ 1 (integer) |
+   | Impact | Discrete steps: 0.25 → 0.5 → 1.0 → 2.0 → 3.0 |
+   | Confidence | 0–100% |
+   | Data\_Readiness | 0–100% |
+   | Effort | ≥ 1 week |
+   | Risk | 1–10 (integer) |
+
+   A **Levers summary** at the end highlights the single most influential positive
+   lever (action that most increases the score) and the most influential negative
+   lever (action that most decreases the score), helping teams prioritize
+   improvement efforts.
+
 3. **STRUCTURE**
 
    ```bash

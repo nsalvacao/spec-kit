@@ -281,6 +281,109 @@ NUMERATOR=$(awk -v r="$REACH" -v i="$IMPACT" -v c="$CONFIDENCE" -v dr="$DATA_REA
 DENOMINATOR=$(awk -v e="$EFFORT" -v risk="$RISK" \
     'BEGIN { printf "%.0f", e * risk }')
 
+# --- Sensitivity Analysis ---
+
+# Impact discrete scale for step-wise ±1
+IMPACT_SCALE=(0.25 0.5 1.0 2.0 3.0)
+
+_impact_step_up() {
+    local current="$1" found=0 val
+    for val in "${IMPACT_SCALE[@]}"; do
+        if [[ "$found" -eq 1 ]]; then echo "$val"; return; fi
+        [[ "$val" == "$current" ]] && found=1
+    done
+    echo "$current"
+}
+
+_impact_step_down() {
+    local current="$1" prev="" val
+    for val in "${IMPACT_SCALE[@]}"; do
+        if [[ "$val" == "$current" ]]; then echo "${prev:-$current}"; return; fi
+        prev="$val"
+    done
+    echo "$current"
+}
+
+_score_raw() {
+    awk -v r="$1" -v i="$2" -v c="$3" -v dr="$4" -v e="$5" -v risk="$6" \
+        'BEGIN { printf "%.2f", (r * i * c * dr) / (e * risk) }'
+}
+
+_fmt_delta() {
+    awk -v n="$1" -v b="$2" \
+        'BEGIN { d = n - b; if (d >= 0) printf "+%.2f", d; else printf "%.2f", d }'
+}
+
+_clamp_pct()  { local v="$1"; echo $(( v < 0 ? 0 : (v > 100 ? 100 : v) )); }
+_clamp_risk() { local v="$1"; echo $(( v < 1 ? 1 : (v > 10  ? 10  : v) )); }
+_clamp_reach(){ local v="$1"; echo $(( v < 1 ? 1 : v )); }
+
+# Bounded ±1 values per dimension
+SENS_RP=$(_clamp_reach $(( REACH + 1 )))
+SENS_RM=$(_clamp_reach $(( REACH - 1 )))
+SENS_IP=$(_impact_step_up   "$IMPACT")
+SENS_IM=$(_impact_step_down "$IMPACT")
+SENS_CP=$(_clamp_pct $(( CONFIDENCE + 1 )))
+SENS_CM=$(_clamp_pct $(( CONFIDENCE - 1 )))
+SENS_DP=$(_clamp_pct $(( DATA_READINESS + 1 )))
+SENS_DM=$(_clamp_pct $(( DATA_READINESS - 1 )))
+SENS_EP=$(awk -v e="$EFFORT" 'BEGIN { printf "%.10g", e + 1 }')
+SENS_EM=$(awk -v e="$EFFORT" 'BEGIN { v = e - 1; printf "%.10g", (v < 1 ? 1 : v) }')
+SENS_KP=$(_clamp_risk $(( RISK + 1 )))
+SENS_KM=$(_clamp_risk $(( RISK - 1 )))
+
+# Scenario scores
+SC_RP=$(_score_raw "$SENS_RP" "$IMPACT"   "$CONFIDENCE"    "$DATA_READINESS" "$EFFORT"   "$RISK")
+SC_RM=$(_score_raw "$SENS_RM" "$IMPACT"   "$CONFIDENCE"    "$DATA_READINESS" "$EFFORT"   "$RISK")
+SC_IP=$(_score_raw "$REACH"   "$SENS_IP"  "$CONFIDENCE"    "$DATA_READINESS" "$EFFORT"   "$RISK")
+SC_IM=$(_score_raw "$REACH"   "$SENS_IM"  "$CONFIDENCE"    "$DATA_READINESS" "$EFFORT"   "$RISK")
+SC_CP=$(_score_raw "$REACH"   "$IMPACT"   "$SENS_CP"       "$DATA_READINESS" "$EFFORT"   "$RISK")
+SC_CM=$(_score_raw "$REACH"   "$IMPACT"   "$SENS_CM"       "$DATA_READINESS" "$EFFORT"   "$RISK")
+SC_DP=$(_score_raw "$REACH"   "$IMPACT"   "$CONFIDENCE"    "$SENS_DP"        "$EFFORT"   "$RISK")
+SC_DM=$(_score_raw "$REACH"   "$IMPACT"   "$CONFIDENCE"    "$SENS_DM"        "$EFFORT"   "$RISK")
+SC_EP=$(_score_raw "$REACH"   "$IMPACT"   "$CONFIDENCE"    "$DATA_READINESS" "$SENS_EP"  "$RISK")
+SC_EM=$(_score_raw "$REACH"   "$IMPACT"   "$CONFIDENCE"    "$DATA_READINESS" "$SENS_EM"  "$RISK")
+SC_KP=$(_score_raw "$REACH"   "$IMPACT"   "$CONFIDENCE"    "$DATA_READINESS" "$EFFORT"   "$SENS_KP")
+SC_KM=$(_score_raw "$REACH"   "$IMPACT"   "$CONFIDENCE"    "$DATA_READINESS" "$EFFORT"   "$SENS_KM")
+
+# Delta strings (formatted with sign)
+D_RP=$(_fmt_delta "$SC_RP" "$RAW_SCORE"); D_RM=$(_fmt_delta "$SC_RM" "$RAW_SCORE")
+D_IP=$(_fmt_delta "$SC_IP" "$RAW_SCORE"); D_IM=$(_fmt_delta "$SC_IM" "$RAW_SCORE")
+D_CP=$(_fmt_delta "$SC_CP" "$RAW_SCORE"); D_CM=$(_fmt_delta "$SC_CM" "$RAW_SCORE")
+D_DP=$(_fmt_delta "$SC_DP" "$RAW_SCORE"); D_DM=$(_fmt_delta "$SC_DM" "$RAW_SCORE")
+D_EP=$(_fmt_delta "$SC_EP" "$RAW_SCORE"); D_EM=$(_fmt_delta "$SC_EM" "$RAW_SCORE")
+D_KP=$(_fmt_delta "$SC_KP" "$RAW_SCORE"); D_KM=$(_fmt_delta "$SC_KM" "$RAW_SCORE")
+
+# Identify most influential positive and negative levers
+SENS_SUMMARY=$(awk -v base="$RAW_SCORE" \
+    -v srp="$SC_RP" -v sip="$SC_IP" -v scp="$SC_CP" \
+    -v sdp="$SC_DP" -v sem="$SC_EM" -v skm="$SC_KM" \
+    -v srm="$SC_RM" -v sim="$SC_IM" -v scm="$SC_CM" \
+    -v sdm="$SC_DM" -v sep="$SC_EP" -v skp="$SC_KP" \
+'BEGIN {
+    pos_d[0] = srp - base; pos_n[0] = "Reach +1"
+    pos_d[1] = sip - base; pos_n[1] = "Impact +1 step"
+    pos_d[2] = scp - base; pos_n[2] = "Confidence +1%"
+    pos_d[3] = sdp - base; pos_n[3] = "Data_Readiness +1%"
+    pos_d[4] = sem - base; pos_n[4] = "Effort -1 wk"
+    pos_d[5] = skm - base; pos_n[5] = "Risk -1"
+    neg_d[0] = srm - base; neg_n[0] = "Reach -1"
+    neg_d[1] = sim - base; neg_n[1] = "Impact -1 step"
+    neg_d[2] = scm - base; neg_n[2] = "Confidence -1%"
+    neg_d[3] = sdm - base; neg_n[3] = "Data_Readiness -1%"
+    neg_d[4] = sep - base; neg_n[4] = "Effort +1 wk"
+    neg_d[5] = skp - base; neg_n[5] = "Risk +1"
+    bi = 0; ni = 0
+    for (i = 1; i < 6; i++) {
+        if (pos_d[i] > pos_d[bi]) bi = i
+        if (neg_d[i] < neg_d[ni]) ni = i
+    }
+    pd = pos_d[bi]; nd = neg_d[ni]
+    pstr = (pd >= 0) ? sprintf("+%.2f", pd) : sprintf("%.2f", pd)
+    printf "  ▲ Best upside:  %s → Δ%s\n", pos_n[bi], pstr
+    printf "  ▼ Biggest risk: %s → Δ%.2f\n", neg_n[ni], nd
+}')
+
 # --- Output ---
 
 echo "┌─────────────────────────────────────────────────────────────┐"
@@ -317,6 +420,23 @@ echo "  Effort         → $EFFORT_CLASS"
 echo "  Risk           → $RISK_CLASS"
 echo ""
 echo "Rationale: $RATIONALE"
+echo ""
+echo "Sensitivity Analysis (what-if ±1 per dimension):"
+printf "  %-18s +1 → %s (Δ%s) | -1 → %s (Δ%s)\n" \
+    "Reach:"         "$SC_RP" "$D_RP" "$SC_RM" "$D_RM"
+printf "  %-18s +1 step → %s (Δ%s) | -1 step → %s (Δ%s)\n" \
+    "Impact:"        "$SC_IP" "$D_IP" "$SC_IM" "$D_IM"
+printf "  %-18s +1%% → %s (Δ%s) | -1%% → %s (Δ%s)\n" \
+    "Confidence:"    "$SC_CP" "$D_CP" "$SC_CM" "$D_CM"
+printf "  %-18s +1%% → %s (Δ%s) | -1%% → %s (Δ%s)\n" \
+    "Data_Readiness:" "$SC_DP" "$D_DP" "$SC_DM" "$D_DM"
+printf "  %-18s +1 wk → %s (Δ%s) | -1 wk → %s (Δ%s)\n" \
+    "Effort:"        "$SC_EP" "$D_EP" "$SC_EM" "$D_EM"
+printf "  %-18s +1 → %s (Δ%s) | -1 → %s (Δ%s)\n" \
+    "Risk:"          "$SC_KP" "$D_KP" "$SC_KM" "$D_KM"
+echo ""
+echo "Levers summary:"
+echo "$SENS_SUMMARY"
 echo ""
 echo "Note: To compare across ideas in a session:"
 echo "  Norm_Score = (raw_score / session_max_raw) × 100"
