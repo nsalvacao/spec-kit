@@ -103,7 +103,9 @@ Quality helpers: `analyze`, `checklist`, `taskstoissues`
 
 **Command:** `uv run pytest tests/ --tb=short`
 
-**Result:** 522 passed, 40 failed (all 40 failures caused by missing `rg` binary — unrelated to CLI logic), 9 skipped.
+**Result:** 522 passed, 40 failed, 9 skipped. The 40 failures are expected in
+environments where ripgrep (`rg`) is not installed — the validation scripts tested by
+those cases require `rg` at runtime.
 
 ## Reproducing this report
 
