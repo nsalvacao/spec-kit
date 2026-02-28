@@ -92,6 +92,23 @@ def test_register_feature_supports_optional_parent_lineage_fields(tmp_path: Path
     assert entry["parent_program_id"] == "program-core-platform"
 
 
+def test_register_feature_rejects_non_feature_scope_mode(tmp_path: Path) -> None:
+    result = run_policy(
+        "register-feature",
+        "--repo-root",
+        str(tmp_path),
+        "--branch",
+        "011-canonical-unit",
+        "--feature-id",
+        "011-canonical-unit",
+        "--scope-mode",
+        "epic",
+    )
+
+    assert result.returncode != 0
+    assert "scope_mode='feature' only" in result.stderr
+
+
 def test_register_feature_preserves_existing_parent_lineage_when_re_registering(tmp_path: Path) -> None:
     first = run_policy(
         "register-feature",

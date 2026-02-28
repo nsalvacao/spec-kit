@@ -1,0 +1,33 @@
+# External Baseline Integration Traceability
+
+This project treats external plugins as design baselines, then migrates useful
+capabilities into native, first-party functionality.
+
+## Integration Contract
+
+- External locations (for example
+  `~/.copilot/installed-plugins/nsalvacao-claude-code-plugins/...`) are
+  reference-only.
+- Runtime logic must live in this repository (`src/`, `scripts/`,
+  `templates/commands/`, workflows).
+- New integrations are tracked as explicit issues/PRs with tests and docs.
+
+## Capability Matrix
+
+| Baseline capability | Native implementation target | Tracking issue | Status |
+| --- | --- | --- | --- |
+| One branch per feature execution unit | `scripts/python/branch-policy.py` + create-feature scripts + docs/tests | [#108](https://github.com/nsalvacao/spec-kit/issues/108) | In hardening/closure |
+| Single canonical tasks artifact (`specs/<feature>/tasks.md`) | `scripts/python/task-artifact-policy.py` + tests | [#109](https://github.com/nsalvacao/spec-kit/issues/109) | Delivered |
+| Cockpit feature binding to active feature tasks | CLI/state + dashboard binding | [#110](https://github.com/nsalvacao/spec-kit/issues/110) | Planned |
+| Guided orchestration across Layers 0-4 | Wizard/orchestrator in native CLI flow | [#111](https://github.com/nsalvacao/spec-kit/issues/111) | Planned |
+| TTY/TUI concise orchestration adapter | Native TTY/TUI prompts and payload parity | [#112](https://github.com/nsalvacao/spec-kit/issues/112) | Planned |
+| Programmatic orchestration payload contract | `src/specify_cli/orchestration_contract.py` + docs/tests | [#113](https://github.com/nsalvacao/spec-kit/issues/113) | Delivered |
+| Instruction contract for templates/scripts | `templates/commands/*` + validation behavior | [#115](https://github.com/nsalvacao/spec-kit/issues/115) | Delivered |
+| Handoff metadata schema and validation gate | `tests/test_handoff_metadata.py` + contracts/docs | [#116](https://github.com/nsalvacao/spec-kit/issues/116) | Delivered |
+
+## Verification Guardrail
+
+Runtime code must not reference external plugin installation paths directly.
+Automated guard:
+
+- `tests/test_runtime_nativity_guard.py`
