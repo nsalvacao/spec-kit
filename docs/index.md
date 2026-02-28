@@ -20,6 +20,7 @@ Spec-Driven Development **flips the script** on traditional software development
 - [Walkthrough](walkthrough.md)
 - [External Baseline Integration](external-baseline-integration-traceability.md)
 - [Google Drive Backup](backup-google-drive.md)
+- [Dogfooding Report](dogfooding.md)
 
 ## Core Philosophy
 

@@ -31,3 +31,5 @@
       href: release.md
     - name: Google Drive Backup
       href: backup-google-drive.md
+    - name: Dogfooding Report
+      href: dogfooding.md
