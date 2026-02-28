@@ -12,6 +12,7 @@ in a real environment and that `specify init` produces a valid project scaffold.
 | Python | 3.12 |
 | Platform | Linux x86_64 |
 | Package Manager | uv |
+| ripgrep | 14.1.0 |
 
 ## 1 — `specify --help`
 
@@ -44,7 +45,7 @@ Tool availability summary:
 | Python 3 | ✅ Available |
 | uv | ✅ Available |
 | yq | ✅ Available |
-| ripgrep (rg) | ⚠ Not found (optional) |
+| ripgrep (rg) | ✅ Available |
 | AI assistants | ○ IDE-based (no CLI check) or not installed |
 
 The CLI printed "Specify CLI is ready to use!" confirming the core toolchain is
@@ -60,7 +61,7 @@ functional.
 
 | Step | Outcome |
 | --- | --- |
-| Check required tools | ○ rg not found (non-blocking warning) |
+| Check required tools | ✅ All present |
 | Select AI assistant | ✅ copilot |
 | Select script type | ✅ sh (default) |
 | Fetch latest release | ✅ v0.0.73 (125,534 bytes) |
@@ -103,15 +104,19 @@ Quality helpers: `analyze`, `checklist`, `taskstoissues`
 
 **Command:** `uv run pytest tests/ --tb=short`
 
-**Result:** 522 passed, 40 failed, 9 skipped. The 40 failures are expected in
-environments where ripgrep (`rg`) is not installed — the validation scripts tested by
-those cases require `rg` at runtime.
+**Result:** ✅ **562 passed**, 9 skipped, 0 failed.
+
+All tests pass when the full toolchain (including ripgrep) is installed.
 
 ## Reproducing this report
 
 Run the following commands from the repository root:
 
 ```bash
+# Ensure ripgrep is installed (required by validation scripts)
+# Linux: sudo apt-get install ripgrep
+# macOS: brew install ripgrep
+
 uv sync
 uv run specify --help
 uv run specify check
