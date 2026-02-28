@@ -19,6 +19,7 @@ Spec-Driven Development **flips the script** on traditional software development
 - [Supported Agents](agents.md)
 - [Walkthrough](walkthrough.md)
 - [Google Drive Backup](backup-google-drive.md)
+- [Dogfooding Report](dogfooding.md)
 
 ## Core Philosophy
 
