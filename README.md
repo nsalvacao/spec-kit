@@ -446,8 +446,8 @@ If you use AI assistance in contributions, disclosure is required (see `CONTRIBU
 
 ### Legal and Compliance
 
-This fork is an independent derivative of `github/spec-kit` distributed under the MIT
-License. Trademark usage is attribution-only; this fork is **not affiliated with GitHub**.
+This fork is an independent derivative of `github/spec-kit` distributed under the MIT license.
+Trademark usage is attribution-only; this fork is **not affiliated with GitHub**.
 
 - License and copyright obligations: [`docs/legal-compliance.md`](docs/legal-compliance.md)
 - Upstream intake provenance workflow: [`docs/provenance-playbook.md`](docs/provenance-playbook.md)

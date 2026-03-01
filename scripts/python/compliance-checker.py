@@ -145,10 +145,13 @@ def _check_readme_phrases(repo_root: Path) -> list[ComplianceViolation]:
             )
         ]
 
+    # Normalize all whitespace (including newlines) so phrase checks remain
+    # stable across line-wraps in markdown formatting.
     content = readme.read_text(encoding="utf-8").lower()
+    normalized_content = re.sub(r"\s+", " ", content).strip()
     violations: list[ComplianceViolation] = []
     for phrase in README_REQUIRED_PHRASES:
-        if phrase not in content:
+        if phrase not in normalized_content:
             violations.append(
                 ComplianceViolation(
                     check="readme_required_phrase",

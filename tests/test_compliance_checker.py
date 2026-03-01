@@ -110,6 +110,16 @@ def test_check_readme_phrases_fails_when_mit_missing(tmp_path: Path) -> None:
     assert any("mit" in v.message.lower() for v in violations)
 
 
+def test_check_readme_phrases_accepts_mit_license_across_line_breaks(tmp_path: Path) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "# Project\n\nThis fork is not affiliated with GitHub.\n\nMIT\nLicense.\n",
+        encoding="utf-8",
+    )
+    violations = _check_readme_phrases(tmp_path)
+    assert violations == []
+
+
 def test_check_trademarks_notice_passes(tmp_path: Path) -> None:
     doc = tmp_path / "docs" / "trademarks.md"
     doc.parent.mkdir(parents=True)
