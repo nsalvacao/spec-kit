@@ -630,7 +630,11 @@ def _resolve_update_paths(project_root: Path, notes: list[str]) -> tuple[Path, P
     config = _read_cockpit_config(project_root, notes)
     config_paths = config.get("paths", {}) if isinstance(config.get("paths"), dict) else {}
 
-    tasks_candidate = _resolve_project_relative_path(project_root, str(config_paths.get("tasks", "")).strip())
+    tasks_raw = config_paths.get("tasks")
+    tasks_candidate = _resolve_project_relative_path(
+        project_root,
+        tasks_raw.strip() if isinstance(tasks_raw, str) else None,
+    )
     if tasks_candidate and tasks_candidate.exists():
         tasks_path = tasks_candidate
     else:
@@ -642,7 +646,11 @@ def _resolve_update_paths(project_root: Path, notes: list[str]) -> tuple[Path, P
         else:
             tasks_path = (project_root / "TASKS.md").resolve()
 
-    memory_candidate = _resolve_project_relative_path(project_root, str(config_paths.get("memory", "")).strip())
+    memory_raw = config_paths.get("memory")
+    memory_candidate = _resolve_project_relative_path(
+        project_root,
+        memory_raw.strip() if isinstance(memory_raw, str) else None,
+    )
     memory_dir = memory_candidate if memory_candidate else (project_root / "memory").resolve()
     try:
         tasks_path.relative_to(project_root)

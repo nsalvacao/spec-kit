@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import date as calendar_date
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -58,12 +60,16 @@ def test_run_productivity_update_requires_scaffold(tmp_path: Path) -> None:
 def test_run_productivity_update_detects_sync_stale_and_memory_gaps(tmp_path: Path) -> None:
     _seed_productivity_state(tmp_path)
 
-    outcome = run_productivity_update(
-        project_root=tmp_path,
-        sync_github=False,
-        external_tasks=["Existing Task", "Review QBR with Maya"],
-        stale_days=30,
-    )
+    with patch("specify_cli.productivity.date") as mock_date:
+        mock_date.today.return_value = calendar_date(2024, 2, 15)
+        mock_date.fromisoformat.side_effect = calendar_date.fromisoformat
+
+        outcome = run_productivity_update(
+            project_root=tmp_path,
+            sync_github=False,
+            external_tasks=["Existing Task", "Review QBR with Maya"],
+            stale_days=30,
+        )
 
     assert outcome.ok is True
     additions = outcome.task_sync["additions"]
@@ -78,6 +84,23 @@ def test_run_productivity_update_detects_sync_stale_and_memory_gaps(tmp_path: Pa
     memory_entities = {item["entity"] for item in outcome.memory_gaps}
     assert "QBR" in memory_entities
     assert any(item["kind"] == "link" for item in outcome.memory_enrichment)
+
+
+def test_run_productivity_update_handles_null_config_paths(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+    (tmp_path / ".cockpit.json").write_text(
+        json.dumps({"paths": {"tasks": None, "memory": None}}),
+        encoding="utf-8",
+    )
+
+    outcome = run_productivity_update(
+        project_root=tmp_path,
+        sync_github=False,
+        external_tasks=["Prepare ops handover"],
+    )
+
+    assert outcome.ok is True
+    assert outcome.tasks_path.name == "TASKS.md"
 
 
 def test_run_productivity_update_apply_yes_writes_tasks_and_memory(tmp_path: Path) -> None:
@@ -148,4 +171,3 @@ def test_productivity_update_cli_compact_output(tmp_path: Path) -> None:
     assert payload["ok"] is True
     assert payload["mode"] == "default"
     assert any(item["title"] == "Prepare retro notes" for item in payload["task_sync"]["additions"])
-

@@ -2527,7 +2527,10 @@ def productivity_update(
 
     confirmer = None
     if apply_changes and not yes and not compact:
-        confirmer = lambda prompt: typer.confirm(prompt, default=False)  # noqa: E731
+        def _confirm_update_prompt(prompt: str) -> bool:
+            return typer.confirm(prompt, default=False)
+
+        confirmer = _confirm_update_prompt
 
     try:
         outcome = run_productivity_update(
