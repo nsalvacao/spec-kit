@@ -30,7 +30,8 @@ jobs:
         run: |
           # Build release packages and confirm a root-level LICENSE is bundled in each zip
           if [ -f ".github/workflows/scripts/create-release-packages.sh" ]; then
-            bash .github/workflows/scripts/create-release-packages.sh v0.0.0-ci-check
+            # Keep a syntactically valid semver-like tag accepted by release packaging scripts.
+            bash .github/workflows/scripts/create-release-packages.sh v0.0.0-fork.1
             missing=0
             for zip in .genreleases/*.zip; do
               # If glob produces no matches, the literal pattern string is passed — skip it
