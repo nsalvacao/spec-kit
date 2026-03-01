@@ -277,3 +277,11 @@ def test_script_check_outputs_valid_json(tmp_path: Path) -> None:
     assert "ok" in payload
     assert "checks_run" in payload
     assert "violations" in payload
+
+
+def test_script_check_returns_2_for_invalid_repo_root(tmp_path: Path) -> None:
+    missing = tmp_path / "does-not-exist"
+    result = run_script("check", "--repo-root", str(missing))
+    assert result.returncode == 2
+    assert "[compliance-checker]" in result.stderr
+    assert "does not exist or is not a directory" in result.stderr

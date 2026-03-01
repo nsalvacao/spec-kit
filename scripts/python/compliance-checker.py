@@ -299,7 +299,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    return args.handler(args)
+    try:
+        return args.handler(args)
+    except ValueError as exc:
+        sys.stderr.write(f"[compliance-checker] {exc}\n")
+        return 2
+    except Exception as exc:  # defensive CLI boundary
+        sys.stderr.write(f"[compliance-checker] Unexpected error: {exc}\n")
+        return 2
 
 
 if __name__ == "__main__":
