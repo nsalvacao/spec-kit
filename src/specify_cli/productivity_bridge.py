@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
+import sys
 import time
 from typing import Any
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,6 +14,7 @@ from urllib.parse import urlparse
 
 
 SERVICE_NAME = "specify-productivity-cockpit"
+LOGGER = logging.getLogger("specify_cli.productivity_bridge")
 
 HTML_PAGE = """<!doctype html>
 <html lang="en">
@@ -60,12 +63,32 @@ HTML_PAGE = """<!doctype html>
           ['Config', data.artifacts?.cockpit_config ? 'present' : 'missing']
         ];
         const grid = document.getElementById('statusGrid');
-        grid.innerHTML = entries.map(([label, value]) =>
-          `<div class="k"><div class="l">${label}</div><div class="v">${value}</div></div>`
-        ).join('');
+        grid.replaceChildren();
+        for (const [label, value] of entries) {
+          const card = document.createElement('div');
+          card.className = 'k';
+          const labelNode = document.createElement('div');
+          labelNode.className = 'l';
+          labelNode.textContent = label;
+          const valueNode = document.createElement('div');
+          valueNode.className = 'v';
+          valueNode.textContent = String(value ?? '');
+          card.append(labelNode, valueNode);
+          grid.appendChild(card);
+        }
       } catch (err) {
-        document.getElementById('statusGrid').innerHTML =
-          `<div class="k"><div class="l">Error</div><div class="v">${String(err)}</div></div>`;
+        const grid = document.getElementById('statusGrid');
+        grid.replaceChildren();
+        const card = document.createElement('div');
+        card.className = 'k';
+        const labelNode = document.createElement('div');
+        labelNode.className = 'l';
+        labelNode.textContent = 'Error';
+        const valueNode = document.createElement('div');
+        valueNode.className = 'v';
+        valueNode.textContent = String(err);
+        card.append(labelNode, valueNode);
+        grid.appendChild(card);
       }
     }
     load();
@@ -126,29 +149,48 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float):
 
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
             # Keep logs concise in detached mode.
-            message = format % args
-            print(f"[bridge] {message}", flush=True)
+            LOGGER.info(format, *args)
 
     return Handler
 
 
-def run_server(project_root: Path, host: str, port: int) -> int:
+def _validate_project_root(project_root: Path) -> Path:
     root = project_root.resolve()
     if not root.exists() or not root.is_dir():
-        print(f"Invalid project root: {root}", flush=True)
+        raise ValueError(f"Invalid project root: {root}")
+
+    cwd = Path.cwd().resolve()
+    if root != cwd:
+        try:
+            root.relative_to(cwd)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid project root: {root}. Root must be current working directory or a child path."
+            ) from exc
+    return root
+
+
+def run_server(project_root: Path, host: str, port: int) -> int:
+    try:
+        root = _validate_project_root(project_root)
+    except ValueError as exc:
+        print(str(exc), flush=True)
         return 2
 
     started_at = time.time()
     handler = build_handler(root, host, port, started_at)
     server = ThreadingHTTPServer((host, port), handler)
     server.daemon_threads = True
-    print(f"{SERVICE_NAME} listening on http://{host}:{port}", flush=True)
-    print(f"project_root={root}", flush=True)
+    LOGGER.info("%s listening on http://%s:%s", SERVICE_NAME, host, port)
+    LOGGER.info("project_root=%s", root)
 
     try:
         server.serve_forever(poll_interval=0.2)
     except KeyboardInterrupt:
         pass
+    except Exception:
+        LOGGER.exception("Bridge server stopped due to unexpected error")
+        return 1
     finally:
         server.server_close()
     return 0
@@ -163,9 +205,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="[bridge] %(message)s")
     args = _parse_args(argv)
     return run_server(Path(args.project_root), args.host, int(args.port))
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

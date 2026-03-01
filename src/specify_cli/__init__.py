@@ -2399,9 +2399,14 @@ def productivity_start(
     compact: bool = typer.Option(False, "--compact", help="Emit machine-readable JSON output."),
 ):
     """Initialize productivity artifacts and launch the native cockpit."""
+    project_root_resolved = project_root.expanduser().resolve()
+    if not project_root_resolved.exists() or not project_root_resolved.is_dir():
+        console.print(f"[red]Error:[/red] Project root does not exist or is not a directory: {project_root_resolved}")
+        raise typer.Exit(1)
+
     try:
         outcome = run_productivity_start(
-            project_root=project_root,
+            project_root=project_root_resolved,
             host=host,
             preferred_port=port,
             start_server=not no_server,
@@ -2409,6 +2414,9 @@ def productivity_start(
         )
     except (OSError, ValueError, RuntimeError) as exc:
         console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1)
+    except Exception as exc:
+        console.print(f"[red]Unexpected error:[/red] {exc}")
         raise typer.Exit(1)
 
     if compact:

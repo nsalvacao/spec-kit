@@ -10,7 +10,7 @@ from urllib.request import urlopen
 
 from http.server import ThreadingHTTPServer
 
-from specify_cli.productivity_bridge import SERVICE_NAME, _status_payload, build_handler
+from specify_cli.productivity_bridge import HTML_PAGE, SERVICE_NAME, _status_payload, build_handler
 
 
 def test_status_payload_reports_expected_artifacts(tmp_path: Path) -> None:
@@ -43,3 +43,8 @@ def test_bridge_status_endpoint_returns_service_metadata(tmp_path: Path) -> None
         server.shutdown()
         server.server_close()
         thread.join(timeout=2.0)
+
+
+def test_bridge_dashboard_uses_text_nodes_for_status_values() -> None:
+    assert "textContent = String(value ?? '')" in HTML_PAGE
+    assert "entries.map" not in HTML_PAGE

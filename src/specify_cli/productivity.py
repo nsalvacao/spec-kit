@@ -140,10 +140,14 @@ class StartOutcome:
 
 
 def _safe_write_if_missing(path: Path, content: str) -> bool:
-    if path.exists():
-        return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write(content)
+    except FileExistsError:
+        return False
+    except OSError as exc:
+        raise RuntimeError(f"Could not write '{path}': {exc}") from exc
     return True
 
 
@@ -242,8 +246,11 @@ def prepare_productivity_scaffold(project_root: Path, *, host: str, port: int) -
 
     if not cockpit_config.exists():
         payload = _default_cockpit_config(tasks_path=tasks_path, host=host, port=port)
-        cockpit_config.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        result.created.append(".cockpit.json")
+        cockpit_config_payload = json.dumps(payload, indent=2) + "\n"
+        if _safe_write_if_missing(cockpit_config, cockpit_config_payload):
+            result.created.append(".cockpit.json")
+        else:
+            result.existing.append(".cockpit.json")
     else:
         result.existing.append(".cockpit.json")
     result.config_path = cockpit_config
@@ -299,12 +306,17 @@ def open_dashboard_url(url: str) -> tuple[bool, str | None]:
     if sys.platform.startswith("darwin"):
         candidates.append(("open", ["open", url]))
     elif sys.platform.startswith("win"):
-        candidates.append(("powershell", ["powershell.exe", "-NoProfile", "-Command", f"Start-Process '{url}'"]))
-        candidates.append(("cmd", ["cmd.exe", "/c", "start", "", url]))
+        startfile = getattr(os, "startfile", None)
+        if callable(startfile):
+            try:
+                startfile(url)
+                return True, "os.startfile"
+            except OSError:
+                pass
+        candidates.append(("explorer", ["explorer.exe", url]))
     else:
         if _is_wsl():
             candidates.append(("wslview", ["wslview", url]))
-            candidates.append(("powershell", ["powershell.exe", "-NoProfile", "-Command", f"Start-Process '{url}'"]))
             candidates.append(("explorer", ["explorer.exe", url]))
         candidates.append(("xdg-open", ["xdg-open", url]))
 
@@ -347,7 +359,10 @@ def _launch_bridge_process(project_root: Path, host: str, port: int) -> subproce
     else:
         popen_kwargs["start_new_session"] = True
 
-    return subprocess.Popen(command, **popen_kwargs)
+    try:
+        return subprocess.Popen(command, **popen_kwargs)
+    finally:
+        log_stream.close()
 
 
 def ensure_bridge_running(project_root: Path, host: str, port: int) -> tuple[bool, bool]:

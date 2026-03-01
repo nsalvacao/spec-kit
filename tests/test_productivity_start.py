@@ -99,3 +99,22 @@ def test_productivity_start_cli_compact_output(tmp_path: Path) -> None:
     assert payload["ok"] is True
     assert payload["scaffold"]["bootstrap_required"] is True
     assert payload["scaffold"]["tasks_path_for_cockpit"]
+
+
+def test_productivity_start_cli_rejects_invalid_project_root(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-root"
+    result = runner.invoke(
+        app,
+        [
+            "productivity",
+            "start",
+            "--project-root",
+            str(missing),
+            "--no-server",
+            "--no-browser",
+            "--compact",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Project root does not exist or is not a directory" in result.output
