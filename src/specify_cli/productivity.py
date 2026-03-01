@@ -468,6 +468,7 @@ FUZZY_TITLE_MATCH_THRESHOLD = 0.84
 DEFAULT_STALE_AGE_DAYS = 30
 MAX_COMPREHENSIVE_SCAN_FILES = 80
 MAX_COMPREHENSIVE_SCAN_FILE_BYTES = 200_000
+MAX_EXTERNAL_TASK_TITLE_CHARS = 240
 COMPREHENSIVE_SKIP_DIRS = {
     ".git",
     ".venv",
@@ -697,17 +698,29 @@ def _parse_tasks(tasks_path: Path) -> list[TaskRecord]:
 
 def _coerce_external_task(item: Any, source_hint: str) -> ExternalTaskRecord | None:
     if isinstance(item, str) and item.strip():
-        return ExternalTaskRecord(title=item.strip(), source=source_hint, state="open")
+        normalized_title = _normalize_external_title(item)
+        if not normalized_title:
+            return None
+        return ExternalTaskRecord(title=normalized_title, source=source_hint, state="open")
     if not isinstance(item, dict):
         return None
 
-    title = str(item.get("title", "")).strip()
+    title = _normalize_external_title(item.get("title", ""))
     if not title:
         return None
     raw_state = str(item.get("state", "open")).strip().lower()
     state = "closed" if raw_state in {"closed", "done", "completed"} else "open"
-    source = str(item.get("source", source_hint)).strip() or source_hint
+    source = " ".join(str(item.get("source", source_hint)).split()).strip() or source_hint
     return ExternalTaskRecord(title=title, source=source, state=state)
+
+
+def _normalize_external_title(value: Any) -> str:
+    title = " ".join(str(value).split()).strip()
+    if not title:
+        return ""
+    if len(title) > MAX_EXTERNAL_TASK_TITLE_CHARS:
+        title = title[: MAX_EXTERNAL_TASK_TITLE_CHARS - 3].rstrip() + "..."
+    return title
 
 
 def _load_external_tasks_from_file(external_tasks_file: Path, notes: list[str]) -> list[ExternalTaskRecord]:

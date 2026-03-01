@@ -227,6 +227,26 @@ def test_run_productivity_update_rejects_invalid_configured_path_types(tmp_path:
     assert "must point to a directory" in outcome.error
 
 
+def test_run_productivity_update_normalizes_external_task_titles(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+    raw_title = "  Task\nwith   irregular\tspacing " + ("X" * 400)
+
+    outcome = run_productivity_update(
+        project_root=tmp_path,
+        sync_github=False,
+        external_tasks=[raw_title],
+    )
+
+    assert outcome.ok is True
+    additions = outcome.task_sync.get("additions", [])
+    assert additions
+    normalized = additions[0]["title"]
+    assert "\n" not in normalized
+    assert "  " not in normalized
+    assert len(normalized) <= 240
+    assert normalized.endswith("...")
+
+
 def test_run_productivity_update_apply_sanitizes_markdown_inputs(tmp_path: Path) -> None:
     _seed_productivity_state(tmp_path)
 
