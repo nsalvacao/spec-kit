@@ -162,6 +162,7 @@ specify init demo --skip-tls --ai gemini --ignore-agent-tools --script ps
 | Local uvx run (repo root) | `uvx --from . specify ...` |
 | Local uvx run (abs path) | `uvx --from /mnt/c/GitHub/spec-kit specify ...` |
 | Git branch uvx | `uvx --from git+URL@branch specify ...` |
+| Start native cockpit scaffold | `specify productivity start --no-browser` |
 | Build wheel | `uv build` |
 
 ## 11. Cleaning Up

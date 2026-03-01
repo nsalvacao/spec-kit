@@ -11,6 +11,7 @@ This reference covers the `specify` CLI and the available slash commands after i
 | `hierarchy-contract` | Normalize and validate Program/Epic/Feature hierarchy metadata payloads |
 | `scope-gate` | Run mandatory decomposition gate flow with follow/inspect/override decisions |
 | `scope-detect` | Run adaptive scope detection and emit gate-ready JSON payload |
+| `productivity` | Native productivity cockpit workflows (`start`) |
 
 ## `specify init` Arguments & Options
 
@@ -41,6 +42,9 @@ specify scope-gate --decision follow --description "Add status filter to custome
 specify scope-gate --decision override --override-mode feature --override-rationale "Emergency patch" --risk-acknowledged --description "Cross-team onboarding redesign"
 specify scope-detect --description "Cross-team migration with security and compliance controls"
 specify scope-detect --input-json scope-input.json --output-json .spec-kit/scope-gate.json
+specify productivity start
+specify productivity start --project-root . --no-browser
+specify productivity start --compact --no-server
 
 ```text
 
