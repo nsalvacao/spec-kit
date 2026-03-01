@@ -924,7 +924,7 @@ def _build_memory_corpus(project_root: Path, memory_dir: Path) -> str:
     for file_path in _iter_memory_markdown_files(project_root, memory_dir):
         try:
             chunks.append(file_path.read_text(encoding="utf-8"))
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
     return "\n".join(chunks).lower()
 
@@ -1293,7 +1293,7 @@ def run_productivity_update(
 
     try:
         local_tasks = _parse_tasks(tasks_path)
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         return UpdateOutcome(
             ok=False,
             mode=mode,
