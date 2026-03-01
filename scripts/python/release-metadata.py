@@ -273,49 +273,57 @@ def check_release_metadata(
     normalized_release_tag: str | None = None
     release_version: str | None = None
 
+    tag_mismatch = False
     if release_tag:
         normalized_release_tag = release_tag.strip()
         release_version = _normalize_release_tag(normalized_release_tag)
         if enforce_release_match and canonical_version != release_version:
+            tag_mismatch = True
             errors.append(
                 f"Canonical version '{canonical_version}' does not match release tag '{normalized_release_tag}'."
             )
 
-    if not _has_release_heading(changelog_content, policy.release_heading_pattern, canonical_version):
+    missing_changelog_heading = not _has_release_heading(
+        changelog_content, policy.release_heading_pattern, canonical_version
+    )
+    if missing_changelog_heading:
         errors.append(
             f"Missing changelog heading for version '{canonical_version}' in '{policy.changelog_file}'."
         )
 
     runtime_cli_version: str | None = None
+    runtime_version_mismatch = False
+    runtime_error = False
     if not skip_runtime:
         try:
             runtime_cli_version = _run_runtime_cli_version(repo_root)
             if runtime_cli_version != canonical_version:
+                runtime_version_mismatch = True
                 errors.append(
                     f"Runtime CLI version '{runtime_cli_version}' does not match canonical version '{canonical_version}'."
                 )
         except ReleaseMetadataError as exc:
+            runtime_error = True
             errors.append(str(exc))
     else:
         warnings.append("Runtime version check skipped by request.")
 
     hints: list[str] = []
-    if errors:
-        if any("does not match release tag" in e for e in errors):
-            hints.append(
-                f"Run 'release-metadata-sync.yml' (workflow_dispatch) with release_tag='{normalized_release_tag}'"
-                " to synchronize canonical version and changelog to the published tag."
-            )
-        if any("Missing changelog heading" in e for e in errors):
-            hints.append(
-                f"Add a '## [{canonical_version}] - YYYY-MM-DD' heading to '{policy.changelog_file}'"
-                " or trigger 'release-metadata-sync.yml' to auto-insert it."
-            )
-        if any("Runtime CLI version" in e for e in errors):
-            hints.append(
-                "Rebuild and reinstall the package (uv sync) to align the runtime CLI version"
-                f" with the canonical version '{canonical_version}'."
-            )
+    if tag_mismatch:
+        hints.append(
+            f"Run 'release-metadata-sync.yml' (workflow_dispatch) with release_tag='{normalized_release_tag}'"
+            " to synchronize canonical version and changelog to the published tag."
+        )
+    if missing_changelog_heading:
+        hints.append(
+            f"Add a '## [{canonical_version}] - YYYY-MM-DD' heading to '{policy.changelog_file}'"
+            " or trigger 'release-metadata-sync.yml' to auto-insert it."
+        )
+    if runtime_version_mismatch or runtime_error:
+        hints.append(
+            "Rebuild and reinstall the package (uv sync) to align the runtime CLI version"
+            f" with the canonical version '{canonical_version}'."
+        )
 
     return {
         "ok": len(errors) == 0,

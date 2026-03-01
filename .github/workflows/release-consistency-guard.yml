@@ -61,7 +61,7 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           cat guard-result.json
 
-          python - <<'PY'
+          python - >> "$GITHUB_STEP_SUMMARY" <<'PY'
           import json
           p = json.load(open("guard-result.json", encoding="utf-8"))
           ok = p.get("ok", False)
@@ -93,7 +93,7 @@ jobs:
           lines.append(json.dumps(p, indent=2))
           lines += ["```", "</details>", ""]
           print("\n".join(lines))
-          PY >> "$GITHUB_STEP_SUMMARY"
+          PY
 
           python3 -c "import json; p=json.load(open('guard-result.json',encoding='utf-8')); print('canonical_version='+p.get('canonical_version','n/a'))" >> "$GITHUB_OUTPUT"
 
