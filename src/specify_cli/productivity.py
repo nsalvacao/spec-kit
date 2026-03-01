@@ -1,7 +1,9 @@
-"""Native productivity start flow (issue #200, A1 scope)."""
+"""Native productivity flows (A1 start + A2 update scopes)."""
 
 from __future__ import annotations
 
+from datetime import date
+from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 import json
 import os
@@ -11,7 +13,7 @@ import socket
 import subprocess
 import sys
 import time
-from typing import Any, TextIO
+from typing import Any, Callable, Iterable, TextIO
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 import webbrowser
@@ -450,5 +452,966 @@ def run_productivity_start(
         browser_opened=browser_opened,
         browser_method=browser_method,
         scaffold=scaffold,
+        notes=notes,
+    )
+
+
+TASK_SECTION_ORDER = ("Active", "Waiting On", "Someday", "Done")
+TASK_LINE_RE = re.compile(r"^\s*-\s*\[(?P<checked>[ xX])\]\s*(?P<body>.+?)\s*$")
+DUE_DATE_RE = re.compile(r"(?i)\bdue[:\s]+(?P<date>\d{4}-\d{2}-\d{2})\b")
+SINCE_DATE_RE = re.compile(r"(?i)\bsince[:\s]+(?P<date>\d{4}-\d{2}-\d{2})\b")
+URL_RE = re.compile(r"https?://[^\s)>\]]+")
+ACRONYM_RE = re.compile(r"\b[A-Z][A-Z0-9]{1,}\b")
+NAME_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b")
+TODO_HINT_RE = re.compile(r"(?i)\b(todo|fixme|action item|action:|follow[- ]up)\b")
+FUZZY_TITLE_MATCH_THRESHOLD = 0.84
+DEFAULT_STALE_AGE_DAYS = 30
+MAX_COMPREHENSIVE_SCAN_FILES = 80
+MAX_COMPREHENSIVE_SCAN_FILE_BYTES = 200_000
+MAX_EXTERNAL_TASK_TITLE_CHARS = 240
+COMPREHENSIVE_SKIP_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    ".spec-kit",
+}
+COMMON_ENTITY_STOPWORDS = {
+    "The",
+    "This",
+    "That",
+    "And",
+    "For",
+    "With",
+    "Done",
+    "TODO",
+    "FIXME",
+    "Action",
+    "Review",
+    "Update",
+    "Task",
+}
+COMMON_ENTITY_VERBISH = {
+    "add",
+    "check",
+    "complete",
+    "create",
+    "draft",
+    "existing",
+    "finalize",
+    "follow",
+    "prepare",
+    "review",
+    "send",
+    "share",
+    "sync",
+    "task",
+    "update",
+    "wait",
+    "write",
+}
+
+
+@dataclass
+class TaskRecord:
+    section: str
+    title: str
+    body: str
+    line_number: int
+    checked: bool
+    due_date: date | None = None
+    since_date: date | None = None
+
+
+@dataclass
+class ExternalTaskRecord:
+    title: str
+    source: str
+    state: str = "open"
+
+
+@dataclass
+class UpdateOutcome:
+    ok: bool
+    mode: str
+    project_root: Path
+    tasks_path: Path | None
+    memory_dir: Path | None
+    task_sync: dict[str, Any] = field(default_factory=dict)
+    stale_findings: list[dict[str, Any]] = field(default_factory=list)
+    memory_gaps: list[dict[str, Any]] = field(default_factory=list)
+    memory_enrichment: list[dict[str, Any]] = field(default_factory=list)
+    comprehensive: dict[str, Any] | None = None
+    applied: dict[str, list[str]] = field(default_factory=lambda: {"tasks": [], "memory": []})
+    notes: list[str] = field(default_factory=list)
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "mode": self.mode,
+            "project_root": str(self.project_root),
+            "tasks_path": str(self.tasks_path) if self.tasks_path else None,
+            "memory_dir": str(self.memory_dir) if self.memory_dir else None,
+            "task_sync": self.task_sync,
+            "stale_findings": self.stale_findings,
+            "memory_gaps": self.memory_gaps,
+            "memory_enrichment": self.memory_enrichment,
+            "comprehensive": self.comprehensive,
+            "applied": self.applied,
+            "notes": self.notes,
+            "error": self.error,
+        }
+
+
+def _normalize_title(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def _title_similarity(a: str, b: str) -> float:
+    if not a or not b:
+        return 0.0
+    return SequenceMatcher(a=a, b=b).ratio()
+
+
+def _parse_iso_date(match: re.Match[str] | None) -> date | None:
+    if not match:
+        return None
+    raw = match.group("date")
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _strip_task_markup(body: str) -> str:
+    stripped = re.sub(r"\*\*(.*?)\*\*", r"\1", body)
+    stripped = re.sub(r"~~(.*?)~~", r"\1", stripped)
+    stripped = re.sub(r"`([^`]*)`", r"\1", stripped)
+    return stripped.strip()
+
+
+def _task_title_from_body(body: str) -> str:
+    plain = _strip_task_markup(body)
+    for separator in (" - ", " — ", " – "):
+        if separator in plain:
+            title = plain.split(separator, 1)[0].strip()
+            if title:
+                return title
+    return plain
+
+
+def _read_cockpit_config(project_root: Path, notes: list[str]) -> dict[str, Any]:
+    cockpit_path = project_root / ".cockpit.json"
+    if not cockpit_path.exists():
+        return {}
+    try:
+        payload = json.loads(cockpit_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        notes.append("Could not parse .cockpit.json; using default path fallback.")
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _resolve_project_relative_path(project_root: Path, raw: str | None) -> Path | None:
+    if not raw:
+        return None
+    candidate = (project_root / raw).resolve()
+    try:
+        candidate.relative_to(project_root)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _resolve_update_paths(project_root: Path, notes: list[str]) -> tuple[Path, Path]:
+    config = _read_cockpit_config(project_root, notes)
+    config_paths = config.get("paths", {}) if isinstance(config.get("paths"), dict) else {}
+
+    tasks_raw = config_paths.get("tasks")
+    tasks_candidate = _resolve_project_relative_path(
+        project_root,
+        tasks_raw.strip() if isinstance(tasks_raw, str) else None,
+    )
+    if tasks_candidate and tasks_candidate.exists():
+        tasks_path = tasks_candidate
+    else:
+        if tasks_candidate and not tasks_candidate.exists():
+            notes.append(f"Configured tasks path not found: {tasks_candidate}. Falling back.")
+        feature_relative = _resolve_feature_tasks_path(project_root)
+        if feature_relative:
+            tasks_path = (project_root / feature_relative).resolve()
+        else:
+            tasks_path = (project_root / "TASKS.md").resolve()
+
+    memory_raw = config_paths.get("memory")
+    memory_candidate = _resolve_project_relative_path(
+        project_root,
+        memory_raw.strip() if isinstance(memory_raw, str) else None,
+    )
+    memory_dir = memory_candidate if memory_candidate else (project_root / "memory").resolve()
+    try:
+        tasks_path.relative_to(project_root)
+        memory_dir.relative_to(project_root)
+    except ValueError as exc:
+        raise ValueError("Resolved update paths must stay inside project root.") from exc
+    return tasks_path, memory_dir
+
+
+def _parse_tasks(tasks_path: Path) -> list[TaskRecord]:
+    lines = tasks_path.read_text(encoding="utf-8").splitlines()
+    records: list[TaskRecord] = []
+    section: str | None = None
+
+    for line_number, line in enumerate(lines, start=1):
+        heading = re.match(r"^\s*##\s+(?P<label>.+?)\s*$", line)
+        if heading:
+            label = heading.group("label").strip()
+            section = label if label in TASK_SECTION_ORDER else None
+            continue
+        if not section:
+            continue
+        match = TASK_LINE_RE.match(line)
+        if not match:
+            continue
+        body = match.group("body").strip()
+        checked = match.group("checked").lower() == "x"
+        due_date = _parse_iso_date(DUE_DATE_RE.search(body))
+        since_date = _parse_iso_date(SINCE_DATE_RE.search(body))
+        title = _task_title_from_body(body)
+        records.append(
+            TaskRecord(
+                section=section,
+                title=title,
+                body=body,
+                line_number=line_number,
+                checked=checked,
+                due_date=due_date,
+                since_date=since_date,
+            )
+        )
+    return records
+
+
+def _coerce_external_task(item: Any, source_hint: str) -> ExternalTaskRecord | None:
+    if isinstance(item, str) and item.strip():
+        normalized_title = _normalize_external_title(item)
+        if not normalized_title:
+            return None
+        return ExternalTaskRecord(title=normalized_title, source=source_hint, state="open")
+    if not isinstance(item, dict):
+        return None
+
+    title = _normalize_external_title(item.get("title", ""))
+    if not title:
+        return None
+    raw_state = str(item.get("state", "open")).strip().lower()
+    state = "closed" if raw_state in {"closed", "done", "completed"} else "open"
+    source = " ".join(str(item.get("source", source_hint)).split()).strip() or source_hint
+    return ExternalTaskRecord(title=title, source=source, state=state)
+
+
+def _normalize_external_title(value: Any) -> str:
+    title = " ".join(str(value).split()).strip()
+    if not title:
+        return ""
+    if len(title) > MAX_EXTERNAL_TASK_TITLE_CHARS:
+        title = title[: MAX_EXTERNAL_TASK_TITLE_CHARS - 3].rstrip() + "..."
+    return title
+
+
+def _load_external_tasks_from_file(external_tasks_file: Path, notes: list[str]) -> list[ExternalTaskRecord]:
+    try:
+        payload = json.loads(external_tasks_file.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"Could not read external tasks file: {external_tasks_file} ({exc})") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Could not parse external tasks file: {external_tasks_file} ({exc.msg})") from exc
+
+    if not isinstance(payload, list):
+        raise ValueError(f"External tasks file must contain a JSON list: {external_tasks_file}")
+
+    records: list[ExternalTaskRecord] = []
+    for item in payload:
+        record = _coerce_external_task(item, f"file:{external_tasks_file.name}")
+        if record:
+            records.append(record)
+    if len(records) < len(payload):
+        notes.append(
+            f"Ignored {len(payload) - len(records)} invalid external task entries in {external_tasks_file.name}."
+        )
+    return records
+
+
+def _load_external_tasks_from_github(project_root: Path, notes: list[str]) -> list[ExternalTaskRecord]:
+    if not (project_root / ".git").exists():
+        return []
+
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "issue",
+                "list",
+                "--assignee",
+                "@me",
+                "--state",
+                "all",
+                "--limit",
+                "100",
+                "--json",
+                "title,url,state",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(project_root),
+            timeout=8.0,
+        )
+    except FileNotFoundError:
+        notes.append("GitHub sync skipped: gh CLI is not available.")
+        return []
+    except subprocess.TimeoutExpired:
+        notes.append("GitHub sync timed out and was skipped.")
+        return []
+
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        detail = stderr.splitlines()[0] if stderr else "unknown gh issue list error"
+        notes.append(f"GitHub sync skipped: {detail}")
+        return []
+
+    try:
+        payload = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError:
+        notes.append("GitHub sync skipped: invalid JSON returned by gh CLI.")
+        return []
+
+    if not isinstance(payload, list):
+        return []
+
+    records: list[ExternalTaskRecord] = []
+    for item in payload:
+        record = _coerce_external_task(item, "github")
+        if record:
+            records.append(record)
+    return records
+
+
+def _best_local_match(external_title: str, local_tasks: list[TaskRecord]) -> tuple[TaskRecord | None, float]:
+    target = _normalize_title(external_title)
+    if not target:
+        return None, 0.0
+
+    best_task: TaskRecord | None = None
+    best_score = 0.0
+    for local in local_tasks:
+        candidate = _normalize_title(local.title)
+        if not candidate:
+            continue
+        score = 1.0 if candidate == target else _title_similarity(candidate, target)
+        if target in candidate or candidate in target:
+            score = max(score, 0.92)
+        if score > best_score:
+            best_score = score
+            best_task = local
+    return best_task, best_score
+
+
+def _analyze_task_sync(
+    *,
+    local_tasks: list[TaskRecord],
+    external_tasks: list[ExternalTaskRecord],
+) -> dict[str, Any]:
+    active_local = [task for task in local_tasks if not task.checked and task.section in {"Active", "Waiting On", "Someday"}]
+    additions: list[dict[str, Any]] = []
+    duplicates: list[dict[str, Any]] = []
+    completion_candidates: list[dict[str, Any]] = []
+
+    seen_addition_norms: set[str] = set()
+    for external in external_tasks:
+        matched, score = _best_local_match(external.title, active_local)
+        normalized = _normalize_title(external.title)
+
+        if matched and score >= FUZZY_TITLE_MATCH_THRESHOLD:
+            duplicates.append(
+                {
+                    "external_title": external.title,
+                    "local_title": matched.title,
+                    "local_section": matched.section,
+                    "match_score": round(score, 3),
+                    "source": external.source,
+                }
+            )
+            if external.state == "closed" and matched.section == "Active":
+                completion_candidates.append(
+                    {
+                        "title": matched.title,
+                        "line_number": matched.line_number,
+                        "source": external.source,
+                        "reason": "matched_closed_external_task",
+                    }
+                )
+            continue
+
+        if external.state == "closed":
+            continue
+
+        if normalized in seen_addition_norms:
+            continue
+        seen_addition_norms.add(normalized)
+        additions.append(
+            {
+                "title": external.title,
+                "source": external.source,
+                "state": external.state,
+            }
+        )
+
+    return {
+        "external_total": len(external_tasks),
+        "additions": additions,
+        "duplicates": duplicates,
+        "completion_candidates": completion_candidates,
+    }
+
+
+def _task_has_context(task: TaskRecord) -> bool:
+    lower = f" {task.body.lower()} "
+    has_person_hint = " for " in lower or "@" in task.body
+    has_project_hint = "#" in task.body or "project:" in lower or "specs/" in lower
+    return has_person_hint or has_project_hint
+
+
+def _analyze_stale_tasks(local_tasks: list[TaskRecord], *, stale_days: int) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    today = date.today()
+
+    for task in local_tasks:
+        if task.checked or task.section != "Active":
+            continue
+
+        reasons: list[str] = []
+        payload: dict[str, Any] = {
+            "title": task.title,
+            "line_number": task.line_number,
+            "section": task.section,
+            "reasons": reasons,
+        }
+
+        if task.due_date and task.due_date < today:
+            reasons.append("due_date_past")
+            payload["due_date"] = task.due_date.isoformat()
+
+        if task.since_date:
+            age_days = (today - task.since_date).days
+            payload["since_date"] = task.since_date.isoformat()
+            payload["age_days"] = age_days
+            if age_days >= stale_days:
+                reasons.append("active_too_long")
+
+        if not _task_has_context(task):
+            reasons.append("missing_context")
+
+        if reasons:
+            findings.append(payload)
+
+    return findings
+
+
+def _iter_memory_markdown_files(project_root: Path, memory_dir: Path) -> Iterable[Path]:
+    claude_file = project_root / "CLAUDE.md"
+    if claude_file.exists():
+        yield claude_file
+    if memory_dir.exists():
+        for candidate in sorted(memory_dir.rglob("*.md")):
+            if candidate.is_file():
+                yield candidate
+
+
+def _build_memory_corpus(project_root: Path, memory_dir: Path) -> str:
+    chunks: list[str] = []
+    for file_path in _iter_memory_markdown_files(project_root, memory_dir):
+        try:
+            chunks.append(file_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+    return "\n".join(chunks).lower()
+
+
+def _extract_entities(text: str) -> list[tuple[str, str]]:
+    entities: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    for token in ACRONYM_RE.findall(text):
+        if token in COMMON_ENTITY_STOPWORDS:
+            continue
+        key = f"acronym:{token.lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        entities.append((token, "acronym"))
+
+    for phrase in NAME_RE.findall(text):
+        if phrase in COMMON_ENTITY_STOPWORDS:
+            continue
+        phrase_words = phrase.split()
+        if len(phrase_words) == 1 and phrase_words[0].lower() in COMMON_ENTITY_VERBISH:
+            continue
+        key = f"name:{phrase.lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        entities.append((phrase, "name"))
+
+    return entities
+
+
+def _detect_memory_gaps(local_tasks: list[TaskRecord], memory_corpus: str) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    seen_entities: set[str] = set()
+
+    for task in local_tasks:
+        if task.checked:
+            continue
+        for entity, kind in _extract_entities(task.body):
+            normalized = entity.lower()
+            if len(normalized) < 3 or normalized in seen_entities:
+                continue
+            if normalized in memory_corpus:
+                continue
+            seen_entities.add(normalized)
+            target = "memory/glossary.md" if kind == "acronym" else "memory/projects/"
+            confidence = 0.92 if kind == "acronym" else 0.72
+            findings.append(
+                {
+                    "entity": entity,
+                    "kind": kind,
+                    "sample_task": task.title,
+                    "line_number": task.line_number,
+                    "target_hint": target,
+                    "confidence": confidence,
+                }
+            )
+
+    findings.sort(key=lambda item: (-float(item["confidence"]), str(item["entity"]).lower()))
+    return findings
+
+
+def _detect_memory_enrichment(local_tasks: list[TaskRecord], memory_corpus: str) -> list[dict[str, Any]]:
+    enrichments: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+
+    for task in local_tasks:
+        if task.checked:
+            continue
+        for url in URL_RE.findall(task.body):
+            normalized = url.lower()
+            if normalized in seen_urls:
+                continue
+            seen_urls.add(normalized)
+            if normalized in memory_corpus:
+                continue
+            enrichments.append(
+                {
+                    "kind": "link",
+                    "value": url,
+                    "sample_task": task.title,
+                    "line_number": task.line_number,
+                    "target_hint": "memory/projects/",
+                    "confidence": 0.78,
+                }
+            )
+    return enrichments
+
+
+def _iter_comprehensive_files(project_root: Path) -> Iterable[Path]:
+    root_str = str(project_root)
+    for current_root, dirnames, filenames in os.walk(root_str):
+        dirnames[:] = sorted(
+            directory for directory in dirnames if directory not in COMPREHENSIVE_SKIP_DIRS
+        )
+        for filename in sorted(filenames):
+            if not filename.lower().endswith(".md"):
+                continue
+            candidate = Path(current_root) / filename
+            try:
+                candidate.relative_to(project_root)
+            except ValueError:
+                continue
+            yield candidate
+
+
+def _candidate_title_from_todo_line(line: str) -> str:
+    cleaned = line.strip()
+    cleaned = re.sub(r"^\s*[-*0-9.\)\]]+\s*", "", cleaned)
+    cleaned = re.sub(r"(?i)\b(todo|fixme|action item|action:|follow[- ]up)\b[:\-\s]*", "", cleaned)
+    cleaned = _strip_task_markup(cleaned).strip(" -:\t")
+    if len(cleaned) > 180:
+        cleaned = cleaned[:177] + "..."
+    return cleaned
+
+
+def _run_comprehensive_scan(
+    *,
+    project_root: Path,
+    local_tasks: list[TaskRecord],
+    memory_corpus: str,
+) -> dict[str, Any]:
+    existing_norms = {_normalize_title(task.title) for task in local_tasks if task.title.strip()}
+    candidate_tasks: list[dict[str, Any]] = []
+    candidate_memory_freq: dict[tuple[str, str], int] = {}
+    scanned_files: list[str] = []
+    seen_candidate_norms: set[str] = set()
+
+    for file_path in _iter_comprehensive_files(project_root):
+        if len(scanned_files) >= MAX_COMPREHENSIVE_SCAN_FILES:
+            break
+
+        try:
+            if file_path.stat().st_size > MAX_COMPREHENSIVE_SCAN_FILE_BYTES:
+                continue
+            relative = file_path.relative_to(project_root).as_posix()
+            scanned_files.append(relative)
+            with file_path.open("r", encoding="utf-8") as handle:
+                for line_number, raw_line in enumerate(handle, start=1):
+                    line = raw_line.rstrip("\n")
+                    if TODO_HINT_RE.search(line):
+                        title = _candidate_title_from_todo_line(line)
+                        normalized = _normalize_title(title)
+                        if not normalized:
+                            continue
+                        if normalized in existing_norms or normalized in seen_candidate_norms:
+                            continue
+                        seen_candidate_norms.add(normalized)
+                        candidate_tasks.append(
+                            {
+                                "title": title,
+                                "source": f"{relative}:{line_number}",
+                                "confidence": 0.64,
+                                "kind": "todo_signal",
+                            }
+                        )
+
+                    for entity, kind in _extract_entities(line):
+                        normalized_entity = entity.lower()
+                        if len(normalized_entity) < 3:
+                            continue
+                        if normalized_entity in memory_corpus:
+                            continue
+                        key = (entity, kind)
+                        candidate_memory_freq[key] = candidate_memory_freq.get(key, 0) + 1
+        except (OSError, UnicodeDecodeError):
+            continue
+
+    candidate_memory: list[dict[str, Any]] = []
+    for (entity, kind), frequency in sorted(candidate_memory_freq.items(), key=lambda item: (-item[1], item[0][0].lower())):
+        if kind != "acronym" and frequency < 2:
+            continue
+        confidence = min(0.95, 0.58 + (frequency * 0.08))
+        candidate_memory.append(
+            {
+                "entity": entity,
+                "kind": kind,
+                "frequency": frequency,
+                "confidence": round(confidence, 2),
+                "target_hint": "memory/glossary.md" if kind == "acronym" else "memory/projects/",
+            }
+        )
+
+    return {
+        "scanned_files": scanned_files,
+        "candidate_tasks": candidate_tasks,
+        "candidate_memory": candidate_memory,
+    }
+
+
+def _sanitize_markdown_inline(value: Any) -> str:
+    text = str(value).strip()
+    if not text:
+        return ""
+    text = " ".join(text.split())
+    text = re.sub(r"([\\|`*_\[\]])", r"\\\1", text)
+    return text
+
+
+def _insert_tasks_into_active(tasks_path: Path, additions: list[dict[str, Any]]) -> list[str]:
+    if not additions:
+        return []
+
+    lines = tasks_path.read_text(encoding="utf-8").splitlines()
+    if not lines:
+        lines = DEFAULT_TASKS_TEMPLATE.strip("\n").splitlines()
+
+    active_index = next((index for index, line in enumerate(lines) if line.strip() == "## Active"), -1)
+    if active_index < 0:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.extend(["## Active", ""])
+        active_index = len(lines) - 2
+
+    insert_at = active_index + 1
+    while insert_at < len(lines) and not re.match(r"^\s*##\s+", lines[insert_at]):
+        insert_at += 1
+
+    inserted_titles: list[str] = []
+    new_lines: list[str] = []
+    for addition in additions:
+        title = _sanitize_markdown_inline(addition.get("title", ""))
+        if not title:
+            continue
+        source = _sanitize_markdown_inline(addition.get("source", "external")) or "external"
+        source_hint = "github" if source.startswith("http") else source
+        new_lines.append(f"- [ ] **{title}** - imported ({source_hint})")
+        inserted_titles.append(title)
+
+    if not new_lines:
+        return []
+    if insert_at > active_index + 1 and lines[insert_at - 1].strip():
+        new_lines.insert(0, "")
+    lines = lines[:insert_at] + new_lines + lines[insert_at:]
+    tasks_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return inserted_titles
+
+
+def _append_glossary_candidates(glossary_path: Path, memory_gaps: list[dict[str, Any]]) -> list[str]:
+    if not memory_gaps:
+        return []
+
+    glossary_path.parent.mkdir(parents=True, exist_ok=True)
+    if glossary_path.exists():
+        content = glossary_path.read_text(encoding="utf-8")
+    else:
+        content = "# Glossary\n"
+
+    lines = content.splitlines()
+    if "## Intake Candidates" not in content:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.extend(["## Intake Candidates", ""])
+
+    corpus_lower = "\n".join(lines).lower()
+    inserted: list[str] = []
+    for gap in memory_gaps:
+        entity = _sanitize_markdown_inline(gap.get("entity", ""))
+        if not entity:
+            continue
+        if entity.lower() in corpus_lower:
+            continue
+        sample = _sanitize_markdown_inline(gap.get("sample_task", ""))
+        lines.append(f"- {entity}: TODO define (captured from task: {sample})")
+        inserted.append(entity)
+        corpus_lower += f"\n{entity.lower()}"
+
+    if inserted:
+        glossary_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return inserted
+
+
+def _should_apply(
+    prompt: str,
+    *,
+    auto_confirm: bool,
+    confirmer: Callable[[str], bool] | None,
+    notes: list[str] | None = None,
+) -> bool:
+    if auto_confirm:
+        return True
+    if confirmer is None:
+        return False
+    try:
+        return bool(confirmer(prompt))
+    except Exception as exc:
+        if notes is not None:
+            notes.append(f"Confirmation handler error: {exc}")
+        return False
+
+
+def run_productivity_update(
+    *,
+    project_root: Path,
+    comprehensive: bool = False,
+    apply_changes: bool = False,
+    auto_confirm: bool = False,
+    sync_github: bool = True,
+    stale_days: int = DEFAULT_STALE_AGE_DAYS,
+    external_tasks: list[str] | None = None,
+    external_tasks_file: Path | None = None,
+    confirmer: Callable[[str], bool] | None = None,
+) -> UpdateOutcome:
+    root = project_root.resolve()
+    notes: list[str] = []
+    mode = "comprehensive" if comprehensive else "default"
+
+    if not root.exists() or not root.is_dir():
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=None,
+            memory_dir=None,
+            notes=notes,
+            error=f"Project root does not exist: {root}",
+        )
+
+    try:
+        tasks_path, memory_dir = _resolve_update_paths(root, notes)
+    except ValueError as exc:
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=None,
+            memory_dir=None,
+            notes=notes,
+            error=str(exc),
+        )
+
+    if not tasks_path.exists() or not memory_dir.exists():
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=tasks_path,
+            memory_dir=memory_dir,
+            notes=notes,
+            error=(
+                "TASKS.md and/or memory directory are missing. "
+                "Run 'specify productivity start' first."
+            ),
+        )
+    if not tasks_path.is_file():
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=tasks_path,
+            memory_dir=memory_dir,
+            notes=notes,
+            error=f"Configured tasks path must point to a file: {tasks_path}",
+        )
+    if not memory_dir.is_dir():
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=tasks_path,
+            memory_dir=memory_dir,
+            notes=notes,
+            error=f"Configured memory path must point to a directory: {memory_dir}",
+        )
+
+    try:
+        local_tasks = _parse_tasks(tasks_path)
+    except (OSError, UnicodeDecodeError) as exc:
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=tasks_path,
+            memory_dir=memory_dir,
+            notes=notes,
+            error=f"Could not read tasks file: {exc}",
+        )
+
+    external_records: list[ExternalTaskRecord] = []
+    if external_tasks:
+        for title in external_tasks:
+            record = _coerce_external_task(title, "manual")
+            if record:
+                external_records.append(record)
+    if external_tasks_file:
+        try:
+            external_records.extend(_load_external_tasks_from_file(external_tasks_file, notes))
+        except ValueError as exc:
+            return UpdateOutcome(
+                ok=False,
+                mode=mode,
+                project_root=root,
+                tasks_path=tasks_path,
+                memory_dir=memory_dir,
+                notes=notes,
+                error=str(exc),
+            )
+    if sync_github:
+        external_records.extend(_load_external_tasks_from_github(root, notes))
+
+    task_sync = _analyze_task_sync(local_tasks=local_tasks, external_tasks=external_records)
+    stale_findings = _analyze_stale_tasks(local_tasks, stale_days=stale_days)
+    memory_corpus = _build_memory_corpus(root, memory_dir)
+    analysis_tasks = list(local_tasks)
+    for addition in task_sync.get("additions", []):
+        title = str(addition.get("title", "")).strip()
+        if not title:
+            continue
+        analysis_tasks.append(
+            TaskRecord(
+                section="Active",
+                title=title,
+                body=title,
+                line_number=0,
+                checked=False,
+            )
+        )
+
+    memory_gaps = _detect_memory_gaps(analysis_tasks, memory_corpus)
+    memory_enrichment = _detect_memory_enrichment(analysis_tasks, memory_corpus)
+    comprehensive_payload: dict[str, Any] | None = None
+    if comprehensive:
+        comprehensive_payload = _run_comprehensive_scan(
+            project_root=root,
+            local_tasks=local_tasks,
+            memory_corpus=memory_corpus,
+        )
+
+    applied_tasks: list[str] = []
+    applied_memory: list[str] = []
+    if apply_changes:
+        selected_task_additions = [
+            item
+            for item in task_sync.get("additions", [])
+            if _should_apply(
+                f"Add task '{item.get('title', '')}' from {item.get('source', 'external')}?",
+                auto_confirm=auto_confirm,
+                confirmer=confirmer,
+                notes=notes,
+            )
+        ]
+        selected_memory_gaps = [
+            gap
+            for gap in memory_gaps
+            if _should_apply(
+                f"Add memory placeholder for '{gap.get('entity', '')}'?",
+                auto_confirm=auto_confirm,
+                confirmer=confirmer,
+                notes=notes,
+            )
+        ]
+
+        if not auto_confirm and confirmer is None:
+            notes.append("Apply requested without confirmation handler; no changes were written.")
+        else:
+            if selected_task_additions:
+                applied_tasks = _insert_tasks_into_active(tasks_path, selected_task_additions)
+            if selected_memory_gaps:
+                applied_memory = _append_glossary_candidates(memory_dir / "glossary.md", selected_memory_gaps)
+    else:
+        notes.append("Dry-run mode: no files were changed. Re-run with --apply to persist confirmed additions.")
+
+    return UpdateOutcome(
+        ok=True,
+        mode=mode,
+        project_root=root,
+        tasks_path=tasks_path,
+        memory_dir=memory_dir,
+        task_sync=task_sync,
+        stale_findings=stale_findings,
+        memory_gaps=memory_gaps,
+        memory_enrichment=memory_enrichment,
+        comprehensive=comprehensive_payload,
+        applied={"tasks": applied_tasks, "memory": applied_memory},
         notes=notes,
     )

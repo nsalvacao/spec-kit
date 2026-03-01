@@ -61,6 +61,7 @@ from specify_cli.hierarchy_contract import normalize_hierarchy_contract_payload
 from specify_cli.productivity import DEFAULT_HOST as PRODUCTIVITY_DEFAULT_HOST
 from specify_cli.productivity import DEFAULT_PORT as PRODUCTIVITY_DEFAULT_PORT
 from specify_cli.productivity import run_productivity_start
+from specify_cli.productivity import run_productivity_update
 
 ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 client = httpx.Client(verify=ssl_context)
@@ -2463,6 +2464,160 @@ def productivity_start(
         )
     for note in outcome.notes:
         summary_lines.append(f"[dim]- {note}[/dim]")
+
+    console.print(Panel("\n".join(summary_lines), border_style="green", padding=(1, 2)))
+
+
+@productivity_app.command("update")
+def productivity_update(
+    project_root: Path = typer.Option(
+        Path("."),
+        "--project-root",
+        help="Project root where TASKS.md/CLAUDE.md/memory/.cockpit.json are managed.",
+    ),
+    comprehensive: bool = typer.Option(
+        False,
+        "--comprehensive",
+        help="Run deeper scan mode and generate candidate proposals.",
+    ),
+    apply_changes: bool = typer.Option(
+        False,
+        "--apply",
+        help="Apply confirmed task/memory additions (never silent by default).",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Auto-confirm all additions when used with --apply.",
+    ),
+    no_github_sync: bool = typer.Option(
+        False,
+        "--no-github-sync",
+        help="Skip GitHub issue sync via gh CLI.",
+    ),
+    stale_days: int = typer.Option(
+        30,
+        "--stale-days",
+        min=1,
+        max=365,
+        help="Age threshold (days) used by stale triage for Active tasks.",
+    ),
+    external_task: Optional[list[str]] = typer.Option(
+        None,
+        "--external-task",
+        help="Manual external task title (repeat option to pass multiple).",
+    ),
+    external_tasks_file: Optional[Path] = typer.Option(
+        None,
+        "--external-tasks-file",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        help="JSON file with external task records for deterministic sync.",
+    ),
+    compact: bool = typer.Option(False, "--compact", help="Emit machine-readable JSON output."),
+):
+    """Sync tasks and memory context (default/comprehensive) with confirmation-first writes."""
+    project_root_resolved = project_root.expanduser().resolve()
+    if not project_root_resolved.exists() or not project_root_resolved.is_dir():
+        console.print(f"[red]Error:[/red] Project root does not exist or is not a directory: {project_root_resolved}")
+        raise typer.Exit(1)
+
+    if compact and apply_changes and not yes:
+        console.print(
+            "[red]Error:[/red] --apply with --compact requires --yes to prevent silent non-interactive mutations."
+        )
+        raise typer.Exit(1)
+
+    confirmer = None
+    if apply_changes and not yes and not compact:
+        def _confirm_update_prompt(prompt: str) -> bool:
+            try:
+                return typer.confirm(prompt, default=False)
+            except (KeyboardInterrupt, EOFError):
+                console.print("[yellow]Confirmation cancelled by user; skipping pending changes.[/yellow]")
+                return False
+
+        confirmer = _confirm_update_prompt
+
+    try:
+        outcome = run_productivity_update(
+            project_root=project_root_resolved,
+            comprehensive=comprehensive,
+            apply_changes=apply_changes,
+            auto_confirm=yes,
+            sync_github=not no_github_sync,
+            stale_days=stale_days,
+            external_tasks=external_task or [],
+            external_tasks_file=external_tasks_file,
+            confirmer=confirmer,
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1)
+    except Exception as exc:
+        console.print(f"[red]Unexpected error:[/red] {exc}")
+        raise typer.Exit(1)
+
+    if compact:
+        typer.echo(json.dumps(outcome.to_dict(), indent=2, ensure_ascii=False))
+        if not outcome.ok:
+            raise typer.Exit(1)
+        return
+
+    if not outcome.ok:
+        console.print("[red]Productivity update failed.[/red]")
+        if outcome.error:
+            console.print(f"[red]{outcome.error}[/red]")
+        raise typer.Exit(1)
+
+    task_sync = outcome.task_sync or {}
+    additions = task_sync.get("additions", [])
+    duplicates = task_sync.get("duplicates", [])
+    completion_candidates = task_sync.get("completion_candidates", [])
+    summary_lines = [
+        "[bold green]Productivity update complete.[/bold green]",
+        "",
+        f"[cyan]Mode:[/cyan] {outcome.mode}",
+        f"[cyan]Tasks file:[/cyan] {outcome.tasks_path}",
+        f"[cyan]External tasks inspected:[/cyan] {task_sync.get('external_total', 0)}",
+        f"[cyan]Task additions proposed:[/cyan] {len(additions)}",
+        f"[cyan]Duplicate matches skipped:[/cyan] {len(duplicates)}",
+        f"[cyan]Externally closed candidates:[/cyan] {len(completion_candidates)}",
+        f"[cyan]Stale findings:[/cyan] {len(outcome.stale_findings)}",
+        f"[cyan]Memory gaps:[/cyan] {len(outcome.memory_gaps)}",
+        f"[cyan]Memory enrichment hints:[/cyan] {len(outcome.memory_enrichment)}",
+        f"[cyan]Applied task additions:[/cyan] {len(outcome.applied.get('tasks', []))}",
+        f"[cyan]Applied memory additions:[/cyan] {len(outcome.applied.get('memory', []))}",
+    ]
+
+    if outcome.comprehensive:
+        summary_lines.extend(
+            [
+                f"[cyan]Comprehensive scan files:[/cyan] {len(outcome.comprehensive.get('scanned_files', []))}",
+                f"[cyan]Comprehensive task candidates:[/cyan] {len(outcome.comprehensive.get('candidate_tasks', []))}",
+                f"[cyan]Comprehensive memory candidates:[/cyan] {len(outcome.comprehensive.get('candidate_memory', []))}",
+            ]
+        )
+
+    if additions:
+        summary_lines.append("")
+        summary_lines.append("[yellow]Top task additions:[/yellow]")
+        for item in additions[:5]:
+            summary_lines.append(f"- {item.get('title', '')} [dim]({item.get('source', 'external')})[/dim]")
+
+    if outcome.stale_findings:
+        summary_lines.append("")
+        summary_lines.append("[yellow]Top stale tasks:[/yellow]")
+        for item in outcome.stale_findings[:5]:
+            summary_lines.append(f"- {item.get('title', '')} [dim]{', '.join(item.get('reasons', []))}[/dim]")
+
+    if outcome.notes:
+        summary_lines.append("")
+        for note in outcome.notes:
+            summary_lines.append(f"[dim]- {note}[/dim]")
 
     console.print(Panel("\n".join(summary_lines), border_style="green", padding=(1, 2)))
 

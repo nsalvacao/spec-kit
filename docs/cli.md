@@ -11,7 +11,7 @@ This reference covers the `specify` CLI and the available slash commands after i
 | `hierarchy-contract` | Normalize and validate Program/Epic/Feature hierarchy metadata payloads |
 | `scope-gate` | Run mandatory decomposition gate flow with follow/inspect/override decisions |
 | `scope-detect` | Run adaptive scope detection and emit gate-ready JSON payload |
-| `productivity` | Native productivity cockpit workflows (`start`) |
+| `productivity` | Native productivity cockpit workflows (`start`, `update`) |
 
 ## `specify init` Arguments & Options
 
@@ -45,6 +45,9 @@ specify scope-detect --input-json scope-input.json --output-json .spec-kit/scope
 specify productivity start
 specify productivity start --project-root . --no-browser
 specify productivity start --compact --no-server
+specify productivity update
+specify productivity update --comprehensive --no-github-sync
+specify productivity update --apply --yes --external-task "Review launch checklist"
 
 ```text
 
