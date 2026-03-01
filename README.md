@@ -33,6 +33,7 @@
 - [Documentation Index](#documentation-index)
 - [Development and Testing](#development-and-testing)
 - [Security, Support, and Governance](#security-support-and-governance)
+  - [Legal and Compliance](#legal-and-compliance)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -442,6 +443,19 @@ More details:
 - Contribution rules and phase taxonomy: `CONTRIBUTING.md`
 
 If you use AI assistance in contributions, disclosure is required (see `CONTRIBUTING.md`).
+
+### Legal and Compliance
+
+This fork is an independent derivative of `github/spec-kit` distributed under the MIT
+License. Trademark usage is attribution-only; this fork is **not affiliated with GitHub**.
+
+- License and copyright obligations: [`docs/legal-compliance.md`](docs/legal-compliance.md)
+- Upstream intake provenance workflow: [`docs/provenance-playbook.md`](docs/provenance-playbook.md)
+- Trademark-safe usage guidance: [`docs/trademarks.md`](docs/trademarks.md)
+- Upstream synchronization policy: [`docs/upstream-sync.md`](docs/upstream-sync.md)
+
+Compliance is enforced automatically via the `compliance-guard` CI workflow on every
+push and pull request.
 
 ## Roadmap
 

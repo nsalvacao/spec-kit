@@ -80,6 +80,32 @@ To add new managed targets safely:
 3. Add the target path to `sync.allowlist`.
 4. Run `python scripts/python/version-orchestrator.py check --skip-runtime`.
 
+## 2.5) Compliance Gate
+
+Before publishing any release, verify all compliance gates pass:
+
+1. **CI compliance-guard is green.** The `compliance-guard` workflow must pass on
+   the release commit (checks `LICENSE`, legal markers, non-affiliation statement,
+   and upstream provenance markers).
+2. **Release artifact includes LICENSE.** Every generated package zip in
+   `.genreleases/` must contain a verbatim copy of `LICENSE`.
+3. **CHANGELOG entry complete.** The version section for the release under
+   `CHANGELOG.md` must exist and all upstream-intake entries must include
+   `Source PR:` provenance lines.
+4. **Non-affiliation statement visible.** `README.md` must contain the non-affiliation
+   disclaimer ("This fork is not affiliated with GitHub").
+5. **No trademark violations.** Review `docs/trademarks.md` and confirm no new
+   GitHub® or Spec Kit™ trademark usage beyond attribution-only.
+
+Run the compliance checker locally before tagging:
+
+```bash
+uv run python scripts/python/compliance-checker.py check --repo-root .
+```
+
+See `docs/legal-compliance.md` for the full policy and `docs/provenance-playbook.md`
+for upstream intake provenance requirements.
+
 ## 3) Build Release Packages
 
 ```bash
