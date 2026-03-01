@@ -232,3 +232,108 @@ def test_check_passes_when_metadata_is_coherent(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
     assert payload["canonical_version"] == "0.0.53"
+
+
+def test_check_no_drift_has_empty_remediation_hints(tmp_path: Path) -> None:
+    seed_repo(tmp_path)
+
+    result = run_script(
+        tmp_path,
+        "check",
+        "--repo-root",
+        str(tmp_path),
+        "--policy",
+        ".github/release-version-policy.yml",
+        "--release-tag",
+        "v0.0.53",
+        "--enforce-release-match",
+        "--skip-runtime",
+        "--json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["remediation_hints"] == []
+
+
+def test_check_drift_includes_remediation_hint_for_tag_mismatch(tmp_path: Path) -> None:
+    seed_repo(tmp_path)
+
+    result = run_script(
+        tmp_path,
+        "check",
+        "--repo-root",
+        str(tmp_path),
+        "--policy",
+        ".github/release-version-policy.yml",
+        "--release-tag",
+        "v0.0.99",
+        "--enforce-release-match",
+        "--skip-runtime",
+        "--json",
+    )
+
+    assert result.returncode != 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert len(payload["remediation_hints"]) > 0
+    assert any("release-metadata-sync" in h for h in payload["remediation_hints"])
+
+
+def test_check_drift_includes_remediation_hint_for_missing_changelog(tmp_path: Path) -> None:
+    seed_repo(tmp_path)
+    (tmp_path / "CHANGELOG.md").write_text(
+        """# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Placeholder
+""",
+        encoding="utf-8",
+    )
+
+    result = run_script(
+        tmp_path,
+        "check",
+        "--repo-root",
+        str(tmp_path),
+        "--policy",
+        ".github/release-version-policy.yml",
+        "--skip-runtime",
+        "--json",
+    )
+
+    assert result.returncode != 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert len(payload["remediation_hints"]) > 0
+    assert any("changelog" in h.lower() for h in payload["remediation_hints"])
+
+
+def test_check_output_includes_all_diagnostic_fields(tmp_path: Path) -> None:
+    seed_repo(tmp_path)
+
+    result = run_script(
+        tmp_path,
+        "check",
+        "--repo-root",
+        str(tmp_path),
+        "--policy",
+        ".github/release-version-policy.yml",
+        "--release-tag",
+        "v0.0.53",
+        "--enforce-release-match",
+        "--skip-runtime",
+        "--json",
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    # All diagnostic fields must be present in output
+    for field in ("ok", "canonical_version", "release_tag", "release_version",
+                  "runtime_cli_version", "errors", "warnings", "remediation_hints",
+                  "policy_allowlist"):
+        assert field in payload, f"Missing field: {field}"
