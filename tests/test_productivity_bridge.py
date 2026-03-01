@@ -39,6 +39,10 @@ def test_bridge_status_endpoint_returns_service_metadata(tmp_path: Path) -> None
             payload = json.loads(response.read().decode("utf-8"))
         assert payload["service"] == SERVICE_NAME
         assert payload["project_root"] == str(tmp_path)
+        assert response.headers.get("X-Content-Type-Options") == "nosniff"
+        assert response.headers.get("X-Frame-Options") == "DENY"
+        assert response.headers.get("Referrer-Policy") == "no-referrer"
+        assert response.headers.get("Cross-Origin-Resource-Policy") == "same-origin"
     finally:
         server.shutdown()
         server.server_close()
@@ -48,3 +52,22 @@ def test_bridge_status_endpoint_returns_service_metadata(tmp_path: Path) -> None
 def test_bridge_dashboard_uses_text_nodes_for_status_values() -> None:
     assert "textContent = String(value ?? '')" in HTML_PAGE
     assert "entries.map" not in HTML_PAGE
+
+
+def test_bridge_root_includes_csp_header(tmp_path: Path) -> None:
+    started_at = time.time()
+    handler = build_handler(tmp_path, "127.0.0.1", 0, started_at)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+
+    try:
+        with urlopen(f"http://{host}:{port}/", timeout=2.0) as response:
+            response.read()
+        assert response.headers.get("Content-Security-Policy")
+        assert response.headers.get("X-Frame-Options") == "DENY"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)

@@ -8,6 +8,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from specify_cli import app
+import specify_cli.productivity as productivity_module
 from specify_cli.productivity import prepare_productivity_scaffold, run_productivity_start
 
 
@@ -33,6 +34,7 @@ def test_prepare_productivity_scaffold_creates_missing_artifacts(tmp_path: Path)
     assert config["service"]["host"] == "127.0.0.1"
     assert config["service"]["port"] == 8001
     assert config["paths"]["tasks"] == "TASKS.md"
+    assert config["ai"]["cli"] == ""
 
 
 def test_prepare_productivity_scaffold_is_idempotent(tmp_path: Path) -> None:
@@ -78,6 +80,26 @@ def test_run_productivity_start_supports_scaffold_only_mode(tmp_path: Path) -> N
     assert outcome.server_reused is False
     assert outcome.browser_opened is False
     assert "Browser opening skipped by option. Cockpit URL:" in "\n".join(outcome.notes)
+
+
+def test_run_productivity_start_scaffold_only_skips_runtime_port_resolution(
+    tmp_path: Path, monkeypatch
+) -> None:
+    def fail_if_called(host: str, preferred_port: int) -> tuple[int, bool]:
+        raise AssertionError(f"resolve_runtime_port should not be called: {host}:{preferred_port}")
+
+    monkeypatch.setattr(productivity_module, "resolve_runtime_port", fail_if_called)
+    outcome = run_productivity_start(
+        project_root=tmp_path,
+        host="127.0.0.1",
+        preferred_port=8010,
+        start_server=False,
+        open_browser=False,
+    )
+
+    assert outcome.ok is True
+    assert outcome.port == 8010
+    assert outcome.server_reused is False
 
 
 def test_productivity_start_cli_compact_output(tmp_path: Path) -> None:

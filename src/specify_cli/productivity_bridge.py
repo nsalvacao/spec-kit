@@ -115,14 +115,21 @@ def _status_payload(*, project_root: Path, host: str, port: int, started_at: flo
     }
 
 
-def build_handler(project_root: Path, host: str, port: int, started_at: float):
+def build_handler(project_root: Path, host: str, port: int, started_at: float) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
+        def _send_common_security_headers(self) -> None:
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+
         def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
             body = json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self._send_common_security_headers()
             self.end_headers()
             self.wfile.write(body)
 
@@ -132,6 +139,20 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self._send_common_security_headers()
+            self.send_header(
+                "Content-Security-Policy",
+                (
+                    "default-src 'self'; "
+                    "script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; "
+                    "img-src 'self' data:; "
+                    "object-src 'none'; "
+                    "base-uri 'none'; "
+                    "frame-ancestors 'none'; "
+                    "connect-src 'self'"
+                ),
+            )
             self.end_headers()
             self.wfile.write(body)
 
@@ -145,7 +166,7 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float):
             if parsed.path in {"/", "/index.html"}:
                 self._send_html(HTML_PAGE)
                 return
-            self._send_json({"error": "not found"}, status=404)
+            self._send_json({"error": "not found", "code": "not_found"}, status=404)
 
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
             # Keep logs concise in detached mode.

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **#200: Native productivity start flow (A1 cockpit bootstrap)**
+  - Added `specify productivity start` command to initialize `TASKS.md`, `CLAUDE.md`,
+    `memory/`, and `.cockpit.json` idempotently.
+  - Added native local cockpit bridge bootstrap with status endpoint and dashboard page.
+  - Added compact JSON output mode and scaffold-only operation (`--no-server`/`--no-browser`).
+
 ## [0.0.74] - 2026-03-01
 
 ### Added

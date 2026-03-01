@@ -11,7 +11,7 @@ import socket
 import subprocess
 import sys
 import time
-from typing import Any
+from typing import Any, TextIO
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 import webbrowser
@@ -184,13 +184,14 @@ def _resolve_feature_tasks_path(project_root: Path) -> str | None:
 
 
 def _default_cockpit_config(*, tasks_path: str, host: str, port: int) -> dict[str, Any]:
+    # A4 (#203) will provide AI provider selection; keep this neutral for now.
     return {
         "name": "Spec Kit Productivity Cockpit",
         "version": "1.0.0",
         "service": {"host": host, "port": port},
         "paths": {"tasks": tasks_path, "tasks_fallback": "TASKS.md", "memory": "memory", "output": "output"},
         "pulse_rules": {"essential_files": ["README.md"], "min_folders": []},
-        "ai": {"mode": "cli", "cli": "codex", "args": []},
+        "ai": {"mode": "cli", "cli": "", "args": []},
     }
 
 
@@ -329,7 +330,7 @@ def open_dashboard_url(url: str) -> tuple[bool, str | None]:
     return False, None
 
 
-def _launch_bridge_process(project_root: Path, host: str, port: int) -> subprocess.Popen[str]:
+def _launch_bridge_process(project_root: Path, host: str, port: int) -> tuple[subprocess.Popen[str], TextIO]:
     log_dir = project_root / ".spec-kit" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "productivity-cockpit.log"
@@ -359,25 +360,26 @@ def _launch_bridge_process(project_root: Path, host: str, port: int) -> subproce
     else:
         popen_kwargs["start_new_session"] = True
 
-    try:
-        return subprocess.Popen(command, **popen_kwargs)
-    finally:
-        log_stream.close()
+    process = subprocess.Popen(command, **popen_kwargs)
+    return process, log_stream
 
 
 def ensure_bridge_running(project_root: Path, host: str, port: int) -> tuple[bool, bool]:
     if _probe_running_bridge(host, port):
         return True, True
 
-    process = _launch_bridge_process(project_root, host, port)
-    start = time.monotonic()
-    while time.monotonic() - start < BRIDGE_START_TIMEOUT_SECONDS:
-        if _probe_running_bridge(host, port):
-            return True, False
-        if process.poll() is not None:
-            break
-        time.sleep(0.2)
-    return False, False
+    process, log_stream = _launch_bridge_process(project_root, host, port)
+    try:
+        start = time.monotonic()
+        while time.monotonic() - start < BRIDGE_START_TIMEOUT_SECONDS:
+            if _probe_running_bridge(host, port):
+                return True, False
+            if process.poll() is not None:
+                break
+            time.sleep(0.2)
+        return False, False
+    finally:
+        log_stream.close()
 
 
 def run_productivity_start(
@@ -390,7 +392,11 @@ def run_productivity_start(
 ) -> StartOutcome:
     root = project_root.resolve()
     scaffold = prepare_productivity_scaffold(root, host=host, port=preferred_port)
-    port, reused = resolve_runtime_port(host, preferred_port)
+    reused = False
+    if start_server:
+        port, reused = resolve_runtime_port(host, preferred_port)
+    else:
+        port = preferred_port
     url = f"http://{host}:{port}"
     notes: list[str] = []
 
