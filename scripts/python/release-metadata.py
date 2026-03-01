@@ -299,6 +299,24 @@ def check_release_metadata(
     else:
         warnings.append("Runtime version check skipped by request.")
 
+    hints: list[str] = []
+    if errors:
+        if any("does not match release tag" in e for e in errors):
+            hints.append(
+                f"Run 'release-metadata-sync.yml' (workflow_dispatch) with release_tag='{normalized_release_tag}'"
+                " to synchronize canonical version and changelog to the published tag."
+            )
+        if any("Missing changelog heading" in e for e in errors):
+            hints.append(
+                f"Add a '## [{canonical_version}] - YYYY-MM-DD' heading to '{policy.changelog_file}'"
+                " or trigger 'release-metadata-sync.yml' to auto-insert it."
+            )
+        if any("Runtime CLI version" in e for e in errors):
+            hints.append(
+                "Rebuild and reinstall the package (uv sync) to align the runtime CLI version"
+                f" with the canonical version '{canonical_version}'."
+            )
+
     return {
         "ok": len(errors) == 0,
         "canonical_version": canonical_version,
@@ -307,6 +325,7 @@ def check_release_metadata(
         "runtime_cli_version": runtime_cli_version,
         "errors": errors,
         "warnings": warnings,
+        "remediation_hints": hints,
         "policy_allowlist": list(policy.sync_allowlist),
     }
 

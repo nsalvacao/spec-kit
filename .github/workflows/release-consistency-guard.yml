@@ -61,47 +61,116 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           cat guard-result.json
 
-          {
-            echo "## Release Consistency Guard"
-            echo ""
-            echo '```json'
-            cat guard-result.json
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import json
+          p = json.load(open("guard-result.json", encoding="utf-8"))
+          ok = p.get("ok", False)
+          lines = [
+              "## Release Consistency Guard",
+              "",
+              "| Field | Value |",
+              "|---|---|",
+              "| Status | " + ("✅ OK" if ok else "❌ DRIFT") + " |",
+              "| Canonical version | `" + str(p.get("canonical_version", "n/a")) + "` |",
+              "| Release tag | `" + str(p.get("release_tag") or "n/a") + "` |",
+              "| Release version | `" + str(p.get("release_version") or "n/a") + "` |",
+              "| Runtime CLI version | `" + str(p.get("runtime_cli_version") or "n/a") + "` |",
+              "",
+          ]
+          if p.get("errors"):
+              lines += ["**Errors:**", ""]
+              lines += ["- " + e for e in p["errors"]]
+              lines.append("")
+          if p.get("warnings"):
+              lines += ["**Warnings:**", ""]
+              lines += ["- " + w for w in p["warnings"]]
+              lines.append("")
+          if p.get("remediation_hints"):
+              lines += ["**Remediation:**", ""]
+              lines += ["- " + h for h in p["remediation_hints"]]
+              lines.append("")
+          lines += ["<details><summary>Raw JSON</summary>", "", "```json"]
+          lines.append(json.dumps(p, indent=2))
+          lines += ["```", "</details>", ""]
+          print("\n".join(lines))
+          PY >> "$GITHUB_STEP_SUMMARY"
+
+          python3 -c "import json; p=json.load(open('guard-result.json',encoding='utf-8')); print('canonical_version='+p.get('canonical_version','n/a'))" >> "$GITHUB_OUTPUT"
 
       - name: Open or update drift issue (monitor mode)
         if: steps.guard.outputs.status != '0' && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.latest_tag.outputs.tag }}
         run: |
           title="[Automation] Release consistency drift detected"
           run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          body=$(cat <<EOF
-          Automated release consistency guard detected metadata drift.
-
-          - Workflow run: ${run_url}
-          - Event: ${GITHUB_EVENT_NAME}
-          - Latest release tag: ${{ steps.latest_tag.outputs.tag }}
-
-          \`\`\`json
-          $(cat guard-result.json)
-          \`\`\`
-          EOF
-          )
+          RUN_URL="$run_url" python - <<'PY'
+          import json, os
+          p = json.load(open("guard-result.json", encoding="utf-8"))
+          run_url = os.environ["RUN_URL"]
+          release_tag = os.environ.get("RELEASE_TAG", "n/a")
+          event = os.environ.get("GITHUB_EVENT_NAME", "n/a")
+          canonical = p.get("canonical_version", "n/a")
+          errors_md = "\n".join("- " + e for e in p.get("errors", [])) or "- (none)"
+          hints_md = "\n".join("- " + h for h in p.get("remediation_hints", [])) or "- (none)"
+          raw_json = json.dumps(p, indent=2)
+          body_lines = [
+              "Automated release consistency guard detected metadata drift.",
+              "",
+              "- Workflow run: " + run_url,
+              "- Event: " + event,
+              "- Canonical version: `" + canonical + "`",
+              "- Latest release tag: `" + release_tag + "`",
+              "",
+              "**Errors:**",
+              "",
+              errors_md,
+              "",
+              "**Remediation:**",
+              "",
+              hints_md,
+              "",
+              "<details><summary>Raw JSON</summary>",
+              "",
+              "```json",
+              raw_json,
+              "```",
+              "",
+              "</details>",
+          ]
+          with open("drift-issue-body.txt", "w", encoding="utf-8") as f:
+              f.write("\n".join(body_lines))
+          PY
 
           existing="$(gh issue list --state open --search "${title} in:title" --json number,title --jq 'map(select(.title == "'"${title}"'")) | .[0].number // ""')"
           if [[ -n "$existing" ]]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment "$existing" --body-file drift-issue-body.txt
           else
             gh issue create \
               --title "$title" \
-              --body "$body" \
+              --body-file drift-issue-body.txt \
               --label "infrastructure" \
               --label "enhancement"
+          fi
+
+      - name: Resolve drift issue when consistency restored (monitor mode)
+        if: steps.guard.outputs.status == '0' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="[Automation] Release consistency drift detected"
+          existing="$(gh issue list --state open --search "${title} in:title" --json number,title --jq 'map(select(.title == "'"${title}"'")) | .[0].number // ""')"
+          if [[ -n "$existing" ]]; then
+            run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            canonical="${{ steps.guard.outputs.canonical_version }}"
+            gh issue comment "$existing" --body "✅ Release consistency restored (canonical version: \`${canonical}\`, run: ${run_url}). Closing automatically."
+            gh issue close "$existing" --reason "completed"
           fi
 
       - name: Enforce guard for pull requests
         if: steps.guard.outputs.status != '0' && github.event_name == 'pull_request'
         run: |
           echo "Release consistency guard failed on pull_request." >&2
+          cat guard-result.json >&2
           exit 1
