@@ -33,3 +33,15 @@
       href: backup-google-drive.md
     - name: Dogfooding Report
       href: dogfooding.md
+
+# Legal and compliance
+- name: Legal and Compliance
+  items:
+    - name: Legal Compliance Policy
+      href: legal-compliance.md
+    - name: Provenance Playbook
+      href: provenance-playbook.md
+    - name: Trademarks
+      href: trademarks.md
+    - name: Upstream Sync
+      href: upstream-sync.md

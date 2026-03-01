@@ -1,0 +1,59 @@
+name: Compliance Guard
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run compliance checker
+        run: uv run python scripts/python/compliance-checker.py check --repo-root .
+
+      - name: Verify LICENSE is present in release packages
+        run: |
+          # Build release packages and confirm a root-level LICENSE is bundled in each zip
+          if [ -f ".github/workflows/scripts/create-release-packages.sh" ]; then
+            # Keep a syntactically valid semver-like tag accepted by release packaging scripts.
+            bash .github/workflows/scripts/create-release-packages.sh v0.0.0-fork.1
+            missing=0
+            found=0
+            for zip in .genreleases/*.zip; do
+              # If glob produces no matches, the literal pattern string is passed — skip it
+              [ -f "$zip" ] || continue
+              found=1
+              # Require a LICENSE entry at the archive root (path exactly "LICENSE")
+              if ! unzip -Z1 "$zip" | grep -qx "LICENSE"; then
+                echo "ERROR: root-level LICENSE not found in $zip"
+                missing=1
+              else
+                echo "OK: root-level LICENSE present in $zip"
+              fi
+            done
+            rm -rf .genreleases
+            if [ "$found" -ne 1 ]; then
+              echo "ERROR: release packaging produced no zip artifacts"
+              exit 1
+            fi
+            if [ "$missing" -ne 0 ]; then
+              exit 1
+            fi
+          else
+            echo "Release package script not found — skipping artifact check."
+          fi
