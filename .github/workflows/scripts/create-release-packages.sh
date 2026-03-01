@@ -130,6 +130,14 @@ build_variant() {
   local base_dir="$GENRELEASES_DIR/sdd-${agent}-package-${script}"
   echo "Building $agent ($script) package..."
   mkdir -p "$base_dir"
+
+  # Release artifacts must redistribute the project license at archive root.
+  if [[ -f LICENSE ]]; then
+    cp LICENSE "$base_dir/LICENSE"
+  else
+    echo "ERROR: repository root LICENSE file not found" >&2
+    exit 1
+  fi
   
   # Copy base structure but filter scripts by variant
   SPEC_DIR="$base_dir/.specify"
