@@ -33,7 +33,7 @@ LEGAL_COMPLIANCE_MARKERS: tuple[str, ...] = (COMPLIANCE_MARKER,)
 # Phrases required in README.md (case-insensitive substring match)
 README_REQUIRED_PHRASES: tuple[str, ...] = (
     "not affiliated with github",
-    "mit",
+    "mit license",
 )
 
 # Phrase required in docs/trademarks.md (case-insensitive)
