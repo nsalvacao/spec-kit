@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `memory/`, and `.cockpit.json` idempotently.
   - Added native local cockpit bridge bootstrap with status endpoint and dashboard page.
   - Added compact JSON output mode and scaffold-only operation (`--no-server`/`--no-browser`).
+- **#201: Native productivity update flow (A2 default + comprehensive)**
+  - Added `specify productivity update` with two modes:
+    - default sync (external task intake, duplicate detection, stale triage, memory gap/enrichment findings)
+    - `--comprehensive` scan (TODO/action mining + candidate task/memory proposals)
+  - Added confirmation-first write gating:
+    - no silent mutation by default (dry-run)
+    - explicit persistence via `--apply` (interactive confirm) or `--apply --yes` (non-interactive)
+  - Added deterministic compact JSON payload output for automation and review workflows.
+  - Added regression tests in `tests/test_productivity_update.py`.
 
 ## [0.0.74] - 2026-03-01
 
