@@ -28,18 +28,19 @@ jobs:
 
       - name: Verify LICENSE is present in release packages
         run: |
-          # Build release packages and confirm LICENSE is bundled in each zip
+          # Build release packages and confirm a root-level LICENSE is bundled in each zip
           if [ -f ".github/workflows/scripts/create-release-packages.sh" ]; then
-            bash .github/workflows/scripts/create-release-packages.sh v0.0.0
+            bash .github/workflows/scripts/create-release-packages.sh v0.0.0-ci-check
             missing=0
             for zip in .genreleases/*.zip; do
               # If glob produces no matches, the literal pattern string is passed — skip it
               [ -f "$zip" ] || continue
-              if ! unzip -l "$zip" | grep -q "LICENSE"; then
-                echo "ERROR: LICENSE not found in $zip"
+              # Require a LICENSE entry at the archive root (path exactly "LICENSE")
+              if ! unzip -Z1 "$zip" | grep -qx "LICENSE"; then
+                echo "ERROR: root-level LICENSE not found in $zip"
                 missing=1
               else
-                echo "OK: LICENSE present in $zip"
+                echo "OK: root-level LICENSE present in $zip"
               fi
             done
             rm -rf .genreleases
