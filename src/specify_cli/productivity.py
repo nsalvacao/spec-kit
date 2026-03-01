@@ -1051,10 +1051,10 @@ def _run_comprehensive_scan(
             break
 
         try:
+            if file_path.stat().st_size > MAX_COMPREHENSIVE_SCAN_FILE_BYTES:
+                continue
             content = file_path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if len(content.encode("utf-8")) > MAX_COMPREHENSIVE_SCAN_FILE_BYTES:
+        except (OSError, UnicodeDecodeError):
             continue
 
         relative = file_path.relative_to(project_root).as_posix()

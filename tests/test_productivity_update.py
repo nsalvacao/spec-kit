@@ -171,3 +171,40 @@ def test_productivity_update_cli_compact_output(tmp_path: Path) -> None:
     assert payload["ok"] is True
     assert payload["mode"] == "default"
     assert any(item["title"] == "Prepare retro notes" for item in payload["task_sync"]["additions"])
+
+
+def test_productivity_update_cli_compact_apply_requires_yes(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "productivity",
+            "update",
+            "--project-root",
+            str(tmp_path),
+            "--compact",
+            "--apply",
+            "--no-github-sync",
+            "--external-task",
+            "Prepare retro notes",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "--apply with --compact requires --yes" in result.output
+
+
+def test_run_productivity_update_handles_invalid_external_tasks_file(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+    payload_path = tmp_path / "external-tasks.json"
+    payload_path.write_text("{invalid json", encoding="utf-8")
+
+    outcome = run_productivity_update(
+        project_root=tmp_path,
+        sync_github=False,
+        external_tasks_file=payload_path,
+    )
+
+    assert outcome.ok is True
+    assert outcome.task_sync["external_total"] == 0
+    assert any("Could not parse external tasks file" in note for note in outcome.notes)

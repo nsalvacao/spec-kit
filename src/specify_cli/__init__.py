@@ -2525,10 +2525,18 @@ def productivity_update(
         console.print(f"[red]Error:[/red] Project root does not exist or is not a directory: {project_root_resolved}")
         raise typer.Exit(1)
 
+    if compact and apply_changes and not yes:
+        console.print("[red]Error:[/red] --apply with --compact requires --yes for explicit non-interactive confirmation.")
+        raise typer.Exit(1)
+
     confirmer = None
     if apply_changes and not yes and not compact:
         def _confirm_update_prompt(prompt: str) -> bool:
-            return typer.confirm(prompt, default=False)
+            try:
+                return typer.confirm(prompt, default=False)
+            except (KeyboardInterrupt, EOFError):
+                console.print("[yellow]Confirmation cancelled by user; skipping pending changes.[/yellow]")
+                return False
 
         confirmer = _confirm_update_prompt
 
