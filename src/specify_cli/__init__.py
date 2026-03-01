@@ -2526,7 +2526,9 @@ def productivity_update(
         raise typer.Exit(1)
 
     if compact and apply_changes and not yes:
-        console.print("[red]Error:[/red] --apply with --compact requires --yes for explicit non-interactive confirmation.")
+        console.print(
+            "[red]Error:[/red] --apply with --compact requires --yes to prevent silent non-interactive mutations."
+        )
         raise typer.Exit(1)
 
     confirmer = None

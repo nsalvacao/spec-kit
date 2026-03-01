@@ -205,9 +205,9 @@ def test_run_productivity_update_handles_invalid_external_tasks_file(tmp_path: P
         external_tasks_file=payload_path,
     )
 
-    assert outcome.ok is True
-    assert outcome.task_sync["external_total"] == 0
-    assert any("Could not parse external tasks file" in note for note in outcome.notes)
+    assert outcome.ok is False
+    assert outcome.error
+    assert "Could not parse external tasks file" in outcome.error
 
 
 def test_run_productivity_update_rejects_invalid_configured_path_types(tmp_path: Path) -> None:

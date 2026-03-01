@@ -713,19 +713,23 @@ def _coerce_external_task(item: Any, source_hint: str) -> ExternalTaskRecord | N
 def _load_external_tasks_from_file(external_tasks_file: Path, notes: list[str]) -> list[ExternalTaskRecord]:
     try:
         payload = json.loads(external_tasks_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        notes.append(f"Could not parse external tasks file: {external_tasks_file}")
-        return []
+    except OSError as exc:
+        raise ValueError(f"Could not read external tasks file: {external_tasks_file} ({exc})") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Could not parse external tasks file: {external_tasks_file} ({exc.msg})") from exc
 
     if not isinstance(payload, list):
-        notes.append(f"External tasks file must contain a JSON list: {external_tasks_file}")
-        return []
+        raise ValueError(f"External tasks file must contain a JSON list: {external_tasks_file}")
 
     records: list[ExternalTaskRecord] = []
     for item in payload:
         record = _coerce_external_task(item, f"file:{external_tasks_file.name}")
         if record:
             records.append(record)
+    if len(records) < len(payload):
+        notes.append(
+            f"Ignored {len(payload) - len(records)} invalid external task entries in {external_tasks_file.name}."
+        )
     return records
 
 
@@ -1057,38 +1061,38 @@ def _run_comprehensive_scan(
         try:
             if file_path.stat().st_size > MAX_COMPREHENSIVE_SCAN_FILE_BYTES:
                 continue
-            content = file_path.read_text(encoding="utf-8")
+            relative = file_path.relative_to(project_root).as_posix()
+            scanned_files.append(relative)
+            with file_path.open("r", encoding="utf-8") as handle:
+                for line_number, raw_line in enumerate(handle, start=1):
+                    line = raw_line.rstrip("\n")
+                    if TODO_HINT_RE.search(line):
+                        title = _candidate_title_from_todo_line(line)
+                        normalized = _normalize_title(title)
+                        if not normalized:
+                            continue
+                        if normalized in existing_norms or normalized in seen_candidate_norms:
+                            continue
+                        seen_candidate_norms.add(normalized)
+                        candidate_tasks.append(
+                            {
+                                "title": title,
+                                "source": f"{relative}:{line_number}",
+                                "confidence": 0.64,
+                                "kind": "todo_signal",
+                            }
+                        )
+
+                    for entity, kind in _extract_entities(line):
+                        normalized_entity = entity.lower()
+                        if len(normalized_entity) < 3:
+                            continue
+                        if normalized_entity in memory_corpus:
+                            continue
+                        key = (entity, kind)
+                        candidate_memory_freq[key] = candidate_memory_freq.get(key, 0) + 1
         except (OSError, UnicodeDecodeError):
             continue
-
-        relative = file_path.relative_to(project_root).as_posix()
-        scanned_files.append(relative)
-        for line_number, line in enumerate(content.splitlines(), start=1):
-            if TODO_HINT_RE.search(line):
-                title = _candidate_title_from_todo_line(line)
-                normalized = _normalize_title(title)
-                if not normalized:
-                    continue
-                if normalized in existing_norms or normalized in seen_candidate_norms:
-                    continue
-                seen_candidate_norms.add(normalized)
-                candidate_tasks.append(
-                    {
-                        "title": title,
-                        "source": f"{relative}:{line_number}",
-                        "confidence": 0.64,
-                        "kind": "todo_signal",
-                    }
-                )
-
-            for entity, kind in _extract_entities(line):
-                normalized_entity = entity.lower()
-                if len(normalized_entity) < 3:
-                    continue
-                if normalized_entity in memory_corpus:
-                    continue
-                key = (entity, kind)
-                candidate_memory_freq[key] = candidate_memory_freq.get(key, 0) + 1
 
     candidate_memory: list[dict[str, Any]] = []
     for (entity, kind), frequency in sorted(candidate_memory_freq.items(), key=lambda item: (-item[1], item[0][0].lower())):
@@ -1117,8 +1121,7 @@ def _sanitize_markdown_inline(value: Any) -> str:
     if not text:
         return ""
     text = " ".join(text.split())
-    text = text.replace("|", "\\|")
-    text = text.replace("`", "'")
+    text = re.sub(r"([\\|`*_\[\]])", r"\\\1", text)
     return text
 
 
@@ -1308,7 +1311,18 @@ def run_productivity_update(
             if record:
                 external_records.append(record)
     if external_tasks_file:
-        external_records.extend(_load_external_tasks_from_file(external_tasks_file, notes))
+        try:
+            external_records.extend(_load_external_tasks_from_file(external_tasks_file, notes))
+        except ValueError as exc:
+            return UpdateOutcome(
+                ok=False,
+                mode=mode,
+                project_root=root,
+                tasks_path=tasks_path,
+                memory_dir=memory_dir,
+                notes=notes,
+                error=str(exc),
+            )
     if sync_github:
         external_records.extend(_load_external_tasks_from_github(root, notes))
 
