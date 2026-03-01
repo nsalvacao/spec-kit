@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.75] - 2026-03-01
+
+### Added
+
+- *No changes documented yet.*
+
 ### Added
 
 - **#200: Native productivity start flow (A1 cockpit bootstrap)**
