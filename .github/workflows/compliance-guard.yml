@@ -33,9 +33,11 @@ jobs:
             # Keep a syntactically valid semver-like tag accepted by release packaging scripts.
             bash .github/workflows/scripts/create-release-packages.sh v0.0.0-fork.1
             missing=0
+            found=0
             for zip in .genreleases/*.zip; do
               # If glob produces no matches, the literal pattern string is passed — skip it
               [ -f "$zip" ] || continue
+              found=1
               # Require a LICENSE entry at the archive root (path exactly "LICENSE")
               if ! unzip -Z1 "$zip" | grep -qx "LICENSE"; then
                 echo "ERROR: root-level LICENSE not found in $zip"
@@ -45,6 +47,10 @@ jobs:
               fi
             done
             rm -rf .genreleases
+            if [ "$found" -ne 1 ]; then
+              echo "ERROR: release packaging produced no zip artifacts"
+              exit 1
+            fi
             if [ "$missing" -ne 0 ]; then
               exit 1
             fi
