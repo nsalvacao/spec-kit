@@ -208,3 +208,41 @@ def test_run_productivity_update_handles_invalid_external_tasks_file(tmp_path: P
     assert outcome.ok is True
     assert outcome.task_sync["external_total"] == 0
     assert any("Could not parse external tasks file" in note for note in outcome.notes)
+
+
+def test_run_productivity_update_rejects_invalid_configured_path_types(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+    (tmp_path / ".cockpit.json").write_text(
+        json.dumps({"paths": {"tasks": "TASKS.md", "memory": "TASKS.md"}}),
+        encoding="utf-8",
+    )
+
+    outcome = run_productivity_update(
+        project_root=tmp_path,
+        sync_github=False,
+    )
+
+    assert outcome.ok is False
+    assert outcome.error
+    assert "must point to a directory" in outcome.error
+
+
+def test_run_productivity_update_apply_sanitizes_markdown_inputs(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+
+    outcome = run_productivity_update(
+        project_root=tmp_path,
+        sync_github=False,
+        external_tasks=["RFD\n## Inject | `danger`"],
+        apply_changes=True,
+        auto_confirm=True,
+    )
+
+    assert outcome.ok is True
+    tasks_content = (tmp_path / "TASKS.md").read_text(encoding="utf-8")
+    glossary_content = (tmp_path / "memory" / "glossary.md").read_text(encoding="utf-8")
+
+    assert "\n## Inject" not in tasks_content
+    assert "\n## Inject" not in glossary_content
+    assert "\\|" in tasks_content
+    assert "\\|" in glossary_content

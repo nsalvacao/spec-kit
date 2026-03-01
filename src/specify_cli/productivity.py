@@ -1012,16 +1012,20 @@ def _detect_memory_enrichment(local_tasks: list[TaskRecord], memory_corpus: str)
 
 
 def _iter_comprehensive_files(project_root: Path) -> Iterable[Path]:
-    for candidate in sorted(project_root.rglob("*.md")):
-        if not candidate.is_file():
-            continue
-        try:
-            relative = candidate.relative_to(project_root)
-        except ValueError:
-            continue
-        if any(part in COMPREHENSIVE_SKIP_DIRS for part in relative.parts):
-            continue
-        yield candidate
+    root_str = str(project_root)
+    for current_root, dirnames, filenames in os.walk(root_str):
+        dirnames[:] = sorted(
+            directory for directory in dirnames if directory not in COMPREHENSIVE_SKIP_DIRS
+        )
+        for filename in sorted(filenames):
+            if not filename.lower().endswith(".md"):
+                continue
+            candidate = Path(current_root) / filename
+            try:
+                candidate.relative_to(project_root)
+            except ValueError:
+                continue
+            yield candidate
 
 
 def _candidate_title_from_todo_line(line: str) -> str:
@@ -1108,6 +1112,16 @@ def _run_comprehensive_scan(
     }
 
 
+def _sanitize_markdown_inline(value: Any) -> str:
+    text = str(value).strip()
+    if not text:
+        return ""
+    text = " ".join(text.split())
+    text = text.replace("|", "\\|")
+    text = text.replace("`", "'")
+    return text
+
+
 def _insert_tasks_into_active(tasks_path: Path, additions: list[dict[str, Any]]) -> list[str]:
     if not additions:
         return []
@@ -1130,10 +1144,10 @@ def _insert_tasks_into_active(tasks_path: Path, additions: list[dict[str, Any]])
     inserted_titles: list[str] = []
     new_lines: list[str] = []
     for addition in additions:
-        title = str(addition.get("title", "")).strip()
+        title = _sanitize_markdown_inline(addition.get("title", ""))
         if not title:
             continue
-        source = str(addition.get("source", "external")).strip() or "external"
+        source = _sanitize_markdown_inline(addition.get("source", "external")) or "external"
         source_hint = "github" if source.startswith("http") else source
         new_lines.append(f"- [ ] **{title}** - imported ({source_hint})")
         inserted_titles.append(title)
@@ -1166,12 +1180,12 @@ def _append_glossary_candidates(glossary_path: Path, memory_gaps: list[dict[str,
     corpus_lower = "\n".join(lines).lower()
     inserted: list[str] = []
     for gap in memory_gaps:
-        entity = str(gap.get("entity", "")).strip()
+        entity = _sanitize_markdown_inline(gap.get("entity", ""))
         if not entity:
             continue
         if entity.lower() in corpus_lower:
             continue
-        sample = str(gap.get("sample_task", "")).strip()
+        sample = _sanitize_markdown_inline(gap.get("sample_task", ""))
         lines.append(f"- {entity}: TODO define (captured from task: {sample})")
         inserted.append(entity)
         corpus_lower += f"\n{entity.lower()}"
@@ -1181,14 +1195,22 @@ def _append_glossary_candidates(glossary_path: Path, memory_gaps: list[dict[str,
     return inserted
 
 
-def _should_apply(prompt: str, *, auto_confirm: bool, confirmer: Callable[[str], bool] | None) -> bool:
+def _should_apply(
+    prompt: str,
+    *,
+    auto_confirm: bool,
+    confirmer: Callable[[str], bool] | None,
+    notes: list[str] | None = None,
+) -> bool:
     if auto_confirm:
         return True
     if confirmer is None:
         return False
     try:
         return bool(confirmer(prompt))
-    except Exception:
+    except Exception as exc:
+        if notes is not None:
+            notes.append(f"Confirmation handler error: {exc}")
         return False
 
 
@@ -1244,6 +1266,26 @@ def run_productivity_update(
                 "TASKS.md and/or memory directory are missing. "
                 "Run 'specify productivity start' first."
             ),
+        )
+    if not tasks_path.is_file():
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=tasks_path,
+            memory_dir=memory_dir,
+            notes=notes,
+            error=f"Configured tasks path must point to a file: {tasks_path}",
+        )
+    if not memory_dir.is_dir():
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=tasks_path,
+            memory_dir=memory_dir,
+            notes=notes,
+            error=f"Configured memory path must point to a directory: {memory_dir}",
         )
 
     try:
@@ -1308,6 +1350,7 @@ def run_productivity_update(
                 f"Add task '{item.get('title', '')}' from {item.get('source', 'external')}?",
                 auto_confirm=auto_confirm,
                 confirmer=confirmer,
+                notes=notes,
             )
         ]
         selected_memory_gaps = [
@@ -1317,6 +1360,7 @@ def run_productivity_update(
                 f"Add memory placeholder for '{gap.get('entity', '')}'?",
                 auto_confirm=auto_confirm,
                 confirmer=confirmer,
+                notes=notes,
             )
         ]
 
