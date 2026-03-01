@@ -30,7 +30,7 @@ jobs:
         run: |
           # Build release packages and confirm LICENSE is bundled in each zip
           if [ -f ".github/workflows/scripts/create-release-packages.sh" ]; then
-            bash .github/workflows/scripts/create-release-packages.sh v0.0.0-ci-check
+            bash .github/workflows/scripts/create-release-packages.sh v0.0.0
             missing=0
             for zip in .genreleases/*.zip; do
               # If glob produces no matches, the literal pattern string is passed — skip it
