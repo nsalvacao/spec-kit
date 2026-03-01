@@ -58,6 +58,9 @@ from specify_cli.decomposition_gate import run_decomposition_gate_for_input
 from specify_cli.scope_detection import detect_scope_for_project, scope_detection_input_from_mapping
 from specify_cli.scope_gate_contract import ScopeGateChannel, build_scope_gate_payload
 from specify_cli.hierarchy_contract import normalize_hierarchy_contract_payload
+from specify_cli.productivity import DEFAULT_HOST as PRODUCTIVITY_DEFAULT_HOST
+from specify_cli.productivity import DEFAULT_PORT as PRODUCTIVITY_DEFAULT_PORT
+from specify_cli.productivity import run_productivity_start
 
 ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 client = httpx.Client(verify=ssl_context)
@@ -2362,6 +2365,98 @@ def update(
             run_command(_INSTALL_CMD_PIP.split(), check_return=False)
         console.print("[bold green]✅ Upgrade complete! Restart your shell if needed.[/bold green]")
 
+
+
+productivity_app = typer.Typer(
+    name="productivity",
+    help="Native productivity cockpit workflows.",
+    add_completion=False,
+)
+app.add_typer(productivity_app, name="productivity")
+
+
+@productivity_app.command("start")
+def productivity_start(
+    project_root: Path = typer.Option(
+        Path("."),
+        "--project-root",
+        help="Project root where TASKS.md/CLAUDE.md/memory/.cockpit.json are managed.",
+    ),
+    host: str = typer.Option(
+        PRODUCTIVITY_DEFAULT_HOST,
+        "--host",
+        help="Host used by the local cockpit bridge.",
+    ),
+    port: int = typer.Option(
+        PRODUCTIVITY_DEFAULT_PORT,
+        "--port",
+        min=1,
+        max=65535,
+        help="Preferred local port used by the cockpit bridge.",
+    ),
+    no_server: bool = typer.Option(False, "--no-server", help="Skip bridge startup (scaffold only)."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Do not open the browser automatically."),
+    compact: bool = typer.Option(False, "--compact", help="Emit machine-readable JSON output."),
+):
+    """Initialize productivity artifacts and launch the native cockpit."""
+    try:
+        outcome = run_productivity_start(
+            project_root=project_root,
+            host=host,
+            preferred_port=port,
+            start_server=not no_server,
+            open_browser=not no_browser,
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1)
+
+    if compact:
+        typer.echo(json.dumps(outcome.to_dict(), indent=2, ensure_ascii=False))
+        if not outcome.ok:
+            raise typer.Exit(1)
+        return
+
+    if not outcome.ok:
+        console.print("[red]Productivity start failed.[/red]")
+        if outcome.error:
+            console.print(f"[red]{outcome.error}[/red]")
+        console.print("[yellow]Recovery:[/yellow] inspect bridge logs at [cyan].spec-kit/logs/productivity-cockpit.log[/cyan]")
+        console.print(f"[yellow]Manual URL:[/yellow] [cyan]{outcome.url}[/cyan]")
+        raise typer.Exit(1)
+
+    server_state = "reused existing bridge" if outcome.server_reused else "started new bridge"
+    if no_server:
+        server_state = "server startup skipped"
+
+    browser_state = "opened automatically" if outcome.browser_opened else "not auto-opened"
+    if outcome.browser_method:
+        browser_state = f"{browser_state} ({outcome.browser_method})"
+
+    summary_lines = [
+        "[bold green]Productivity cockpit ready.[/bold green]",
+        "",
+        f"[cyan]URL:[/cyan] {outcome.url}",
+        f"[cyan]Server:[/cyan] {server_state}",
+        f"[cyan]Browser:[/cyan] {browser_state}",
+        "",
+        "[cyan]Scaffold created:[/cyan] " + (", ".join(outcome.scaffold.created) if outcome.scaffold.created else "none"),
+        "[cyan]Scaffold existing:[/cyan] " + (", ".join(outcome.scaffold.existing) if outcome.scaffold.existing else "none"),
+        f"[cyan]Tasks path for cockpit:[/cyan] {outcome.scaffold.tasks_path_for_cockpit}",
+    ]
+
+    if outcome.scaffold.bootstrap_required:
+        summary_lines.extend(
+            [
+                "",
+                "[yellow]First-run memory bootstrap detected.[/yellow]",
+                "Complete [cyan]memory/bootstrap.md[/cyan] and then fold confirmed context into [cyan]CLAUDE.md[/cyan] + [cyan]memory/[/cyan].",
+            ]
+        )
+    for note in outcome.notes:
+        summary_lines.append(f"[dim]- {note}[/dim]")
+
+    console.print(Panel("\n".join(summary_lines), border_style="green", padding=(1, 2)))
 
 
 extension_app = typer.Typer(

@@ -8,6 +8,7 @@ This reference covers the `specify` CLI and the available slash commands after i
 | --- | --- |
 | `init` | Initialize a new Specify project from templates |
 | `check` | Check for installed tools and agent CLIs |
+| `productivity` | Native productivity cockpit workflows (`start`) |
 
 ## `specify init` Arguments & Options
 
@@ -33,6 +34,9 @@ specify init . --here --ai claude
 specify init my-project --ai copilot --script ps
 specify init my-project --ai gemini --no-git
 specify check
+specify productivity start
+specify productivity start --project-root . --no-browser
+specify productivity start --compact --no-server
 
 ```text
 
