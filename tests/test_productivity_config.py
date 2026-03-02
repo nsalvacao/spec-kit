@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from specify_cli.productivity_config import (
+    DEFAULT_MAX_COCKPIT_CONFIG_FILE_BYTES,
     ProductivityUpdateConfig,
     cockpit_config_from_mapping,
     load_cockpit_config,
@@ -74,6 +75,20 @@ def test_load_cockpit_config_raises_on_invalid_json(tmp_path: Path) -> None:
     (tmp_path / ".cockpit.json").write_text("{invalid", encoding="utf-8")
 
     with pytest.raises(ValueError, match="Could not parse .cockpit.json"):
+        load_cockpit_config(tmp_path)
+
+
+def test_load_cockpit_config_rejects_oversized_file(tmp_path: Path) -> None:
+    (tmp_path / ".cockpit.json").write_bytes(b"x" * (DEFAULT_MAX_COCKPIT_CONFIG_FILE_BYTES + 1))
+
+    with pytest.raises(ValueError, match="exceeds size limit"):
+        load_cockpit_config(tmp_path)
+
+
+def test_load_cockpit_config_rejects_non_utf8(tmp_path: Path) -> None:
+    (tmp_path / ".cockpit.json").write_bytes(b"\xff\xfe\x00")
+
+    with pytest.raises(ValueError, match="expected UTF-8"):
         load_cockpit_config(tmp_path)
 
 

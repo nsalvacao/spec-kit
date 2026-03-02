@@ -25,6 +25,11 @@ runtime safety.
 
 Unknown keys are rejected with actionable errors.
 
+Input hardening:
+
+- `.cockpit.json` must be UTF-8 encoded text;
+- `.cockpit.json` size is capped to a safe maximum before parsing.
+
 ## Path Safety Contract
 
 All configured paths are validated as project-relative and sandboxed:

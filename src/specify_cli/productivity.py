@@ -1274,8 +1274,10 @@ def run_productivity_update(
             error=f"Invalid productivity_update configuration: {exc}",
         )
 
-    effective_stale_days = stale_days if stale_days is not None else update_config.default_stale_age_days
-    if effective_stale_days < 1:
+    if stale_days is None:
+        # Config value is already validated by ProductivityUpdateConfig.validate().
+        effective_stale_days = update_config.default_stale_age_days
+    elif isinstance(stale_days, bool) or not isinstance(stale_days, int) or stale_days < 1:
         return UpdateOutcome(
             ok=False,
             mode=mode,
@@ -1285,6 +1287,8 @@ def run_productivity_update(
             notes=notes,
             error="stale_days must be a positive integer.",
         )
+    else:
+        effective_stale_days = stale_days
 
     try:
         tasks_path, memory_dir = _resolve_update_paths(root, notes)

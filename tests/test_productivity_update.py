@@ -260,6 +260,34 @@ def test_run_productivity_update_rejects_external_tasks_file_outside_project_roo
     assert "outside project root" in outcome.error
 
 
+def test_run_productivity_update_rejects_non_integer_stale_days(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+
+    outcome = run_productivity_update(
+        project_root=tmp_path,
+        sync_github=False,
+        stale_days="30",  # type: ignore[arg-type]
+    )
+
+    assert outcome.ok is False
+    assert outcome.error
+    assert "stale_days must be a positive integer" in outcome.error
+
+
+def test_run_productivity_update_rejects_non_positive_stale_days(tmp_path: Path) -> None:
+    _seed_productivity_state(tmp_path)
+
+    outcome = run_productivity_update(
+        project_root=tmp_path,
+        sync_github=False,
+        stale_days=0,
+    )
+
+    assert outcome.ok is False
+    assert outcome.error
+    assert "stale_days must be a positive integer" in outcome.error
+
+
 def test_run_productivity_update_normalizes_external_task_titles(tmp_path: Path) -> None:
     _seed_productivity_state(tmp_path)
     raw_title = "  Task\nwith   irregular\tspacing " + ("X" * 400)

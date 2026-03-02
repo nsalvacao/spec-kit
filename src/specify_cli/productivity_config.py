@@ -28,6 +28,7 @@ DEFAULT_FUZZY_TITLE_MATCH_THRESHOLD = 0.84
 DEFAULT_STALE_AGE_DAYS = 30
 DEFAULT_MAX_COMPREHENSIVE_SCAN_FILES = 80
 DEFAULT_MAX_COMPREHENSIVE_SCAN_FILE_BYTES = 200_000
+DEFAULT_MAX_COCKPIT_CONFIG_FILE_BYTES = 1_000_000
 DEFAULT_COMMON_ENTITY_STOPWORDS = frozenset(
     {
         "The",
@@ -416,9 +417,24 @@ def load_cockpit_config(
         ensure_path_within_project_root(root, cockpit_path.resolve(), field_name=file_name)
 
     try:
-        payload = json.loads(cockpit_path.read_text(encoding="utf-8"))
+        file_size = cockpit_path.stat().st_size
     except OSError as exc:
         raise ValueError(f"Could not read .cockpit.json: {exc}") from exc
+    if file_size > DEFAULT_MAX_COCKPIT_CONFIG_FILE_BYTES:
+        raise ValueError(
+            ".cockpit.json exceeds size limit "
+            f"({DEFAULT_MAX_COCKPIT_CONFIG_FILE_BYTES} bytes)."
+        )
+
+    try:
+        payload_text = cockpit_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Could not read .cockpit.json: expected UTF-8 encoded text.") from exc
+    except OSError as exc:
+        raise ValueError(f"Could not read .cockpit.json: {exc}") from exc
+
+    try:
+        payload = json.loads(payload_text)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Could not parse .cockpit.json: {exc.msg}") from exc
 
@@ -440,7 +456,7 @@ def productivity_update_config_from_mapping(raw_config: Mapping[str, Any] | None
         joined = ", ".join(unknown)
         raise ValueError(f"Unknown productivity_update config keys: {joined}")
 
-    data = dict(raw_config)
+    data = {key: raw_config[key] for key in raw_config.keys()}
     if "fuzzy_title_match_threshold" in data:
         data["fuzzy_title_match_threshold"] = _coerce_float(
             data["fuzzy_title_match_threshold"],
