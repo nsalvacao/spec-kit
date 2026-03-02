@@ -19,6 +19,8 @@
       href: quickstart.md
     - name: Configuration
       href: configuration.md
+    - name: Productivity Cockpit Config Contract
+      href: productivity-cockpit-config-contract.md
     - name: Scope Scoring Rubric
       href: scope-scoring-rubric.md
     - name: Scope Gate Contract

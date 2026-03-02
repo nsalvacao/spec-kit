@@ -19,7 +19,8 @@ capabilities into native, first-party functionality.
 | One branch per feature execution unit | `scripts/python/branch-policy.py` + create-feature scripts + docs/tests | [#108](https://github.com/nsalvacao/spec-kit/issues/108) | In hardening/closure |
 | Single canonical tasks artifact (`specs/<feature>/tasks.md`) | `scripts/python/task-artifact-policy.py` + tests | [#109](https://github.com/nsalvacao/spec-kit/issues/109) | Delivered |
 | Productivity start flow parity (A1 bootstrap + launch) | `specify productivity start` + `src/specify_cli/productivity*.py` + tests | [#200](https://github.com/nsalvacao/spec-kit/issues/200) | Delivered |
-| Productivity update flow parity (A2 default + comprehensive) | `specify productivity update` + task sync/stale/memory proposal engine + tests | [#201](https://github.com/nsalvacao/spec-kit/issues/201) | In progress |
+| Productivity update flow parity (A2 default + comprehensive) | `specify productivity update` + task sync/stale/memory proposal engine + tests | [#201](https://github.com/nsalvacao/spec-kit/issues/201) | Delivered |
+| Productivity config + safety parity (A4 schema/guards) | `.cockpit.json` contract + path sandboxing + runtime tuning in project config | [#203](https://github.com/nsalvacao/spec-kit/issues/203) | In progress |
 | Cockpit feature binding to active feature tasks | CLI/state + dashboard binding | [#110](https://github.com/nsalvacao/spec-kit/issues/110) | Planned |
 | Guided orchestration across Layers 0-4 | Wizard/orchestrator in native CLI flow | [#111](https://github.com/nsalvacao/spec-kit/issues/111) | Planned |
 | TTY/TUI concise orchestration adapter | Native TTY/TUI prompts and payload parity | [#112](https://github.com/nsalvacao/spec-kit/issues/112) | Planned |

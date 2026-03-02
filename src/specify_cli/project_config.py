@@ -24,6 +24,7 @@ ENV_CONFIG_PREFIX = "SPECIFY_CONFIG__"
 DEFAULT_PROJECT_CONFIG: dict[str, Any] = {
     "schema_version": 1,
     "scope_detection": {},
+    "productivity_update": {},
 }
 
 

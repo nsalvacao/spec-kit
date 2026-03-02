@@ -50,6 +50,23 @@ See full contract and examples in:
 - `docs/adaptive-scope-detection-contract.md`
 - `docs/scope-scoring-rubric.md`
 
+## Current Configurable Section: Productivity Update Runtime
+
+The native productivity update engine (`specify productivity update`) consumes:
+
+- `productivity_update.fuzzy_title_match_threshold`
+- `productivity_update.default_stale_age_days`
+- `productivity_update.max_comprehensive_scan_files`
+- `productivity_update.max_comprehensive_scan_file_bytes`
+- `productivity_update.common_entity_stopwords`
+- `productivity_update.common_entity_verbish`
+
+These values tune matching/triage depth and scan limits without hardcoding policy in code.
+
+See full contract and cockpit safety model in:
+
+- `docs/productivity-cockpit-config-contract.md`
+
 ## Reuse Guidance for Future Features
 
 When adding new configurable behavior in Spec-Kit:

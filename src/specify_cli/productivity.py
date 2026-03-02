@@ -18,11 +18,23 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 import webbrowser
 
+from .productivity_config import (
+    DEFAULT_HOST as PRODUCTIVITY_CONFIG_DEFAULT_HOST,
+    DEFAULT_PORT as PRODUCTIVITY_CONFIG_DEFAULT_PORT,
+    ProductivityUpdateConfig,
+    default_cockpit_config_payload,
+    ensure_path_within_project_root,
+    load_cockpit_config,
+    load_productivity_update_config,
+    resolve_optional_project_relative_path,
+    resolve_project_relative_path,
+)
+
 
 CANONICAL_FEATURE_BRANCH_RE = re.compile(r"^(?P<prefix>\d{3})-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)$")
 PRODUCTIVITY_SERVICE_NAME = "specify-productivity-cockpit"
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8001
+DEFAULT_HOST = PRODUCTIVITY_CONFIG_DEFAULT_HOST
+DEFAULT_PORT = PRODUCTIVITY_CONFIG_DEFAULT_PORT
 PORT_SCAN_LIMIT = 25
 BRIDGE_START_TIMEOUT_SECONDS = 10.0
 
@@ -186,15 +198,8 @@ def _resolve_feature_tasks_path(project_root: Path) -> str | None:
 
 
 def _default_cockpit_config(*, tasks_path: str, host: str, port: int) -> dict[str, Any]:
-    # A4 (#203) will provide AI provider selection; keep this neutral for now.
-    return {
-        "name": "Spec Kit Productivity Cockpit",
-        "version": "1.0.0",
-        "service": {"host": host, "port": port},
-        "paths": {"tasks": tasks_path, "tasks_fallback": "TASKS.md", "memory": "memory", "output": "output"},
-        "pulse_rules": {"essential_files": ["README.md"], "min_folders": []},
-        "ai": {"mode": "cli", "cli": "", "args": []},
-    }
+    # A4 (#203) contract keeps ai.cli neutral by default until a CLI is explicitly chosen.
+    return default_cockpit_config_payload(tasks_path=tasks_path, host=host, port=port)
 
 
 def prepare_productivity_scaffold(project_root: Path, *, host: str, port: int) -> ScaffoldResult:
@@ -464,10 +469,6 @@ URL_RE = re.compile(r"https?://[^\s)>\]]+")
 ACRONYM_RE = re.compile(r"\b[A-Z][A-Z0-9]{1,}\b")
 NAME_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b")
 TODO_HINT_RE = re.compile(r"(?i)\b(todo|fixme|action item|action:|follow[- ]up)\b")
-FUZZY_TITLE_MATCH_THRESHOLD = 0.84
-DEFAULT_STALE_AGE_DAYS = 30
-MAX_COMPREHENSIVE_SCAN_FILES = 80
-MAX_COMPREHENSIVE_SCAN_FILE_BYTES = 200_000
 MAX_EXTERNAL_TASK_TITLE_CHARS = 240
 COMPREHENSIVE_SKIP_DIRS = {
     ".git",
@@ -478,40 +479,6 @@ COMPREHENSIVE_SKIP_DIRS = {
     ".ruff_cache",
     ".pytest_cache",
     ".spec-kit",
-}
-COMMON_ENTITY_STOPWORDS = {
-    "The",
-    "This",
-    "That",
-    "And",
-    "For",
-    "With",
-    "Done",
-    "TODO",
-    "FIXME",
-    "Action",
-    "Review",
-    "Update",
-    "Task",
-}
-COMMON_ENTITY_VERBISH = {
-    "add",
-    "check",
-    "complete",
-    "create",
-    "draft",
-    "existing",
-    "finalize",
-    "follow",
-    "prepare",
-    "review",
-    "send",
-    "share",
-    "sync",
-    "task",
-    "update",
-    "wait",
-    "write",
 }
 
 
@@ -604,60 +571,77 @@ def _task_title_from_body(body: str) -> str:
     return plain
 
 
-def _read_cockpit_config(project_root: Path, notes: list[str]) -> dict[str, Any]:
-    cockpit_path = project_root / ".cockpit.json"
-    if not cockpit_path.exists():
-        return {}
-    try:
-        payload = json.loads(cockpit_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        notes.append("Could not parse .cockpit.json; using default path fallback.")
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _resolve_project_relative_path(project_root: Path, raw: str | None) -> Path | None:
-    if not raw:
-        return None
-    candidate = (project_root / raw).resolve()
-    try:
-        candidate.relative_to(project_root)
-    except ValueError:
-        return None
-    return candidate
-
-
 def _resolve_update_paths(project_root: Path, notes: list[str]) -> tuple[Path, Path]:
-    config = _read_cockpit_config(project_root, notes)
-    config_paths = config.get("paths", {}) if isinstance(config.get("paths"), dict) else {}
+    cockpit_config = load_cockpit_config(project_root)
+    tasks_raw = cockpit_config.paths.tasks if cockpit_config else None
+    tasks_fallback_raw = cockpit_config.paths.tasks_fallback if cockpit_config else None
+    memory_raw = cockpit_config.paths.memory if cockpit_config else None
 
-    tasks_raw = config_paths.get("tasks")
-    tasks_candidate = _resolve_project_relative_path(
-        project_root,
-        tasks_raw.strip() if isinstance(tasks_raw, str) else None,
-    )
+    try:
+        tasks_candidate = resolve_optional_project_relative_path(
+            project_root,
+            tasks_raw,
+            field_name="paths.tasks",
+        )
+    except ValueError as exc:
+        raise ValueError(f"Invalid cockpit config path for tasks: {exc}") from exc
+
     if tasks_candidate and tasks_candidate.exists():
         tasks_path = tasks_candidate
     else:
         if tasks_candidate and not tasks_candidate.exists():
             notes.append(f"Configured tasks path not found: {tasks_candidate}. Falling back.")
-        feature_relative = _resolve_feature_tasks_path(project_root)
-        if feature_relative:
-            tasks_path = (project_root / feature_relative).resolve()
-        else:
-            tasks_path = (project_root / "TASKS.md").resolve()
 
-    memory_raw = config_paths.get("memory")
-    memory_candidate = _resolve_project_relative_path(
-        project_root,
-        memory_raw.strip() if isinstance(memory_raw, str) else None,
-    )
-    memory_dir = memory_candidate if memory_candidate else (project_root / "memory").resolve()
+        tasks_fallback_candidate = None
+        if tasks_fallback_raw:
+            try:
+                tasks_fallback_candidate = resolve_optional_project_relative_path(
+                    project_root,
+                    tasks_fallback_raw,
+                    field_name="paths.tasks_fallback",
+                )
+            except ValueError as exc:
+                raise ValueError(f"Invalid cockpit config path for tasks_fallback: {exc}") from exc
+
+        if tasks_fallback_candidate and tasks_fallback_candidate.exists():
+            tasks_path = tasks_fallback_candidate
+        else:
+            if tasks_fallback_candidate and not tasks_fallback_candidate.exists():
+                notes.append(f"Configured tasks fallback path not found: {tasks_fallback_candidate}.")
+            feature_relative = _resolve_feature_tasks_path(project_root)
+            if feature_relative:
+                tasks_path = resolve_project_relative_path(
+                    project_root,
+                    feature_relative,
+                    field_name="feature tasks path",
+                )
+            else:
+                tasks_path = resolve_project_relative_path(
+                    project_root,
+                    "TASKS.md",
+                    field_name="default tasks path",
+                )
+
     try:
-        tasks_path.relative_to(project_root)
-        memory_dir.relative_to(project_root)
+        memory_candidate = resolve_optional_project_relative_path(
+            project_root,
+            memory_raw,
+            field_name="paths.memory",
+        )
     except ValueError as exc:
-        raise ValueError("Resolved update paths must stay inside project root.") from exc
+        raise ValueError(f"Invalid cockpit config path for memory: {exc}") from exc
+
+    if memory_candidate:
+        memory_dir = memory_candidate
+    else:
+        memory_dir = resolve_project_relative_path(
+            project_root,
+            "memory",
+            field_name="default memory path",
+        )
+
+    tasks_path = ensure_path_within_project_root(project_root, tasks_path, field_name="tasks path")
+    memory_dir = ensure_path_within_project_root(project_root, memory_dir, field_name="memory path")
     return tasks_path, memory_dir
 
 
@@ -825,6 +809,7 @@ def _analyze_task_sync(
     *,
     local_tasks: list[TaskRecord],
     external_tasks: list[ExternalTaskRecord],
+    fuzzy_match_threshold: float,
 ) -> dict[str, Any]:
     active_local = [task for task in local_tasks if not task.checked and task.section in {"Active", "Waiting On", "Someday"}]
     additions: list[dict[str, Any]] = []
@@ -836,7 +821,7 @@ def _analyze_task_sync(
         matched, score = _best_local_match(external.title, active_local)
         normalized = _normalize_title(external.title)
 
-        if matched and score >= FUZZY_TITLE_MATCH_THRESHOLD:
+        if matched and score >= fuzzy_match_threshold:
             duplicates.append(
                 {
                     "external_title": external.title,
@@ -942,12 +927,17 @@ def _build_memory_corpus(project_root: Path, memory_dir: Path) -> str:
     return "\n".join(chunks).lower()
 
 
-def _extract_entities(text: str) -> list[tuple[str, str]]:
+def _extract_entities(
+    text: str,
+    *,
+    stopwords: set[str] | frozenset[str],
+    verbish: set[str] | frozenset[str],
+) -> list[tuple[str, str]]:
     entities: list[tuple[str, str]] = []
     seen: set[str] = set()
 
     for token in ACRONYM_RE.findall(text):
-        if token in COMMON_ENTITY_STOPWORDS:
+        if token in stopwords:
             continue
         key = f"acronym:{token.lower()}"
         if key in seen:
@@ -956,10 +946,10 @@ def _extract_entities(text: str) -> list[tuple[str, str]]:
         entities.append((token, "acronym"))
 
     for phrase in NAME_RE.findall(text):
-        if phrase in COMMON_ENTITY_STOPWORDS:
+        if phrase in stopwords:
             continue
         phrase_words = phrase.split()
-        if len(phrase_words) == 1 and phrase_words[0].lower() in COMMON_ENTITY_VERBISH:
+        if len(phrase_words) == 1 and phrase_words[0].lower() in verbish:
             continue
         key = f"name:{phrase.lower()}"
         if key in seen:
@@ -970,14 +960,23 @@ def _extract_entities(text: str) -> list[tuple[str, str]]:
     return entities
 
 
-def _detect_memory_gaps(local_tasks: list[TaskRecord], memory_corpus: str) -> list[dict[str, Any]]:
+def _detect_memory_gaps(
+    local_tasks: list[TaskRecord],
+    memory_corpus: str,
+    *,
+    update_config: ProductivityUpdateConfig,
+) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     seen_entities: set[str] = set()
 
     for task in local_tasks:
         if task.checked:
             continue
-        for entity, kind in _extract_entities(task.body):
+        for entity, kind in _extract_entities(
+            task.body,
+            stopwords=update_config.common_entity_stopwords,
+            verbish=update_config.common_entity_verbish,
+        ):
             normalized = entity.lower()
             if len(normalized) < 3 or normalized in seen_entities:
                 continue
@@ -1060,6 +1059,7 @@ def _run_comprehensive_scan(
     project_root: Path,
     local_tasks: list[TaskRecord],
     memory_corpus: str,
+    update_config: ProductivityUpdateConfig,
 ) -> dict[str, Any]:
     existing_norms = {_normalize_title(task.title) for task in local_tasks if task.title.strip()}
     candidate_tasks: list[dict[str, Any]] = []
@@ -1068,11 +1068,11 @@ def _run_comprehensive_scan(
     seen_candidate_norms: set[str] = set()
 
     for file_path in _iter_comprehensive_files(project_root):
-        if len(scanned_files) >= MAX_COMPREHENSIVE_SCAN_FILES:
+        if len(scanned_files) >= update_config.max_comprehensive_scan_files:
             break
 
         try:
-            if file_path.stat().st_size > MAX_COMPREHENSIVE_SCAN_FILE_BYTES:
+            if file_path.stat().st_size > update_config.max_comprehensive_scan_file_bytes:
                 continue
             relative = file_path.relative_to(project_root).as_posix()
             scanned_files.append(relative)
@@ -1096,7 +1096,11 @@ def _run_comprehensive_scan(
                             }
                         )
 
-                    for entity, kind in _extract_entities(line):
+                    for entity, kind in _extract_entities(
+                        line,
+                        stopwords=update_config.common_entity_stopwords,
+                        verbish=update_config.common_entity_verbish,
+                    ):
                         normalized_entity = entity.lower()
                         if len(normalized_entity) < 3:
                             continue
@@ -1237,7 +1241,7 @@ def run_productivity_update(
     apply_changes: bool = False,
     auto_confirm: bool = False,
     sync_github: bool = True,
-    stale_days: int = DEFAULT_STALE_AGE_DAYS,
+    stale_days: int | None = None,
     external_tasks: list[str] | None = None,
     external_tasks_file: Path | None = None,
     confirmer: Callable[[str], bool] | None = None,
@@ -1256,6 +1260,35 @@ def run_productivity_update(
             notes=notes,
             error=f"Project root does not exist: {root}",
         )
+
+    try:
+        update_config = load_productivity_update_config(project_root=root)
+    except (TypeError, ValueError) as exc:
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=None,
+            memory_dir=None,
+            notes=notes,
+            error=f"Invalid productivity_update configuration: {exc}",
+        )
+
+    if stale_days is None:
+        # Config value is already validated by ProductivityUpdateConfig.validate().
+        effective_stale_days = update_config.default_stale_age_days
+    elif isinstance(stale_days, bool) or not isinstance(stale_days, int) or stale_days < 1:
+        return UpdateOutcome(
+            ok=False,
+            mode=mode,
+            project_root=root,
+            tasks_path=None,
+            memory_dir=None,
+            notes=notes,
+            error="stale_days must be a positive integer.",
+        )
+    else:
+        effective_stale_days = stale_days
 
     try:
         tasks_path, memory_dir = _resolve_update_paths(root, notes)
@@ -1323,9 +1356,27 @@ def run_productivity_update(
             record = _coerce_external_task(title, "manual")
             if record:
                 external_records.append(record)
+    safe_external_tasks_file: Path | None = None
     if external_tasks_file:
         try:
-            external_records.extend(_load_external_tasks_from_file(external_tasks_file, notes))
+            safe_external_tasks_file = ensure_path_within_project_root(
+                root,
+                external_tasks_file,
+                field_name="external_tasks_file",
+            )
+        except ValueError as exc:
+            return UpdateOutcome(
+                ok=False,
+                mode=mode,
+                project_root=root,
+                tasks_path=tasks_path,
+                memory_dir=memory_dir,
+                notes=notes,
+                error=str(exc),
+            )
+    if safe_external_tasks_file:
+        try:
+            external_records.extend(_load_external_tasks_from_file(safe_external_tasks_file, notes))
         except ValueError as exc:
             return UpdateOutcome(
                 ok=False,
@@ -1339,8 +1390,12 @@ def run_productivity_update(
     if sync_github:
         external_records.extend(_load_external_tasks_from_github(root, notes))
 
-    task_sync = _analyze_task_sync(local_tasks=local_tasks, external_tasks=external_records)
-    stale_findings = _analyze_stale_tasks(local_tasks, stale_days=stale_days)
+    task_sync = _analyze_task_sync(
+        local_tasks=local_tasks,
+        external_tasks=external_records,
+        fuzzy_match_threshold=update_config.fuzzy_title_match_threshold,
+    )
+    stale_findings = _analyze_stale_tasks(local_tasks, stale_days=effective_stale_days)
     memory_corpus = _build_memory_corpus(root, memory_dir)
     analysis_tasks = list(local_tasks)
     for addition in task_sync.get("additions", []):
@@ -1357,7 +1412,11 @@ def run_productivity_update(
             )
         )
 
-    memory_gaps = _detect_memory_gaps(analysis_tasks, memory_corpus)
+    memory_gaps = _detect_memory_gaps(
+        analysis_tasks,
+        memory_corpus,
+        update_config=update_config,
+    )
     memory_enrichment = _detect_memory_enrichment(analysis_tasks, memory_corpus)
     comprehensive_payload: dict[str, Any] | None = None
     if comprehensive:
@@ -1365,6 +1424,7 @@ def run_productivity_update(
             project_root=root,
             local_tasks=local_tasks,
             memory_corpus=memory_corpus,
+            update_config=update_config,
         )
 
     applied_tasks: list[str] = []

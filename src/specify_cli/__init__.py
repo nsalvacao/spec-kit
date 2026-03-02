@@ -2495,12 +2495,15 @@ def productivity_update(
         "--no-github-sync",
         help="Skip GitHub issue sync via gh CLI.",
     ),
-    stale_days: int = typer.Option(
-        30,
+    stale_days: Optional[int] = typer.Option(
+        None,
         "--stale-days",
         min=1,
         max=365,
-        help="Age threshold (days) used by stale triage for Active tasks.",
+        help=(
+            "Age threshold (days) used by stale triage for Active tasks. "
+            "Defaults to .specify/spec-kit.yml productivity_update.default_stale_age_days (fallback: 30)."
+        ),
     ),
     external_task: Optional[list[str]] = typer.Option(
         None,
