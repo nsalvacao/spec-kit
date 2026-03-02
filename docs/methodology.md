@@ -31,7 +31,7 @@ This creates a defensible, documented rationale before the SDD pipeline starts.
 
 1. **Optional Strategy Pre-Phase**: BRAINSTORM
 2. **Phase 0**: IDEATE → SELECT → STRUCTURE → VALIDATE  
-2. **SDD Core**: CONSTITUTION → SPECIFY → PLAN → TASKS → IMPLEMENT
+3. **SDD Core**: CONSTITUTION → SPECIFY → PLAN → TASKS → IMPLEMENT
 
 ## Core Principles
 
