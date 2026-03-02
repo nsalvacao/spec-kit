@@ -2,7 +2,7 @@
   <img src="./media/logo_large.webp" alt="Nexo Spec Kit logo" width="200" height="200" />
   <h1>Nexo Spec Kit</h1>
   <p><strong>The structured AI development toolkit that turns ideas into executable specifications.</strong></p>
-  <p>Phase 0 AI ideation · Enterprise governance · 17+ agent integrations · Upstream-compatible.</p>
+  <p>Phase 0 AI ideation · Enterprise governance · 18 AI coding agents · Upstream-compatible.</p>
 </div>
 
 <p align="center">
@@ -71,10 +71,10 @@ top of the Spec-Driven Development workflow, plus enterprise-grade governance
 that makes every AI decision traceable and auditable:
 
 - Phase 0 AI ideation workflow (`ideate → select → structure → validate`)
-- broader agent integration surface (17+ AI coding agents)
-- extension management commands in the CLI
+- 18 AI coding agent integrations (the same named agents as upstream)
+- 5 additional CLI commands vs upstream (`hierarchy-contract`, `scope-detect`, `scope-gate`, `productivity`, `update`)
 - contract validation, scope gates, and handoff metadata
-- operational workflows for release/distribution/upstream synchronization
+- enterprise compliance checker and operational release/deploy workflows
 
 ## Core Capabilities
 

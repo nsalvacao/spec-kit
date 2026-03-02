@@ -7,7 +7,7 @@
 ## Context
 
 Nexo Spec Kit began as a fork of `github/spec-kit` adding Phase 0 AI ideation.
-As the toolkit has grown — adding 17+ agent integrations, enterprise compliance
+As the toolkit has grown — adding 18 agent integrations, enterprise compliance
 controls, contract validation modules, and a full release/deploy pipeline — the
 "fork with Phase 0" framing no longer captures the product's scope or value.
 
@@ -76,7 +76,7 @@ upstream parity for teams that need it.
 Nexo Spec Kit adopts a clear, independent product identity while maintaining
 explicit, opt-in upstream compatibility. The rationale:
 
-1. **The capabilities already justify independence.** Phase 0 ideation, 17+
+1. **The capabilities already justify independence.** Phase 0 ideation, 18
    agent integrations, contract validation, enterprise compliance, and the
    deploy pipeline are not "extras on a fork" — they constitute a distinct
    product.

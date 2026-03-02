@@ -2,7 +2,7 @@
 
 > **One-liner:** The structured AI development toolkit that turns ideas into
 > executable specifications — with Phase 0 ideation, enterprise controls, and
-> multi-agent orchestration built in.
+> programmatic governance built in.
 
 ## Problem Statement
 
@@ -28,35 +28,50 @@ This forces teams to bolt on ad-hoc ideation steps or skip them entirely.
 ## Elevator Pitch
 
 **Nexo Spec Kit** is an independent toolkit and CLI for teams who build
-software with AI agents. It implements a complete Spec-Driven Development (SDD)
-pipeline that starts *before* any code is written:
+software with AI agents. It extends Spec-Driven Development with a Phase 0
+discovery layer that runs *before* any spec is written:
 
-1. **Phase 0 — Ideate**: Structured AI ideation using SCAMPER, Blue Ocean, and
-   JTBD frameworks to discover what to build.
-2. **Phase 1 — Specify**: Author executable specifications that constrain agents
-   to the right scope.
-3. **Phase 2 — Plan and implement**: Generate traceable implementation plans and
-   delegate execution to AI agents.
-4. **Phase 3 — Validate**: Automated scope gates, contract validation, and
-   handoff metadata ensure each output is auditable.
+1. **Phase 0 — Ideate**: Structured AI ideation using SCAMPER + HMW to generate
+   an ideas backlog. Select a winner with AI-RICE scoring. Complete the
+   Integrated AI Vision Canvas and vision brief. Gate G0 validation.
+2. **SDD Core — Specify**: Author executable specifications that constrain agents
+   to the right scope (`/speckit.constitution`, `/speckit.specify`,
+   `/speckit.clarify`).
+3. **SDD Core — Plan and implement**: Generate traceable implementation plans
+   and delegate execution to AI agents (`/speckit.plan`, `/speckit.tasks`,
+   `/speckit.implement`, `/speckit.amend`).
+4. **Enterprise layer**: Scope gate contracts, handoff metadata, orchestration
+   contracts, and a compliance checker create an auditable trail from idea to
+   shipped code.
 
-Unlike upstream `github/spec-kit`, Nexo Spec Kit ships Phase 0 as a first-class
-workflow, adds enterprise compliance controls, and integrates 17+ AI coding
-agents out of the box.
+Nexo Spec Kit integrates with **18 AI coding agents** (Claude Code, Gemini CLI,
+GitHub Copilot, Cursor, Qwen Code, opencode, Codex CLI, Windsurf, Kilo Code,
+Auggie CLI, Roo Code, CodeBuddy, Qoder CLI, Amazon Q Developer CLI, Amp, SHAI,
+Antigravity, IBM Bob) and remains upstream-compatible with `github/spec-kit`.
 
 ## Differentiation Matrix
 
+The following table compares Nexo Spec Kit with the upstream
+`github/spec-kit` project based on capabilities verifiable in each
+repository's source code and documentation at the time of writing.
+
 | Capability | Upstream `github/spec-kit` | **Nexo Spec Kit** |
 | ---------- | -------------------------- | ----------------- |
-| Phase 0 AI ideation | ❌ Not included | ✅ Full IDEATE → SELECT → STRUCTURE → VALIDATE |
-| Multi-agent bootstrapping | Partial (Claude, Copilot) | ✅ 17+ agents (Claude, Gemini, Copilot, Cursor, Qwen, opencode, Codex, Windsurf, Kilo Code, Auggie, Roo Code, CodeBuddy, Qoder, Amazon Q, Amp, SHAI, IBM Bob) |
-| Scope gate contracts | ❌ | ✅ Programmatic scope-gate validation |
+| Phase 0 AI ideation (IDEATE → SELECT → STRUCTURE → VALIDATE) | ❌ | ✅ Full workflow with state checks and G0 gate |
+| `/speckit.amend` command | ❌ | ✅ Post-implementation spec amendment |
+| `specify update` (CLI update check) | ❌ | ✅ |
+| `specify hierarchy-contract` | ❌ | ✅ Program/Epic/Feature hierarchy validation |
+| `specify scope-detect` | ❌ | ✅ Adaptive scope detection with gate-ready JSON |
+| `specify scope-gate` | ❌ | ✅ Decomposition gate with follow/inspect/override |
+| `specify productivity` cockpit | ❌ | ✅ `start` and `update` task management workflows |
+| Scope gate contract module | ❌ | ✅ Typed strict/non-strict validation |
 | Handoff metadata schema | ❌ | ✅ Structured handoff with provenance tracking |
-| Orchestration contract | ❌ | ✅ Typed orchestration contract with strict/non-strict modes |
-| Extension system | ❌ | ✅ Built-in extension management (`specify extensions`) |
-| Enterprise compliance guard | ❌ | ✅ Compliance checker, legal markers, trademark policy |
-| Release deploy pipeline | ❌ | ✅ VM deploy + Google Drive backup workflows |
-| Upstream compatibility | N/A | ✅ Opt-in upstream template layer |
+| Orchestration contract module | ❌ | ✅ Typed orchestration contract validation |
+| Enterprise compliance checker | ❌ | ✅ License, legal markers, trademark policy |
+| Release deploy pipeline | ❌ | ✅ Automated VM deploy + Google Drive backup |
+| Upstream compatibility opt-in | N/A | ✅ `--template-repo github/spec-kit` |
+| Agent integrations | ✅ 18 named + "generic" catch-all | ✅ 18 named agents |
+| Extension system | ✅ | ✅ |
 | MIT license | ✅ | ✅ Preserved with attribution |
 
 ## Value Pillars
@@ -68,24 +83,66 @@ vague ideas into ranked, scoped feature candidates before a single spec is
 written. Commands: `/speckit.ideate`, `/speckit.select`, `/speckit.structure`,
 `/speckit.validate`.
 
+Key artifacts:
+
+- `.spec-kit/ideas_backlog.md`
+- `.spec-kit/idea_selection.md`
+- `.spec-kit/ai_vision_canvas.md`
+- `.spec-kit/vision_brief.md`
+- `.spec-kit/approvals/g0-validation-report.md`
+
 ### 2. Executable Specifications
 
 Specifications are not documents — they are contracts between human intent and
-AI execution. The SDD workflow (`/speckit.constitution`, `/speckit.specify`,
-`/speckit.plan`, `/speckit.tasks`, `/speckit.implement`, `/speckit.amend`)
-produces artifacts that agents can directly consume.
+AI execution. The SDD workflow produces `.specify/specs/<feature>/spec.md`,
+`plan.md`, and `tasks.md` as artifacts that agents directly consume.
+
+Commands: `/speckit.constitution`, `/speckit.specify`, `/speckit.clarify`,
+`/speckit.plan`, `/speckit.tasks`, `/speckit.implement`, `/speckit.amend`,
+`/speckit.analyze`, `/speckit.checklist`, `/speckit.taskstoissues`.
 
 ### 3. Enterprise-Grade Governance
 
-Every AI decision is traceable. Handoff metadata, scope gate validations,
-orchestration contracts, and provenance playbooks create an auditable trail
-from idea to shipped code.
+Every AI decision is traceable. The governance layer includes:
+
+- **Scope gate contracts** (`specify scope-gate`, `specify scope-detect`):
+  programmatic follow/inspect/override decisions with audit JSON.
+- **Handoff metadata schema**: structured handoff records with provenance.
+- **Orchestration contract module**: strict/non-strict typed validation.
+- **Hierarchy contract** (`specify hierarchy-contract`): normalizes
+  Program/Epic/Feature hierarchy payloads.
+- **Compliance checker**: verifies license, legal markers, and trademark policy
+  before each release.
+- **Provenance playbook**: upstream intake with `git cherry-pick -x` for full
+  commit-level traceability.
 
 ### 4. Broad Agent Integration Surface
 
-Teams choose their AI tools. Nexo Spec Kit generates the right configuration
-for each agent rather than locking teams into a single provider. New agents are
-added via a documented, convention-driven integration pattern (see `AGENTS.md`).
+18 AI coding agents are supported out of the box:
+
+| Key | Agent | Type |
+| --- | ----- | ---- |
+| `claude` | Claude Code | CLI |
+| `gemini` | Gemini CLI | CLI |
+| `copilot` | GitHub Copilot | IDE |
+| `cursor-agent` | Cursor | IDE |
+| `qwen` | Qwen Code | CLI |
+| `opencode` | opencode | CLI |
+| `codex` | Codex CLI | CLI |
+| `windsurf` | Windsurf | IDE |
+| `kilocode` | Kilo Code | IDE |
+| `auggie` | Auggie CLI | CLI |
+| `roo` | Roo Code | IDE |
+| `codebuddy` | CodeBuddy | CLI |
+| `qoder` | Qoder CLI | CLI |
+| `q` | Amazon Q Developer CLI | CLI |
+| `amp` | Amp | CLI |
+| `shai` | SHAI | CLI |
+| `agy` | Antigravity | IDE |
+| `bob` | IBM Bob | IDE |
+
+New agents are added via a documented, convention-driven integration pattern
+(see `AGENTS.md`). Use `specify init --ai <key>` to bootstrap any agent.
 
 ## Promise and Non-Goals
 
@@ -115,8 +172,8 @@ Nexo Spec Kit is **upstream-compatible** with `github/spec-kit`:
 - `specify init` pulls templates from `nsalvacao/spec-kit` by default.
 - Set `SPECIFY_TEMPLATE_REPO=github/spec-kit` or pass
   `--template-repo github/spec-kit` to use upstream templates.
-- All extensions are additive and isolated to templates, scripts, and
-  documented overrides. No upstream behaviour is removed or replaced.
+- All enhancements are additive and isolated. No upstream behavior is removed
+  or replaced.
 - Upstream intake is governed by the 7-step workflow in `AGENTS.md`, with
   provenance tracking via `git cherry-pick -x`.
 
@@ -132,3 +189,6 @@ For upstream sync procedures, see `docs/upstream-sync.md`.
 - [Legal Compliance](legal-compliance.md) — Trademark, license, and compliance
   policy.
 - [Trademarks](trademarks.md) — Attribution-only trademark usage.
+- [Supported Agents](agents.md) — Full agent reference with install URLs.
+- [CLI Reference](cli.md) — Full CLI command reference.
+- [Methodology](methodology.md) — SDD methodology and Phase 0 workflow.
