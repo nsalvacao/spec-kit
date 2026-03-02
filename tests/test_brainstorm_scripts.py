@@ -261,6 +261,18 @@ class TestBrainstormValidator:
         result = run(VALIDATE_BRAINSTORM, str(artifact))
         assert result.returncode != 0
 
+    def test_validator_rejects_double_pipe_risk_rows(self, tmp_path):
+        ideas_dir = tmp_path / ".ideas"
+        ideas_dir.mkdir(parents=True, exist_ok=True)
+        artifact = ideas_dir / "brainstorm-expansion.md"
+        content = _build_valid_brainstorm("Malformed Risk Table Demo").replace(
+            "| Risk ", "|| Risk "
+        )
+        artifact.write_text(content, encoding="utf-8")
+
+        result = run(VALIDATE_BRAINSTORM, str(artifact))
+        assert result.returncode != 0
+
 
 @skip_no_pwsh
 class TestBrainstormPowerShell:
@@ -288,3 +300,15 @@ class TestBrainstormPowerShell:
 
         result = run_ps1(VALIDATE_BRAINSTORM_PS1, str(artifact))
         assert result.returncode == 0, result.stderr
+
+    def test_validator_rejects_double_pipe_risk_rows(self, tmp_path):
+        ideas_dir = tmp_path / ".ideas"
+        ideas_dir.mkdir(parents=True, exist_ok=True)
+        artifact = ideas_dir / "brainstorm-expansion.md"
+        content = _build_valid_brainstorm("PowerShell Malformed Risk Table Demo").replace(
+            "| Risk ", "|| Risk "
+        )
+        artifact.write_text(content, encoding="utf-8")
+
+        result = run_ps1(VALIDATE_BRAINSTORM_PS1, str(artifact))
+        assert result.returncode != 0

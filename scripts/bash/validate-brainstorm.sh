@@ -63,7 +63,7 @@ risk_data_rows=$(awk '
   /^## 10\. Honest Weaknesses & Risks/ {in_section=1; next}
   /^## 11\. / {in_section=0}
   in_section {print}
-' "$FILE_PATH" | rg '^\|' | rg -v '^\|[[:space:]]*---' | rg -v '^\|[[:space:]]*Weakness[[:space:]]*\|' | wc -l)
+' "$FILE_PATH" | rg '^\|[^|]' | rg -v '^\|[[:space:]]*---' | rg -v '^\|[[:space:]]*Weakness[[:space:]]*\|' | wc -l)
 
 if [ "$risk_data_rows" -lt 5 ]; then
   echo "Error: Expected at least 5 risk rows, found $risk_data_rows." >&2

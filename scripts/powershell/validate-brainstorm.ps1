@@ -79,7 +79,7 @@ if ($tierCount -lt 3) {
 }
 
 $riskLines = Get-SectionLines -AllLines $lines -StartPattern '^## 10\. Honest Weaknesses & Risks$' -EndPattern '^## 11\. '
-$riskDataRows = ($riskLines | Where-Object { $_ -match '^\|' -and $_ -notmatch '^\|\s*---' -and $_ -notmatch '^\|\s*Weakness\s*\|' }).Count
+$riskDataRows = ($riskLines | Where-Object { $_ -match '^\|[^|]' -and $_ -notmatch '^\|\s*---' -and $_ -notmatch '^\|\s*Weakness\s*\|' }).Count
 if ($riskDataRows -lt 5) {
     Write-Error "Expected at least 5 risk rows, found $riskDataRows."
     exit 1

@@ -17,9 +17,11 @@ Open the project folder and start your AI agent of choice.
 
 Use strategic brainstorm when you need a deeper expansion pass before Phase 0:
 
-```bash
-/speckit.brainstorm Run the 8-framework strategic brainstorm and generate .ideas/brainstorm-expansion.md.
+```text
+/speckit.brainstorm
 ```
+
+This command runs the 8-framework strategic brainstorm and generates `.ideas/brainstorm-expansion.md`.
 
 Output: `.ideas/brainstorm-expansion.md`
 
