@@ -1,12 +1,20 @@
-# Spec Kit (Fork)
+# Nexo Spec Kit
 
-*Build high-quality software faster — with Phase 0 AI ideation built in.*
+*The structured AI development toolkit that turns ideas into executable specifications.*
 
-**An effort to allow organizations to focus on product scenarios rather than writing undifferentiated code, now extended with Phase 0 AI System Ideation.**
+**Phase 0 AI ideation, enterprise controls, and multi-agent orchestration — built in.**
+
+> This toolkit is not affiliated with GitHub. See [docs/trademarks.md](trademarks.md).
+> For the product identity and strategic positioning, see [docs/positioning.md](positioning.md).
 
 ## What is Spec-Driven Development?
 
 Spec-Driven Development **flips the script** on traditional software development. For decades, code has been king — specifications were just scaffolding we built and discarded once the "real work" of coding began. Spec-Driven Development changes this: **specifications become executable**, directly generating working implementations rather than just guiding them.
+
+## Product Identity
+
+- [Positioning](positioning.md) — Problem statement, target users, differentiation, promise
+- [ADR — Positioning Model](adr-positioning-model.md) — Decision record: independent product vs fork-plus vs dual-track
 
 ## Getting Started
 
