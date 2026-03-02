@@ -84,6 +84,7 @@ that makes every AI decision traceable and auditable:
   - dry-run and automation flags (`--dry-run`, `--no-banner`, `--no-git`)
   - template source override (`--template-repo`, `SPECIFY_TEMPLATE_REPO`)
 - Phase 0 slash-command set:
+  - `/speckit.brainstorm` (optional strategic pre-phase that feeds IDEATE)
   - `/speckit.ideate`
   - `/speckit.select`
   - `/speckit.structure`
@@ -111,6 +112,10 @@ that makes every AI decision traceable and auditable:
 ### Phase 0 (recommended before SDD)
 
 `IDEATE -> SELECT -> STRUCTURE -> VALIDATE`
+
+Optional strategic pre-step:
+
+`BRAINSTORM -> IDEATE -> SELECT -> STRUCTURE -> VALIDATE`
 
 Purpose:
 

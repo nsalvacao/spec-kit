@@ -66,6 +66,10 @@ specify init my-project --template-repo nsalvacao/spec-kit --ai codex
 
 ## Slash Commands (after init)
 
+### Strategy (Optional Pre-Phase)
+
+- `/speckit.brainstorm` - strategic expansion artifact (feeds IDEATE as context)
+
 ### Phase 0 (Recommended Prerequisite)
 
 - `/speckit.ideate` - generate ideas backlog (SCAMPER + HMW)

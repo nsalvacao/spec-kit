@@ -1839,6 +1839,9 @@ def init(
 
     steps_lines.append(f"{step_num}. Start using slash commands with your AI agent:")
     steps_lines.append("")
+    steps_lines.append("   [bold cyan]Strategy (Optional Pre-Phase)[/bold cyan]")
+    steps_lines.append("   • [cyan]/speckit.brainstorm[/] - Build strategic expansion context in .ideas/")
+    steps_lines.append("")
     steps_lines.append("   [bold cyan]Phase 0: AI System Ideation[/bold cyan]")
     steps_lines.append("   • [cyan]/speckit.ideate[/] - Generate ideas using SCAMPER + HMW")
     steps_lines.append("   • [cyan]/speckit.select[/] - Score and select best idea using AI-RICE")

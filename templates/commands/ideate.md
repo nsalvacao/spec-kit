@@ -24,22 +24,24 @@ agent_scripts:
    - Overwrite: delete .spec-kit/ideas_backlog.md (destructive) before proceeding.
    - Append: keep existing backlog and add new ideas with provenance.
    - Cancel: exit without changes.
-3. If .spec-kit/ideas_backlog.md does not exist, scaffold it:
+3. If `.ideas/brainstorm-expansion.md` exists, read it first and extract the strongest strategic options as seed inputs.
+4. If .spec-kit/ideas_backlog.md does not exist, scaffold it:
    - Run: `bash scripts/bash/ideate.sh [PROJECT_DIR]` (Linux/macOS)
    - Or:  `pwsh scripts/powershell/ideate.ps1 [-ProjectDir PROJECT_DIR]` (Windows)
    - Pass $ARGUMENTS as context to help the user fill in the seed ideas.
-4. Collect 2-5 seed ideas (1-3 sentences each).
-5. Apply SCAMPER (all 7 lenses) to each seed (one variation per lens).
-6. Generate 5+ HMW questions across Data/Model/Safety/Cost/UX.
-7. Write .spec-kit/ideas_backlog.md using ideas-backlog-template.md.
-8. Validate with validate-scamper.{sh|ps}.
-9. Update state: set current_phase=select; record ideas_backlog path.
-10. Report completion and idea counts.
+5. Collect 2-5 seed ideas (1-3 sentences each).
+6. Apply SCAMPER (all 7 lenses) to each seed (one variation per lens).
+7. Generate 5+ HMW questions across Data/Model/Safety/Cost/UX.
+8. Write .spec-kit/ideas_backlog.md using ideas-backlog-template.md.
+9. Validate with validate-scamper.{sh|ps}.
+10. Update state: set current_phase=select; record ideas_backlog path.
+11. Report completion and idea counts.
 -->
 
 ## Required Inputs
 
 - 2-5 seed AI system ideas (1-3 sentences each)
+- Optional strategic context from `.ideas/brainstorm-expansion.md`
 
 ## Output
 
