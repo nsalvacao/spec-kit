@@ -20,6 +20,7 @@ def test_load_project_config_returns_defaults_when_no_files(tmp_path: Path):
     config = load_project_config(project_root=tmp_path)
     assert config["schema_version"] == DEFAULT_PROJECT_CONFIG["schema_version"]
     assert config["scope_detection"] == {}
+    assert config["productivity_update"] == {}
 
 
 def test_project_and_local_config_merge_with_precedence(tmp_path: Path):

@@ -48,6 +48,7 @@ specify productivity start --compact --no-server
 specify productivity update
 specify productivity update --comprehensive --no-github-sync
 specify productivity update --apply --yes --external-task "Review launch checklist"
+specify productivity update --stale-days 14
 
 ```text
 
@@ -94,3 +95,12 @@ specify init my-project --template-repo nsalvacao/spec-kit --ai codex
 | --- | --- |
 | `SPECIFY_TEMPLATE_REPO` | Override template source repo (owner/name) |
 | `SPECIFY_FEATURE` | Override feature detection when not using git branches |
+
+## Productivity Update Runtime Config
+
+If `--stale-days` is not provided, `specify productivity update` uses:
+
+- `.specify/spec-kit.yml` -> `productivity_update.default_stale_age_days`
+- fallback default: `30`
+
+See `docs/productivity-cockpit-config-contract.md` for full A4 contract and safety semantics.

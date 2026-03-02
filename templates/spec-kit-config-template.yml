@@ -28,3 +28,19 @@ scope_detection:
   #   - platform
   #   - migration
   #   - compliance
+
+productivity_update:
+  # Runtime tuning for `specify productivity update`:
+  #
+  # fuzzy_title_match_threshold: 0.84
+  # default_stale_age_days: 30
+  # max_comprehensive_scan_files: 80
+  # max_comprehensive_scan_file_bytes: 200000
+  #
+  # Optional lexical filters:
+  # common_entity_stopwords:
+  #   - TODO
+  #   - FIXME
+  # common_entity_verbish:
+  #   - review
+  #   - update
