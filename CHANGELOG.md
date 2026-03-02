@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     optional strategy pre-phase that complements (does not replace) Phase 0.
   - Added regression coverage in `tests/test_brainstorm_scripts.py`.
 
+### Changed
+
+- Release metadata sync now hydrates newly created release changelog sections from
+  published GitHub release notes when a placeholder is present.
+
+## [0.0.80] - 2026-03-02
+
+### Added
+
+- *No changes documented yet.*
+
 ## [0.0.79] - 2026-03-02
 
 ### Added
