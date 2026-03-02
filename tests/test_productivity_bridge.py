@@ -190,6 +190,66 @@ def test_memory_endpoint_roundtrip(tmp_path: Path) -> None:
         thread.join(timeout=2.0)
 
 
+def test_post_rejects_non_json_content_type(tmp_path: Path) -> None:
+    started_at = time.time()
+    handler = build_handler(tmp_path, "127.0.0.1", 0, started_at)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+
+    try:
+        request = Request(
+            f"http://{host}:{port}/api/tasks",
+            data=b'{"sections": {}}',
+            headers={"Content-Type": "text/plain"},
+            method="POST",
+        )
+        try:
+            urlopen(request, timeout=2.0)
+        except HTTPError as exc:
+            payload = json.loads(exc.read().decode("utf-8"))
+            assert exc.code == 400
+            assert payload["code"] == "invalid_request"
+            assert "Content-Type must be application/json" in payload["error"]
+        else:
+            raise AssertionError("Expected HTTPError for invalid Content-Type.")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)
+
+
+def test_post_rejects_cross_origin_request(tmp_path: Path) -> None:
+    started_at = time.time()
+    handler = build_handler(tmp_path, "127.0.0.1", 0, started_at)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+
+    try:
+        request = Request(
+            f"http://{host}:{port}/api/tasks",
+            data=json.dumps({"sections": {"Active": [], "Waiting On": [], "Someday": [], "Done": []}}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Origin": "http://evil.example"},
+            method="POST",
+        )
+        try:
+            urlopen(request, timeout=2.0)
+        except HTTPError as exc:
+            payload = json.loads(exc.read().decode("utf-8"))
+            assert exc.code == 400
+            assert payload["code"] == "invalid_request"
+            assert "Origin is not allowed" in payload["error"]
+        else:
+            raise AssertionError("Expected HTTPError for cross-origin request.")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)
+
+
 def test_pulse_and_drift_endpoints(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("ok\n", encoding="utf-8")
     (tmp_path / "TASKS.md").write_text("# Tasks\n\n## Active\n- [ ] A\n", encoding="utf-8")
@@ -225,6 +285,11 @@ def test_pulse_and_drift_endpoints(tmp_path: Path) -> None:
 
 
 def test_exec_endpoint_rejects_non_whitelisted_cli(tmp_path: Path) -> None:
+    (tmp_path / ".cockpit.json").write_text(
+        json.dumps({"ai": {"mode": "cli", "cli": "bash", "args": []}}),
+        encoding="utf-8",
+    )
+
     started_at = time.time()
     handler = build_handler(tmp_path, "127.0.0.1", 0, started_at)
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -235,7 +300,7 @@ def test_exec_endpoint_rejects_non_whitelisted_cli(tmp_path: Path) -> None:
     try:
         request = Request(
             f"http://{host}:{port}/api/exec",
-            data=json.dumps({"prompt": "hi", "mode": "cli", "cli": "bash"}).encode("utf-8"),
+            data=json.dumps({"prompt": "hi", "mode": "cli"}).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )

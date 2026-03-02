@@ -37,9 +37,12 @@ TASK_LINE_RE = re.compile(r"^\s*-\s*\[(?P<checked>[ xX])\]\s*(?P<body>.+?)\s*$")
 MAX_REQUEST_BODY_BYTES = 256_000
 MAX_PROMPT_CHARS = 8_000
 MAX_EXEC_OUTPUT_CHARS = 20_000
+MAX_CLI_ARGS = 12
+MAX_CLI_ARG_CHARS = 140
 MAX_MEMORY_FILES = 300
 MAX_MEMORY_FILE_BYTES = 350_000
 MAX_MEMORY_CONTENT_BYTES = 350_000
+ALLOWED_CLI_ARG_RE = re.compile(r"^--[a-zA-Z0-9][a-zA-Z0-9-]*(=[a-zA-Z0-9._:/+\-]{1,120})?$")
 ALLOWED_AI_CLIS = frozenset(
     {
         "claude",
@@ -1143,6 +1146,24 @@ def _truncate_output(value: str, max_chars: int = MAX_EXEC_OUTPUT_CHARS) -> str:
     return value[: max_chars - 3] + "..."
 
 
+def _sanitize_cli_args(args: list[str]) -> list[str]:
+    if len(args) > MAX_CLI_ARGS:
+        raise ValueError(f"Too many CLI args. Maximum allowed is {MAX_CLI_ARGS}.")
+    normalized: list[str] = []
+    for raw in args:
+        token = str(raw).strip()
+        if not token:
+            continue
+        if len(token) > MAX_CLI_ARG_CHARS:
+            raise ValueError("CLI arg exceeds maximum length.")
+        if not ALLOWED_CLI_ARG_RE.fullmatch(token):
+            raise ValueError(
+                "Unsupported CLI arg format. Allowed format is '--flag' or '--flag=value'."
+            )
+        normalized.append(token)
+    return normalized
+
+
 def _exec_cli_mode(
     *,
     project_root: Path,
@@ -1156,7 +1177,9 @@ def _exec_cli_mode(
         joined = ", ".join(sorted(ALLOWED_AI_CLIS))
         raise ValueError(f"CLI '{command}' is not allowed. Allowed: {joined}.")
 
-    cmd = [command, *args, prompt]
+    safe_args = _sanitize_cli_args(args)
+    # "--" forces prompt to be treated as a positional value, not a flag.
+    cmd = [command, *safe_args, "--", prompt]
     try:
         result = subprocess.run(
             cmd,
@@ -1186,9 +1209,12 @@ def _exec_api_mode(*, provider: str, model: str, prompt: str, timeout: float = 4
         raise ValueError("API mode requires 'provider'.")
 
     if provider_norm == "ollama":
+        ollama_base_url = (os.getenv("OLLAMA_HOST") or "http://127.0.0.1:11434").strip().rstrip("/")
+        if not ollama_base_url.startswith(("http://", "https://")):
+            raise ValueError("OLLAMA_HOST must start with http:// or https://.")
         body = json.dumps({"model": model or "llama3.1:8b", "prompt": prompt, "stream": False}).encode("utf-8")
         request = Request(
-            "http://127.0.0.1:11434/api/generate",
+            f"{ollama_base_url}/api/generate",
             data=body,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -1231,7 +1257,9 @@ def _exec_api_mode(*, provider: str, model: str, prompt: str, timeout: float = 4
                 payload = json.loads(response.read().decode("utf-8"))
         except (URLError, HTTPError, json.JSONDecodeError) as exc:
             raise RuntimeError(f"OpenAI API request failed: {exc}") from exc
-        text = payload.get("choices", [{}])[0].get("message", {}).get("content", "")
+        choices = payload.get("choices", [])
+        first_choice = choices[0] if isinstance(choices, list) and choices else {}
+        text = first_choice.get("message", {}).get("content", "") if isinstance(first_choice, dict) else ""
         return {
             "stdout": _truncate_output(str(text)),
             "stderr": "",
@@ -1370,6 +1398,31 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
             self.wfile.write(body)
 
         def _read_json_body(self) -> dict[str, Any]:
+            content_type = self.headers.get("Content-Type", "")
+            media_type = content_type.split(";", 1)[0].strip().lower()
+            if media_type != "application/json":
+                raise ValueError("Content-Type must be application/json.")
+
+            allowed_origins = {f"http://{host}:{port}", f"http://localhost:{port}"}
+            sec_fetch_site = (self.headers.get("Sec-Fetch-Site") or "").strip().lower()
+            if sec_fetch_site and sec_fetch_site not in {"same-origin", "same-site", "none"}:
+                raise ValueError("Cross-site requests are not allowed.")
+
+            origin = (self.headers.get("Origin") or "").strip()
+            if origin and origin not in allowed_origins:
+                raise ValueError("Origin is not allowed.")
+
+            referer = (self.headers.get("Referer") or "").strip()
+            if not origin and referer:
+                parsed_referer = urlparse(referer)
+                referer_origin = (
+                    f"{parsed_referer.scheme}://{parsed_referer.netloc}"
+                    if parsed_referer.scheme and parsed_referer.netloc
+                    else ""
+                )
+                if referer_origin not in allowed_origins:
+                    raise ValueError("Referer origin is not allowed.")
+
             raw_len = self.headers.get("Content-Length", "").strip()
             if not raw_len.isdigit():
                 raise ValueError("Missing or invalid Content-Length.")
@@ -1512,7 +1565,6 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
                     return
                 try:
                     target = _resolve_memory_target(project_root, raw_path)
-                    target = ensure_path_within_project_root(project_root, target, field_name="memory.path")
                 except ValueError as exc:
                     self._send_json({"error": str(exc), "code": "invalid_path"}, status=400)
                     return
@@ -1545,14 +1597,12 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
 
                 try:
                     if mode == "cli":
-                        cli = str(payload.get("cli", ai_defaults.cli if ai_defaults else "")).strip() or "codex"
-                        raw_args = payload.get("args", list(ai_defaults.args) if ai_defaults else [])
-                        if not isinstance(raw_args, list) or not all(isinstance(item, str) for item in raw_args):
-                            raise ValueError("args must be a list of strings.")
+                        cli = str(ai_defaults.cli if ai_defaults else "").strip() or "codex"
+                        raw_args = list(ai_defaults.args) if ai_defaults else []
                         result = _exec_cli_mode(
                             project_root=project_root,
                             cli=cli,
-                            args=[item for item in raw_args if item.strip()],
+                            args=[item for item in raw_args if str(item).strip()],
                             prompt=prompt,
                         )
                     else:
