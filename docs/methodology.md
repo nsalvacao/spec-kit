@@ -2,6 +2,10 @@
 
 This fork extends Spec-Driven Development with **Phase 0** for AI system ideation as a recommended prerequisite. The result is a complete workflow from idea exploration to execution, with explicit artifacts and validation gates.
 
+An optional strategic pre-phase (`/speckit.brainstorm`) can be used to produce
+`.ideas/brainstorm-expansion.md` before IDEATE. This deep strategic artifact
+feeds Phase 0 context but does not replace Phase 0 artifacts or gates.
+
 ## Spec-Driven Development (SDD)
 
 SDD treats specifications as executable artifacts. Instead of starting with code, the workflow starts with structured specs and progressively narrows to implementation:
@@ -25,8 +29,9 @@ This creates a defensible, documented rationale before the SDD pipeline starts.
 
 ## End-to-End Workflow
 
-1. **Phase 0**: IDEATE → SELECT → STRUCTURE → VALIDATE  
-2. **SDD Core**: CONSTITUTION → SPECIFY → PLAN → TASKS → IMPLEMENT
+1. **Optional Strategy Pre-Phase**: BRAINSTORM
+2. **Phase 0**: IDEATE → SELECT → STRUCTURE → VALIDATE  
+3. **SDD Core**: CONSTITUTION → SPECIFY → PLAN → TASKS → IMPLEMENT
 
 ## Core Principles
 

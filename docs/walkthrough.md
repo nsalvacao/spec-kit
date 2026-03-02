@@ -13,7 +13,21 @@ specify init my-project --ai codex
 
 Open the project folder and start your AI agent of choice.
 
-## 1) Phase 0 — AI System Ideation (Recommended Prerequisite)
+## 1) Strategy Pre-Phase (Optional but Recommended)
+
+Use strategic brainstorm when you need a deeper expansion pass before Phase 0:
+
+```text
+/speckit.brainstorm
+```
+
+This command runs the 8-framework strategic brainstorm and generates `.ideas/brainstorm-expansion.md`.
+
+Output: `.ideas/brainstorm-expansion.md`
+
+The result complements (does not replace) Phase 0. Use it as context for IDEATE.
+
+## 2) Phase 0 — AI System Ideation (Recommended Prerequisite)
 
 Phase 0 generates the artifacts that justify the project before specs are written.
 
@@ -67,7 +81,7 @@ Phase 0 generates the artifacts that justify the project before specs are writte
 
    Output: `.spec-kit/approvals/g0-validation-report.md`
 
-## 2) Establish Project Constitution
+## 3) Establish Project Constitution
 
 ```text
 /speckit.constitution Create principles focused on code quality, testing standards, UX consistency, and performance.
@@ -75,7 +89,7 @@ Phase 0 generates the artifacts that justify the project before specs are writte
 
 Output: `.specify/memory/constitution.md`
 
-## 3) Create the Specification
+## 4) Create the Specification
 
 ```text
 /speckit.specify Describe the feature requirements, user stories, and constraints.
@@ -83,13 +97,13 @@ Output: `.specify/memory/constitution.md`
 
 Output: `.specify/specs/<feature>/spec.md`
 
-## 4) Clarify (Recommended)
+## 5) Clarify (Recommended)
 
 ```text
 /speckit.clarify Review and clarify missing details before planning.
 ```
 
-## 5) Create the Plan
+## 6) Create the Plan
 
 ```text
 /speckit.plan Provide the tech stack and architecture choices.
@@ -97,7 +111,7 @@ Output: `.specify/specs/<feature>/spec.md`
 
 Output: `.specify/specs/<feature>/plan.md`
 
-## 6) Generate Tasks
+## 7) Generate Tasks
 
 ```text
 /speckit.tasks
@@ -105,7 +119,7 @@ Output: `.specify/specs/<feature>/plan.md`
 
 Output: `.specify/specs/<feature>/tasks.md`
 
-## 7) Analyze (Recommended)
+## 8) Analyze (Recommended)
 
 ```text
 /speckit.analyze
@@ -113,7 +127,7 @@ Output: `.specify/specs/<feature>/tasks.md`
 
 Checks cross‑artifact consistency before execution.
 
-## 8) Implement
+## 9) Implement
 
 ```bash
 /speckit.implement
@@ -121,7 +135,7 @@ Checks cross‑artifact consistency before execution.
 
 Executes tasks according to the plan.
 
-## 9) Amend (Post-Implementation)
+## 10) Amend (Post-Implementation)
 
 ```text
 /speckit.amend Describe the edge case, new scenario, or behavioral correction.
@@ -131,7 +145,7 @@ Applies a targeted amendment when an edge case or correction is discovered
 after implementation. Updates the spec, adds a failing test, then fixes the
 code without re-running the full pipeline.
 
-## 10) Checklist
+## 11) Checklist
 
 ```text
 /speckit.checklist
@@ -139,7 +153,7 @@ code without re-running the full pipeline.
 
 Generates a quality checklist for the current feature.
 
-## 11) Tasks to Issues
+## 12) Tasks to Issues
 
 ```text
 /speckit.taskstoissues

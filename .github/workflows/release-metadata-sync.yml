@@ -147,6 +147,30 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Hydrate changelog section from release notes
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.release_tag.outputs.tag }}"
+          body="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq '.body // ""' 2>/dev/null || true)"
+          printf '%s\n' "$body" > release-body.md
+
+          python scripts/python/changelog-hydrator.py \
+            --changelog CHANGELOG.md \
+            --version "${tag#v}" \
+            --release-body-file release-body.md \
+            --json > changelog-hydrator-result.json
+
+          cat changelog-hydrator-result.json
+          {
+            echo "### Changelog Hydration"
+            echo ""
+            echo '```json'
+            cat changelog-hydrator-result.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Enforce sync allowlist
         if: steps.sync.outputs.changed == 'true'
         run: |

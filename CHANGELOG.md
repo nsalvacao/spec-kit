@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **#204: Native strategic brainstorm command (B1)**
+  - Added `/speckit.brainstorm` command template with Bash/PowerShell scaffold and
+    validator scripts for `.ideas/brainstorm-expansion.md`.
+  - Integrated brainstorm discoverability in CLI next steps and documentation as an
+    optional strategy pre-phase that complements (does not replace) Phase 0.
+  - Added regression coverage in `tests/test_brainstorm_scripts.py`.
+
+### Changed
+
+- Release metadata sync now hydrates newly created release changelog sections from
+  published GitHub release notes when a placeholder is present.
+
 ## [0.0.80] - 2026-03-02
 
 ### Added
