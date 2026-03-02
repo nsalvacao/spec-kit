@@ -1,8 +1,8 @@
 <div align="center">
   <img src="./media/logo_large.webp" alt="Nexo Spec Kit logo" width="200" height="200" />
   <h1>Nexo Spec Kit</h1>
-  <p><strong>Phase 0 Ideation + Spec-Driven Development for multi-agent teams.</strong></p>
-  <p>Independent fork of <code>github/spec-kit</code> with enterprise workflow extensions.</p>
+  <p><strong>The structured AI development toolkit that turns ideas into executable specifications.</strong></p>
+  <p>Phase 0 AI ideation · Enterprise governance · 18 AI coding agents · Upstream-compatible.</p>
 </div>
 
 <p align="center">
@@ -19,7 +19,7 @@
 ## Table of Contents
 
 - [What This Project Is](#what-this-project-is)
-- [Why This Fork Exists](#why-this-fork-exists)
+- [Why This Project Exists](#why-this-project-exists)
 - [Core Capabilities](#core-capabilities)
 - [Workflow at a Glance](#workflow-at-a-glance)
 - [Supported AI Agents](#supported-ai-agents)
@@ -39,24 +39,42 @@
 
 ## What This Project Is
 
-Nexo Spec Kit is an independent, MIT-licensed fork of `github/spec-kit` focused on:
+**Nexo Spec Kit** is a structured AI development toolkit and CLI for teams who
+build software with AI agents. It implements a complete Spec-Driven Development
+(SDD) pipeline that starts *before* any code is written:
 
-- Phase 0 ideation before specification work
-- robust multi-agent project bootstrapping
-- structured Spec-Driven Development (SDD) execution
-- enterprise-friendly validation and extension workflows
+- **Phase 0 — Ideate**: Structured AI ideation (IDEATE → SELECT → STRUCTURE →
+  VALIDATE) to discover *what* to build before writing a single spec.
+- **Phase 1 — Specify**: Author executable specifications that constrain AI
+  agents to the right scope.
+- **Phase 2 — Plan and implement**: Generate traceable implementation plans and
+  delegate execution to AI agents.
+- **Phase 3 — Validate**: Automated scope gates, contract validation, and
+  handoff metadata create an auditable trail from idea to shipped code.
 
-This fork is **not affiliated with GitHub**.  
-Trademark usage is attribution-only. See `docs/trademarks.md`.
+Nexo Spec Kit maintains **optional upstream compatibility** with
+`github/spec-kit`. Set `SPECIFY_TEMPLATE_REPO=github/spec-kit` or use
+`--template-repo github/spec-kit` to use upstream templates. This toolkit is
+**not affiliated with GitHub**. See `docs/trademarks.md`.
 
-## Why This Fork Exists
+For the full product identity and strategic positioning, see
+[`docs/positioning.md`](docs/positioning.md).
 
-Upstream Spec Kit provides a strong SDD foundation. This fork extends it with a stronger front-end discovery phase and execution hardening:
+## Why This Project Exists
 
-- Phase 0 AI ideation workflow (`ideate -> select -> structure -> validate`)
-- broader agent integration surface
-- extension management commands in the CLI
-- operational workflows for release/distribution/upstream synchronization
+AI coding agents are excellent at *implementing* but poor at *deciding what to
+build*. Without a structured front-end discovery phase, teams accumulate
+poorly-scoped features, duplicated agent context, and brittle handoffs.
+
+Nexo Spec Kit closes this gap by adding a complete Phase 0 ideation layer on
+top of the Spec-Driven Development workflow, plus enterprise-grade governance
+that makes every AI decision traceable and auditable:
+
+- Phase 0 AI ideation workflow (`ideate → select → structure → validate`)
+- 18 AI coding agent integrations (the same named agents as upstream)
+- 5 additional CLI commands vs upstream (`hierarchy-contract`, `scope-detect`, `scope-gate`, `productivity`, `update`)
+- contract validation, scope gates, and handoff metadata
+- enterprise compliance checker and operational release/deploy workflows
 
 ## Core Capabilities
 
@@ -392,6 +410,8 @@ Detailed policy:
 
 | Topic | Link |
 | --- | --- |
+| **Product positioning** | `docs/positioning.md` |
+| **ADR — Positioning model** | `docs/adr-positioning-model.md` |
 | Getting started | `docs/quickstart.md` |
 | Installation | `docs/installation.md` |
 | Configuration | `docs/configuration.md` |

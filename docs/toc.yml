@@ -2,6 +2,14 @@
 - name: Home
   href: index.md
 
+# Product identity
+- name: Product Identity
+  items:
+    - name: Positioning
+      href: positioning.md
+    - name: ADR — Positioning Model
+      href: adr-positioning-model.md
+
 # Getting started section
 - name: Getting Started
   items:

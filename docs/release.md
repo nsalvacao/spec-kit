@@ -1,6 +1,32 @@
 # Release Process
 
-This guide describes how releases are published for this fork.
+This guide describes how releases are published for **Nexo Spec Kit** — an
+independent toolkit and CLI for Spec-Driven Development with Phase 0 AI
+ideation and enterprise controls. For the product identity and positioning
+context, see [`docs/positioning.md`](positioning.md).
+
+## Release Identity Language
+
+When writing release notes, changelogs, or announcement text, use the
+following conventions to maintain consistent product identity:
+
+- **Product name**: *Nexo Spec Kit* (not "spec-kit fork" or "fork of github/spec-kit")
+- **CLI name**: `specify` CLI
+- **Non-affiliation**: Include the phrase *"not affiliated with GitHub"* in any
+  release announcement that references the upstream `github/spec-kit` project.
+- **Upstream compatibility**: Use *"upstream-compatible with `github/spec-kit`"*
+  rather than *"based on"* or *"derived from"* to emphasize the independent
+  product identity while acknowledging the compatibility layer.
+- **Phase 0**: Refer to the ideation workflow as *"Phase 0 AI ideation"*
+  (IDEATE → SELECT → STRUCTURE → VALIDATE).
+- **Agent count**: Use the current count from `AGENT_CONFIG` in
+  `src/specify_cli/__init__.py` (e.g., *"17+ AI coding agent integrations"*).
+
+**Example release note opening:**
+
+> Nexo Spec Kit vX.Y.Z — Phase 0 AI ideation, enterprise governance, and
+> 17+ agent integrations. Upstream-compatible with `github/spec-kit`. Not
+> affiliated with GitHub.
 
 ## 0) Automation Baseline
 
