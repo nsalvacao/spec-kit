@@ -37,12 +37,11 @@ TASK_LINE_RE = re.compile(r"^\s*-\s*\[(?P<checked>[ xX])\]\s*(?P<body>.+?)\s*$")
 MAX_REQUEST_BODY_BYTES = 256_000
 MAX_PROMPT_CHARS = 8_000
 MAX_EXEC_OUTPUT_CHARS = 20_000
-MAX_CLI_ARGS = 12
-MAX_CLI_ARG_CHARS = 140
 MAX_MEMORY_FILES = 300
 MAX_MEMORY_FILE_BYTES = 350_000
 MAX_MEMORY_CONTENT_BYTES = 350_000
-ALLOWED_CLI_ARG_RE = re.compile(r"^--[a-zA-Z0-9][a-zA-Z0-9-]*(=[a-zA-Z0-9._:/+\-]{1,120})?$")
+MAX_DRIFT_WATCH_FILES = 1200
+MIN_DRIFT_RESCAN_INTERVAL_SECONDS = 2.0
 ALLOWED_AI_CLIS = frozenset(
     {
         "claude",
@@ -60,6 +59,7 @@ ALLOWED_AI_CLIS = frozenset(
         "ollama",
     }
 )
+CLI_EXECUTABLES: dict[str, str] = {name: name for name in ALLOWED_AI_CLIS}
 
 HTML_PAGE = """<!doctype html>
 <html lang="en">
@@ -1130,14 +1130,20 @@ def _collect_memory_files(memory_dir: Path, project_root: Path) -> list[dict[str
     return files
 
 
-def _resolve_memory_target(project_root: Path, raw_path: str) -> Path:
+def _resolve_memory_target(project_root: Path, memory_root: Path, raw_path: str) -> Path:
     normalized = PurePosixPath(str(raw_path).replace("\\", "/"))
     if normalized.is_absolute() or ".." in normalized.parts:
         raise ValueError("memory.path must be project-relative without path traversal.")
     if not normalized.parts:
         raise ValueError("memory.path must not be empty.")
     target = (project_root / normalized.as_posix()).resolve()
-    return ensure_path_within_project_root(project_root, target, field_name="memory.path")
+    target = ensure_path_within_project_root(project_root, target, field_name="memory.path")
+    memory_base = ensure_path_within_project_root(project_root, memory_root.resolve(), field_name="memory root")
+    try:
+        target.relative_to(memory_base)
+    except ValueError as exc:
+        raise ValueError("memory.path must be within the configured memory root.") from exc
+    return target
 
 
 def _truncate_output(value: str, max_chars: int = MAX_EXEC_OUTPUT_CHARS) -> str:
@@ -1146,43 +1152,25 @@ def _truncate_output(value: str, max_chars: int = MAX_EXEC_OUTPUT_CHARS) -> str:
     return value[: max_chars - 3] + "..."
 
 
-def _sanitize_cli_args(args: list[str]) -> list[str]:
-    if len(args) > MAX_CLI_ARGS:
-        raise ValueError(f"Too many CLI args. Maximum allowed is {MAX_CLI_ARGS}.")
-    normalized: list[str] = []
-    for raw in args:
-        token = str(raw).strip()
-        if not token:
-            continue
-        if len(token) > MAX_CLI_ARG_CHARS:
-            raise ValueError("CLI arg exceeds maximum length.")
-        if not ALLOWED_CLI_ARG_RE.fullmatch(token):
-            raise ValueError(
-                "Unsupported CLI arg format. Allowed format is '--flag' or '--flag=value'."
-            )
-        normalized.append(token)
-    return normalized
-
-
 def _exec_cli_mode(
     *,
     project_root: Path,
     cli: str,
-    args: list[str],
     prompt: str,
     timeout: float = 45.0,
 ) -> dict[str, Any]:
     command = cli.strip()
-    if command not in ALLOWED_AI_CLIS:
+    executable = CLI_EXECUTABLES.get(command)
+    if executable is None:
         joined = ", ".join(sorted(ALLOWED_AI_CLIS))
         raise ValueError(f"CLI '{command}' is not allowed. Allowed: {joined}.")
 
-    safe_args = _sanitize_cli_args(args)
-    # "--" forces prompt to be treated as a positional value, not a flag.
-    cmd = [command, *safe_args, "--", prompt]
+    # Keep command-line static and pass prompt via stdin to avoid arg/flag injection.
+    cmd = [executable]
     try:
         result = subprocess.run(
             cmd,
+            input=prompt,
             capture_output=True,
             text=True,
             check=False,
@@ -1338,10 +1326,16 @@ def _pulse_payload(project_root: Path, runtime: CockpitRuntimePaths) -> dict[str
     }
 
 
-def _scan_drift_snapshot(project_root: Path, runtime: CockpitRuntimePaths) -> dict[str, float]:
+def _scan_drift_snapshot(project_root: Path, runtime: CockpitRuntimePaths) -> tuple[dict[str, float], bool]:
     watched = [runtime.tasks_path]
+    truncated = False
     if runtime.memory_dir.exists() and runtime.memory_dir.is_dir():
-        watched.extend(path for path in runtime.memory_dir.rglob("*") if path.is_file())
+        for path in runtime.memory_dir.rglob("*"):
+            if len(watched) >= MAX_DRIFT_WATCH_FILES:
+                truncated = True
+                break
+            if path.is_file():
+                watched.append(path)
     snapshot: dict[str, float] = {}
     for path in watched:
         try:
@@ -1350,14 +1344,32 @@ def _scan_drift_snapshot(project_root: Path, runtime: CockpitRuntimePaths) -> di
             continue
         rel = _safe_rel(path, project_root)
         snapshot[rel] = mtime
-    return snapshot
+    return snapshot, truncated
 
 
 def build_handler(project_root: Path, host: str, port: int, started_at: float) -> type[BaseHTTPRequestHandler]:
     drift_lock = threading.Lock()
-    drift_state: dict[str, Any] = {"cursor": 0, "snapshot": {}}
+    drift_state: dict[str, Any] = {"cursor": 0, "snapshot": {}, "last_scan_at": 0.0, "truncated": False}
 
     class Handler(BaseHTTPRequestHandler):
+        def _effective_bind(self) -> tuple[str, int]:
+            server_host = host
+            server_port = port
+            address = getattr(self.server, "server_address", None)
+            if isinstance(address, tuple) and len(address) >= 2:
+                server_host = str(address[0]) if address[0] else server_host
+                server_port = int(address[1])
+            if server_host in {"0.0.0.0", "::"}:
+                server_host = host
+            return server_host, int(server_port)
+
+        def _allowed_origins(self) -> set[str]:
+            bound_host, bound_port = self._effective_bind()
+            hosts = {bound_host, "localhost", "127.0.0.1"}
+            if ":" in bound_host and not bound_host.startswith("["):
+                hosts.add(f"[{bound_host}]")
+            return {f"http://{item}:{bound_port}" for item in hosts}
+
         def _send_common_security_headers(self) -> None:
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
@@ -1403,7 +1415,7 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
             if media_type != "application/json":
                 raise ValueError("Content-Type must be application/json.")
 
-            allowed_origins = {f"http://{host}:{port}", f"http://localhost:{port}"}
+            allowed_origins = self._allowed_origins()
             sec_fetch_site = (self.headers.get("Sec-Fetch-Site") or "").strip().lower()
             if sec_fetch_site and sec_fetch_site not in {"same-origin", "same-site", "none"}:
                 raise ValueError("Cross-site requests are not allowed.")
@@ -1442,23 +1454,40 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
             return _resolve_runtime_paths(project_root)
 
         def _drift_payload(self, runtime: CockpitRuntimePaths) -> dict[str, Any]:
-            new_snapshot = _scan_drift_snapshot(project_root, runtime)
             with drift_lock:
                 previous: dict[str, float] = dict(drift_state["snapshot"])
+                last_scan = float(drift_state["last_scan_at"])
+                previous_truncated = bool(drift_state["truncated"])
+
+            now = time.monotonic()
+            should_rescan = (now - last_scan) >= MIN_DRIFT_RESCAN_INTERVAL_SECONDS or not previous
+            if should_rescan:
+                new_snapshot, truncated = _scan_drift_snapshot(project_root, runtime)
+            else:
+                new_snapshot = previous
+                truncated = previous_truncated
+
+            with drift_lock:
+                baseline = dict(drift_state["snapshot"])
                 changed: list[str] = []
                 for path, mtime in new_snapshot.items():
-                    if path not in previous or previous[path] != mtime:
+                    if path not in baseline or baseline[path] != mtime:
                         changed.append(path)
-                for path in previous:
+                for path in baseline:
                     if path not in new_snapshot:
                         changed.append(path)
                 drift_state["cursor"] += 1
                 drift_state["snapshot"] = new_snapshot
+                if should_rescan:
+                    drift_state["last_scan_at"] = now
+                    drift_state["truncated"] = truncated
                 cursor = drift_state["cursor"]
             return {
                 "cursor": cursor,
                 "changed": sorted(changed),
                 "tracked_files": len(new_snapshot),
+                "snapshot_cached": not should_rescan,
+                "watch_limit_hit": bool(truncated),
                 "generated_at": _iso_now(),
             }
 
@@ -1467,7 +1496,10 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
             runtime = self._runtime_paths()
 
             if parsed.path == "/api/status":
-                self._send_json(_status_payload(project_root=project_root, host=host, port=port, started_at=started_at))
+                bind_host, bind_port = self._effective_bind()
+                self._send_json(
+                    _status_payload(project_root=project_root, host=bind_host, port=bind_port, started_at=started_at)
+                )
                 return
 
             if parsed.path == "/api/config":
@@ -1486,7 +1518,7 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
                 requested = (query.get("path") or [""])[0].strip()
                 if requested:
                     try:
-                        target = _resolve_memory_target(project_root, requested)
+                        target = _resolve_memory_target(project_root, runtime.memory_dir, requested)
                     except ValueError as exc:
                         self._send_json({"error": str(exc), "code": "invalid_path"}, status=400)
                         return
@@ -1564,7 +1596,7 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
                     )
                     return
                 try:
-                    target = _resolve_memory_target(project_root, raw_path)
+                    target = _resolve_memory_target(project_root, runtime.memory_dir, raw_path)
                 except ValueError as exc:
                     self._send_json({"error": str(exc), "code": "invalid_path"}, status=400)
                     return
@@ -1598,11 +1630,9 @@ def build_handler(project_root: Path, host: str, port: int, started_at: float) -
                 try:
                     if mode == "cli":
                         cli = str(ai_defaults.cli if ai_defaults else "").strip() or "codex"
-                        raw_args = list(ai_defaults.args) if ai_defaults else []
                         result = _exec_cli_mode(
                             project_root=project_root,
                             cli=cli,
-                            args=[item for item in raw_args if str(item).strip()],
                             prompt=prompt,
                         )
                     else:

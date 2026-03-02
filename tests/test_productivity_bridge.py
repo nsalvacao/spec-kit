@@ -160,6 +160,36 @@ def test_memory_endpoint_rejects_path_traversal(tmp_path: Path) -> None:
         thread.join(timeout=2.0)
 
 
+def test_memory_endpoint_rejects_paths_outside_memory_root(tmp_path: Path) -> None:
+    started_at = time.time()
+    handler = build_handler(tmp_path, "127.0.0.1", 0, started_at)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+
+    try:
+        request = Request(
+            f"http://{host}:{port}/api/memory",
+            data=json.dumps({"path": "pyproject.toml", "content": "x"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urlopen(request, timeout=2.0)
+        except HTTPError as exc:
+            payload = json.loads(exc.read().decode("utf-8"))
+            assert exc.code == 400
+            assert payload["code"] == "invalid_path"
+            assert "configured memory root" in payload["error"]
+        else:
+            raise AssertionError("Expected HTTPError for non-memory path.")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)
+
+
 def test_memory_endpoint_roundtrip(tmp_path: Path) -> None:
     started_at = time.time()
     handler = build_handler(tmp_path, "127.0.0.1", 0, started_at)
@@ -250,6 +280,31 @@ def test_post_rejects_cross_origin_request(tmp_path: Path) -> None:
         thread.join(timeout=2.0)
 
 
+def test_post_accepts_same_origin_with_effective_runtime_port(tmp_path: Path) -> None:
+    started_at = time.time()
+    handler = build_handler(tmp_path, "127.0.0.1", 0, started_at)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+
+    try:
+        request = Request(
+            f"http://{host}:{port}/api/tasks",
+            data=json.dumps({"sections": {"Active": [], "Waiting On": [], "Someday": [], "Done": []}}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Origin": f"http://127.0.0.1:{port}"},
+            method="POST",
+        )
+        with urlopen(request, timeout=2.0) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        assert response.status == 200
+        assert payload["ok"] is True
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)
+
+
 def test_pulse_and_drift_endpoints(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("ok\n", encoding="utf-8")
     (tmp_path / "TASKS.md").write_text("# Tasks\n\n## Active\n- [ ] A\n", encoding="utf-8")
@@ -270,13 +325,16 @@ def test_pulse_and_drift_endpoints(tmp_path: Path) -> None:
         status, drift1, _ = _http_get_json(f"http://{host}:{port}/api/drift")
         assert status == 200
         assert isinstance(drift1["cursor"], int)
+        assert drift1["snapshot_cached"] is False
 
         _http_post_json(
             f"http://{host}:{port}/api/memory",
             {"path": "memory/new.md", "content": "drift\n"},
         )
+        time.sleep(2.1)
         status, drift2, _ = _http_get_json(f"http://{host}:{port}/api/drift")
         assert status == 200
+        assert drift2["snapshot_cached"] is False
         assert any("memory/new.md" in path for path in drift2["changed"])
     finally:
         server.shutdown()
