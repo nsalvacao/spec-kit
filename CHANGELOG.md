@@ -13,7 +13,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- *No changes documented yet.*
+- **#203: Native parity A4 cockpit config schema and safety guards**
+  - Added versioned cockpit config contract and parser in
+    `src/specify_cli/productivity_config.py`.
+  - Added strict path sandboxing for productivity flows (absolute/traversal/symlink
+    escape protection) and fail-fast diagnostics for invalid config.
+  - Added configurable runtime tuning via `.specify/spec-kit.yml` section
+    `productivity_update` (thresholds, scan caps, lexical filters).
+  - Added contract documentation and regression coverage:
+    - `docs/productivity-cockpit-config-contract.md`
+    - `tests/test_productivity_config.py`
+    - expanded `tests/test_productivity_update.py`.
+
+### Changed
+
+- **#179: Product identity and positioning documentation**
+  - Added positioning artifacts and ADR for independent product identity with
+    upstream compatibility:
+    - `docs/positioning.md`
+    - `docs/adr-positioning-model.md`
+  - Updated README and docs index/navigation to reflect the positioning model.
 
 ## [0.0.78] - 2026-03-02
 
