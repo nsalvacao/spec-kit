@@ -85,6 +85,7 @@ that makes every AI decision traceable and auditable:
   - template source override (`--template-repo`, `SPECIFY_TEMPLATE_REPO`)
 - Phase 0 slash-command set:
   - `/speckit.brainstorm` (optional strategic pre-phase that feeds IDEATE)
+  - `/speckit.execution-plan` (optional strategic roadmap artifact before readiness review)
   - `/speckit.ideate`
   - `/speckit.select`
   - `/speckit.structure`
@@ -115,7 +116,7 @@ that makes every AI decision traceable and auditable:
 
 Optional strategic pre-step:
 
-`BRAINSTORM -> IDEATE -> SELECT -> STRUCTURE -> VALIDATE`
+`BRAINSTORM -> EXECUTION-PLAN -> IDEATE -> SELECT -> STRUCTURE -> VALIDATE`
 
 Purpose:
 

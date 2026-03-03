@@ -25,7 +25,17 @@ This command runs the 8-framework strategic brainstorm and generates `.ideas/bra
 
 Output: `.ideas/brainstorm-expansion.md`
 
-The result complements (does not replace) Phase 0. Use it as context for IDEATE.
+Then transform strategy into an actionable roadmap:
+
+```text
+/speckit.execution-plan
+```
+
+This command generates `.ideas/execution-plan.md`.
+
+Output: `.ideas/execution-plan.md`
+
+These artifacts complement (do not replace) Phase 0. Use them as context for IDEATE and downstream planning.
 
 ## 2) Phase 0 — AI System Ideation (Recommended Prerequisite)
 

@@ -83,6 +83,7 @@ uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <project_n
 After initialization, you should see the following commands available in your AI agent:
 
 - `/speckit.brainstorm` - Strategic pre-phase (feeds IDEATE)
+- `/speckit.execution-plan` - Strategic execution planning artifact
 - `/speckit.ideate` - Phase 0 ideation
 - `/speckit.select` - Phase 0 selection
 - `/speckit.structure` - Phase 0 structure

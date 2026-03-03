@@ -33,6 +33,18 @@ uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <PROJECT_N
 uvx --from git+https://github.com/nsalvacao/spec-kit.git specify init <PROJECT_NAME> --script sh  # Force POSIX shell
 ```
 
+### Optional Strategy Pre-Phase
+
+Before Phase 0, you can run strategy artifacts for deeper planning context:
+
+```markdown
+/speckit.brainstorm
+/speckit.execution-plan
+```
+
+These outputs are written under `.ideas/` and complement Phase 0; they do not
+replace Phase 0 gates/artifacts.
+
 ### Step 2: Phase 0 AI System Ideation (Recommended Prerequisite)
 
 Run the Phase 0 commands in order:

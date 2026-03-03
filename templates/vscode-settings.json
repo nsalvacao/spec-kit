@@ -1,6 +1,7 @@
 {
     "chat.promptFilesRecommendations": {
         "speckit.brainstorm": true,
+        "speckit.execution-plan": true,
         "speckit.ideate": true,
         "speckit.select": true,
         "speckit.structure": true,
