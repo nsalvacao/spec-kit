@@ -14,6 +14,13 @@ if ((BASH_VERSINFO[0] < 4)); then
     exit 1
 fi
 
+for dep in date mkdir cat; do
+    if ! command -v "$dep" >/dev/null 2>&1; then
+        echo "Error: required dependency '$dep' is not available in PATH." >&2
+        exit 1
+    fi
+done
+
 FORCE=false
 PROJECT_DIR=""
 
@@ -76,6 +83,16 @@ PROJECT_NAME="$(basename "$PROJECT_DIR")"
 IDEAS_DIR="$PROJECT_DIR/.ideas"
 TARGET="$IDEAS_DIR/execution-plan.md"
 TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+if [ -L "$IDEAS_DIR" ]; then
+    echo "Error: $IDEAS_DIR is a symlink. Remove it manually before proceeding." >&2
+    exit 1
+fi
+
+if [ -e "$IDEAS_DIR" ] && [ ! -d "$IDEAS_DIR" ]; then
+    echo "Error: $IDEAS_DIR exists but is not a directory. Remove it manually before proceeding." >&2
+    exit 1
+fi
 
 if [ -L "$TARGET" ]; then
     echo "Error: $TARGET is a symlink. Remove it manually before proceeding." >&2

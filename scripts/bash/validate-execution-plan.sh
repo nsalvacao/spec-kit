@@ -6,17 +6,25 @@ set -euo pipefail
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo "Usage: $(basename "$0") [FILE_PATH]"
   echo ""
-  echo "Validate .ideas/execution-plan.md structure and minimum depth."
+  echo "Validate .ideas/execution-plan.md structure and minimum strategic depth."
   echo ""
   echo "Arguments:"
   echo "  FILE_PATH   Path to execution-plan markdown file (default: .ideas/execution-plan.md)"
   echo ""
   echo "Note:"
   echo "  Default path is resolved from the current working directory."
+  echo ""
+  echo "Validation thresholds:"
+  echo "  - No remaining 'TODO:' placeholders"
+  echo "  - Minimum 180 lines"
+  echo "  - Minimum 4 roadmap phases (### Phase N:)"
+  echo "  - Minimum 8 rows in Pre-Mortem Analysis (section 4b)"
+  echo "  - Minimum 10 rows in Risk Register (section 5)"
+  echo "  - Minimum 5 rows in Contrarian Challenges (section 7)"
   exit 0
 fi
 
-for dep in rg awk wc; do
+for dep in rg awk wc cat; do
   if ! command -v "$dep" >/dev/null 2>&1; then
     echo "Error: required dependency '$dep' is not available in PATH." >&2
     exit 1
@@ -77,6 +85,7 @@ if [ "$phase_count" -lt 4 ]; then
   exit 1
 fi
 
+# Use `cat --` so leading-hyphen file paths are not treated as awk options.
 premortem_rows=$(cat -- "$FILE_PATH" | awk '
   /^## 4b\. Pre-Mortem Analysis/ {in_section=1; next}
   /^## 4c\. / {in_section=0}

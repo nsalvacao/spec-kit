@@ -18,6 +18,7 @@ VALIDATE_EXECUTION_PLAN_PS1 = PS1_DIR / "validate-execution-plan.ps1"
 
 PWSH = shutil.which("pwsh")
 skip_no_pwsh = pytest.mark.skipif(PWSH is None, reason="pwsh not available")
+SUBPROCESS_TIMEOUT_SECONDS = 20
 
 
 def run(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
@@ -26,6 +27,7 @@ def run(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=cwd,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
     )
 
 
@@ -35,6 +37,7 @@ def run_ps1(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=cwd,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
     )
 
 
@@ -342,6 +345,19 @@ class TestExecutionPlanScaffold:
         assert result.returncode == 0
         assert (tmp_path / ".ideas" / "execution-plan.md").exists()
 
+    def test_rejects_symlinked_ideas_dir(self, tmp_path):
+        external = tmp_path / "external"
+        external.mkdir()
+        ideas = tmp_path / ".ideas"
+        try:
+            ideas.symlink_to(external, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported in this environment: {exc}")
+
+        result = run(EXECUTION_PLAN, str(tmp_path))
+        assert result.returncode != 0
+        assert "symlink" in result.stderr.lower()
+
 
 class TestExecutionPlanValidator:
     def test_validator_fails_on_scaffold_with_todo(self, tmp_path):
@@ -422,3 +438,16 @@ class TestExecutionPlanPowerShell:
 
         result = run_ps1(VALIDATE_EXECUTION_PLAN_PS1, str(artifact))
         assert result.returncode != 0
+
+    def test_rejects_symlinked_ideas_dir(self, tmp_path):
+        external = tmp_path / "external"
+        external.mkdir()
+        ideas = tmp_path / ".ideas"
+        try:
+            ideas.symlink_to(external, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported in this environment: {exc}")
+
+        result = run_ps1(EXECUTION_PLAN_PS1, str(tmp_path))
+        assert result.returncode != 0
+        assert "reparse point" in result.stderr.lower()

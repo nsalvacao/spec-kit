@@ -25,27 +25,56 @@ if ($Help) {
     exit 0
 }
 
+function Test-ReparsePoint {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $false
+    }
+
+    $item = Get-Item -LiteralPath $Path -Force
+    return [bool]($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
+}
+
 if (-not $ProjectDir) {
     $ProjectDir = (Get-Location).Path
 }
 
-if (-not (Test-Path $ProjectDir -PathType Container)) {
+if (-not (Test-Path -LiteralPath $ProjectDir -PathType Container)) {
     Write-Error "Error: Project directory does not exist: $ProjectDir"
     exit 1
 }
 
-$ProjectDir = (Resolve-Path $ProjectDir).Path
+$ProjectDir = (Resolve-Path -LiteralPath $ProjectDir).Path
 $ProjectName = Split-Path -Leaf $ProjectDir
 $ideasDir = Join-Path $ProjectDir '.ideas'
 $target = Join-Path $ideasDir 'execution-plan.md'
 $timestamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
-if ((Test-Path $target -PathType Container)) {
+if ((Test-Path -LiteralPath $ideasDir) -and (Test-ReparsePoint -Path $ideasDir)) {
+    Write-Error "Error: $ideasDir is a reparse point (symlink/junction). Remove it manually before proceeding."
+    exit 1
+}
+
+if ((Test-Path -LiteralPath $ideasDir) -and -not (Test-Path -LiteralPath $ideasDir -PathType Container)) {
+    Write-Error "Error: $ideasDir exists but is not a directory. Remove it manually before proceeding."
+    exit 1
+}
+
+if ((Test-Path -LiteralPath $target) -and (Test-ReparsePoint -Path $target)) {
+    Write-Error "Error: $target is a reparse point (symlink/junction). Remove it manually before proceeding."
+    exit 1
+}
+
+if ((Test-Path -LiteralPath $target -PathType Container)) {
     Write-Error "Error: $target is a directory, not a file. Remove it manually before proceeding."
     exit 1
 }
 
-if ((Test-Path $target) -and -not $Force) {
+if ((Test-Path -LiteralPath $target) -and -not $Force) {
     Write-Error "Error: $target already exists. Use -Force to overwrite."
     exit 1
 }
