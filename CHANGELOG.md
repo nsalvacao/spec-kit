@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.83] - 2026-03-03
+
+### Added
+
+- Merge pull request #233 from nsalvacao/intake/issue-206-b3-native-strategic-review
+- fix(strategy): enforce Python 3.9+ for strategic-review validation
+- fix(strategy): apply review hardening and docs coherence updates
+- fix(strategy): enforce PowerShell root blocking and fail-fast errors
+- fix(strategy): resolve PowerShell env var parser failure in CI
+- fix(strategy): harden strategic-review path and parser safeguards
+- fix(scripts): set executable mode for strategic-review runners
+- feat(strategy): add native strategic-review command with configurable scoring
+- Merge pull request #231 from nsalvacao/automation/release-metadata-0.0.82
+- chore(ci): retrigger checks for release metadata PR #231
+- chore(release): sync metadata for v0.0.82
+
 ### Added
 
 - **#206: Native strategic-review command (B3)**
