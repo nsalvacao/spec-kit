@@ -20,13 +20,6 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   exit 0
 fi
 
-for dep in python3; do
-  if ! command -v "$dep" >/dev/null 2>&1; then
-    echo "Error: required dependency '$dep' is not available in PATH." >&2
-    exit 1
-  fi
-done
-
 FILE_PATH="${1:-.ideas/evaluation-results.md}"
 PROJECT_DIR="${2:-.}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,6 +27,24 @@ RUNTIME_SCRIPT="$SCRIPT_DIR/../strategic-review-runtime.py"
 
 if [ ! -f "$RUNTIME_SCRIPT" ]; then
   echo "Error: strategic-review runtime helper not found at $RUNTIME_SCRIPT" >&2
+  exit 1
+fi
+
+if command -v uv >/dev/null 2>&1; then
+  uv run python "$RUNTIME_SCRIPT" \
+    --mode validate \
+    --file "$FILE_PATH" \
+    --project-root "$PROJECT_DIR"
+  exit $?
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Error: neither 'uv' nor 'python3' is available in PATH." >&2
+  exit 1
+fi
+
+if ! python3 -c "import sys; raise SystemExit(0 if sys.version_info.major == 3 else 1)" >/dev/null 2>&1; then
+  echo "Error: python3 must be Python 3.x." >&2
   exit 1
 fi
 

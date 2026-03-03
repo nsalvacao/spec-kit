@@ -14,7 +14,7 @@ if ((BASH_VERSINFO[0] < 4)); then
     exit 1
 fi
 
-for dep in date mkdir cat; do
+for dep in date mkdir cat basename; do
     if ! command -v "$dep" >/dev/null 2>&1; then
         echo "Error: required dependency '$dep' is not available in PATH." >&2
         exit 1

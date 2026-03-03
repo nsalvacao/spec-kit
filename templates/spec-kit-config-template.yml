@@ -47,6 +47,18 @@ productivity_update:
 
 strategic_review:
   # Runtime tuning for strategic readiness scoring and blocker extraction:
+  # Required keys under this section:
+  # - weights.output_quality, readme_docs_quality, developer_experience,
+  #   security_trust, competitive_positioning, test_coverage
+  # - thresholds.green_min_score, thresholds.yellow_min_score
+  # - blockers.emit_on_bands, blockers.max_items
+  # - validator.min_sections, validator.min_line_count
+  # Validation rules:
+  # - weights must sum to exactly 1.0
+  # - thresholds must be between 0 and 5 (yellow <= green)
+  # - blockers.max_items must be between 1 and 200
+  # - validator.min_sections must be >= 8
+  # - validator.min_line_count must be between 40 and 5000
   #
   # weights:
   #   output_quality: 0.25

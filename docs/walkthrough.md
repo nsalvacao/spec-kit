@@ -174,7 +174,7 @@ code without re-running the full pipeline.
 
 Generates a quality checklist for the current feature.
 
-## 12) Tasks to Issues
+## 13) Tasks to Issues
 
 ```text
 /speckit.taskstoissues

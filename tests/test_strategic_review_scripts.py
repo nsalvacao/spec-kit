@@ -23,10 +23,12 @@ STRATEGIC_REVIEW_RUNTIME = SHARED_SCRIPTS_DIR / "strategic-review-runtime.py"
 
 PWSH = shutil.which("pwsh")
 skip_no_pwsh = pytest.mark.skipif(PWSH is None, reason="pwsh not available")
-SUBPROCESS_TIMEOUT_SECONDS = 30
+SUBPROCESS_TIMEOUT_SECONDS = int(os.getenv("SPECIFY_TEST_SUBPROCESS_TIMEOUT_SECONDS", "30"))
 
 
 def run(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
+    if not script.exists():
+        raise FileNotFoundError(f"Script not found: {script}")
     return subprocess.run(
         [str(script), *args],
         capture_output=True,
@@ -37,6 +39,8 @@ def run(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
 
 
 def run_ps1(script: Path, *args, cwd=None) -> subprocess.CompletedProcess:
+    if not script.exists():
+        raise FileNotFoundError(f"Script not found: {script}")
     return subprocess.run(
         [PWSH, "-NonInteractive", "-File", str(script), *args],
         capture_output=True,
