@@ -51,7 +51,7 @@ function Test-BlockedProjectDirectory {
         $env:SystemRoot,
         $env:ProgramFiles,
         $env:ProgramW6432,
-        $env:'ProgramFiles(x86)',
+        [Environment]::GetEnvironmentVariable('ProgramFiles(x86)'),
         $env:ProgramData
     ) | Where-Object { $_ }
 
