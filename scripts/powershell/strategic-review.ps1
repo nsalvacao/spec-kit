@@ -6,6 +6,8 @@ param(
     [switch]$Help
 )
 
+$ErrorActionPreference = 'Stop'
+
 if ($Help) {
     Write-Output 'Usage: strategic-review.ps1 [[-ProjectDir] <path>] [-Force] [-Help]'
     Write-Output ''
@@ -45,7 +47,11 @@ function Test-BlockedProjectDirectory {
         [string]$ResolvedProjectDir
     )
 
-    $normalized = ([System.IO.Path]::GetFullPath($ResolvedProjectDir)).TrimEnd('\', '/')
+    $fullPath = [System.IO.Path]::GetFullPath($ResolvedProjectDir)
+    $normalized = $fullPath.TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        $normalized = $fullPath
+    }
 
     $windowsSystemDirs = @(
         $env:SystemRoot,
