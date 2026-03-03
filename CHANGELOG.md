@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **#205: Native strategic execution-plan command (B2)**
+  - Added `/speckit.execution-plan` command template with Bash/PowerShell
+    scaffold and validator scripts for `.ideas/execution-plan.md`.
+  - Added strategic command discoverability in CLI next steps and documentation.
+  - Added regression coverage in `tests/test_execution_plan_scripts.py`.
+
 ## [0.0.81] - 2026-03-02
 
 ### Added

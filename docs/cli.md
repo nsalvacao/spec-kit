@@ -69,6 +69,7 @@ specify init my-project --template-repo nsalvacao/spec-kit --ai codex
 ### Strategy (Optional Pre-Phase)
 
 - `/speckit.brainstorm` - strategic expansion artifact (feeds IDEATE as context)
+- `/speckit.execution-plan` - strategic execution roadmap artifact (feeds readiness review)
 
 ### Phase 0 (Recommended Prerequisite)
 

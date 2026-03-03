@@ -110,8 +110,10 @@ Outputs saved to `.ideas/` (gitignored). Skills: `strategic-analysis` (12 framew
 > **Use for**: New feature strategy, upstream PR evaluation, Phase 0 ideation complement.
 
 Native parity note:
+
 - `/speckit.brainstorm` is available in this repository as the native strategy pre-phase command.
-- Prefer `/speckit.brainstorm` for repository-native workflows and CI/tested behavior.
+- `/speckit.execution-plan` is available as the native strategic roadmap command.
+- Prefer native `/speckit.*` strategy commands for repository-native workflows and CI/tested behavior.
 
 ### Persistent Memory Protocol
 

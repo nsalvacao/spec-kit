@@ -48,7 +48,7 @@ def test_next_steps_panel_has_no_orphan_commands():
 
     import re
 
-    panel_refs = set(re.findall(r"/speckit\.(\w+)", source))
+    panel_refs = set(re.findall(r"/speckit\.([a-zA-Z0-9_-]+)", source))
     orphans = panel_refs - commands
 
     assert not orphans, (
