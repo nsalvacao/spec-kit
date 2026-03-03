@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -220,6 +221,11 @@ class TestStrategicReviewScaffold:
         assert result.returncode != 0
         assert "symlink" in result.stderr.lower()
 
+    def test_rejects_unix_system_directory(self):
+        result = run(STRATEGIC_REVIEW, "/")
+        assert result.returncode != 0
+        assert "system directory" in result.stderr.lower()
+
 
 class TestStrategicReviewRuntimeConfig:
     def test_runtime_config_defaults(self, tmp_path):
@@ -372,3 +378,9 @@ class TestStrategicReviewPowerShell:
         blockers_path = ideas_dir / "launch-blockers.md"
         assert blockers_path.exists()
         assert "RED" in blockers_path.read_text(encoding="utf-8")
+
+    def test_rejects_system_directory(self):
+        target = "/" if os.name != "nt" else os.environ.get("SystemRoot", r"C:\Windows")
+        result = run_ps1(STRATEGIC_REVIEW_PS1, target)
+        assert result.returncode != 0
+        assert "system directory" in result.stderr.lower()

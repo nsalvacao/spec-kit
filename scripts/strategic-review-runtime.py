@@ -19,7 +19,7 @@ from typing import Any, Mapping
 
 try:
     import yaml
-except Exception:  # pragma: no cover - fallback path
+except ImportError:  # pragma: no cover - fallback path
     yaml = None
 
 
@@ -122,7 +122,7 @@ def _parse_env_value(raw: str) -> Any:
         return raw
     try:
         return yaml.safe_load(raw)
-    except Exception:
+    except yaml.YAMLError:
         return raw
 
 
@@ -360,7 +360,7 @@ def validate_review_file(*, file_path: Path, project_root: Path, config: Mapping
 
     resolved_project_root = project_root.resolve()
     resolved_file = file_path.resolve()
-    if not str(resolved_file).startswith(str(resolved_project_root)):
+    if not resolved_file.is_relative_to(resolved_project_root):
         raise StrategicReviewRuntimeError(
             f"Refusing to validate file outside project root: {resolved_file}"
         )

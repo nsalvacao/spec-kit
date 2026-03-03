@@ -71,10 +71,18 @@ if [ ! -d "$PROJECT_DIR" ]; then
 fi
 
 PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
+PROJECT_DIR_LOWER="${PROJECT_DIR,,}"
 
 case "$PROJECT_DIR" in
     /|/etc|/usr|/bin|/sbin|/lib|/lib64|/boot|/proc|/sys|/dev)
         echo "Error: Refusing to use system directory as project directory: $PROJECT_DIR" >&2
+        exit 1
+        ;;
+esac
+
+case "$PROJECT_DIR_LOWER" in
+    /mnt/c/windows|/mnt/c/windows/*|/mnt/c/program\ files|/mnt/c/program\ files/*|/mnt/c/program\ files\ \(x86\)|/mnt/c/program\ files\ \(x86\)/*|/mnt/c/programdata|/mnt/c/programdata/*|/mnt/c/users/all\ users|/mnt/c/users/all\ users/*|/c/windows|/c/windows/*|/c/program\ files|/c/program\ files/*|/c/program\ files\ \(x86\)|/c/program\ files\ \(x86\)/*|/c/programdata|/c/programdata/*|c:/windows|c:/windows/*|c:/program\ files|c:/program\ files/*|c:/program\ files\ \(x86\)|c:/program\ files\ \(x86\)/*|c:/programdata|c:/programdata/*)
+        echo "Error: Refusing to use Windows system directory as project directory: $PROJECT_DIR" >&2
         exit 1
         ;;
 esac

@@ -39,6 +39,64 @@ function Test-ReparsePoint {
     return [bool]($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
 }
 
+function Test-BlockedProjectDirectory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedProjectDir
+    )
+
+    $normalized = ([System.IO.Path]::GetFullPath($ResolvedProjectDir)).TrimEnd('\', '/')
+
+    $windowsSystemDirs = @(
+        $env:SystemRoot,
+        $env:ProgramFiles,
+        $env:ProgramW6432,
+        $env:'ProgramFiles(x86)',
+        $env:ProgramData
+    ) | Where-Object { $_ }
+
+    foreach ($candidate in ($windowsSystemDirs | Select-Object -Unique)) {
+        $blocked = ([System.IO.Path]::GetFullPath($candidate)).TrimEnd('\', '/')
+        if (
+            $normalized.Equals($blocked, [System.StringComparison]::OrdinalIgnoreCase) -or
+            $normalized.StartsWith("$blocked\", [System.StringComparison]::OrdinalIgnoreCase)
+        ) {
+            return $true
+        }
+    }
+
+    $unixSystemDirs = @('/', '/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/proc', '/sys', '/dev')
+    foreach ($blocked in $unixSystemDirs) {
+        if (
+            $normalized -eq $blocked -or
+            $normalized.StartsWith("$blocked/", [System.StringComparison]::Ordinal)
+        ) {
+            return $true
+        }
+    }
+
+    $wslWindowsSystemDirs = @(
+        '/mnt/c/windows',
+        '/mnt/c/program files',
+        '/mnt/c/program files (x86)',
+        '/mnt/c/programdata',
+        '/c/windows',
+        '/c/program files',
+        '/c/program files (x86)',
+        '/c/programdata'
+    )
+    foreach ($blocked in $wslWindowsSystemDirs) {
+        if (
+            $normalized.Equals($blocked, [System.StringComparison]::OrdinalIgnoreCase) -or
+            $normalized.StartsWith("$blocked/", [System.StringComparison]::OrdinalIgnoreCase)
+        ) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 if (-not $ProjectDir) {
     $ProjectDir = (Get-Location).Path
 }
@@ -49,6 +107,11 @@ if (-not (Test-Path -LiteralPath $ProjectDir -PathType Container)) {
 }
 
 $ProjectDir = (Resolve-Path -LiteralPath $ProjectDir).Path
+if (Test-BlockedProjectDirectory -ResolvedProjectDir $ProjectDir) {
+    Write-Error "Error: Refusing to use system directory as project directory: $ProjectDir"
+    exit 1
+}
+
 $ProjectName = Split-Path -Leaf $ProjectDir
 $ideasDir = Join-Path $ProjectDir '.ideas'
 $target = Join-Path $ideasDir 'evaluation-results.md'
