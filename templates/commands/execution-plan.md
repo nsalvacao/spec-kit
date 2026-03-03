@@ -45,4 +45,4 @@ agent_scripts:
 
 - This command complements Phase 0 and does not replace it.
 - Recommended sequence:
-  - `/speckit.brainstorm` -> `/speckit.ideate` -> `/speckit.select` -> `/speckit.structure` -> `/speckit.validate` -> `/speckit.execution-plan`
+  - `/speckit.brainstorm` -> `/speckit.execution-plan` -> `/speckit.ideate` -> `/speckit.select` -> `/speckit.structure` -> `/speckit.validate`
