@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.82] - 2026-03-03
+
+### Added
+
+- Merge pull request #229 from nsalvacao/intake/issue-205-b2-native-execution-plan
+- fix(execution-plan): harden symlink guards and test stability
+- fix(strategy): harden validator input handling and script perms
+- feat(strategy): add native execution-plan command parity
+- Merge pull request #227 from nsalvacao/automation/release-metadata-0.0.81
+- chore(release): sync metadata for v0.0.81
+
 ### Added
 
 - **#205: Native strategic execution-plan command (B2)**
