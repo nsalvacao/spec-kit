@@ -68,6 +68,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
 }
 
+MIN_PYTHON = (3, 9)
+
 OVERALL_SCORE_PATTERN = re.compile(r"^\*\*Overall Score:\*\*\s*([0-9]+(?:\.[0-9]+)?)\s*$")
 BAND_PATTERN = re.compile(r"^\*\*Band:\*\*\s*(GREEN|YELLOW|RED)\s*$")
 DATE_PATTERN = re.compile(r"^\*\*Date:\*\*\s*(.+?)\s*$")
@@ -557,6 +559,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    if sys.version_info < MIN_PYTHON:
+        required = ".".join(str(part) for part in MIN_PYTHON)
+        print(
+            f"Error: strategic-review runtime requires Python >= {required}.",
+            file=sys.stderr,
+        )
+        return 1
+
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
     project_root = Path(args.project_root).resolve()

@@ -25,14 +25,22 @@ function Resolve-CommandPath {
     return $CommandInfo.Source
 }
 
-function Test-Python3 {
+function Test-PythonCompatible {
     param(
         [Parameter(Mandatory = $true)]
         [string]$ExecutablePath
     )
 
-    $majorVersion = & $ExecutablePath -c "import sys; print(sys.version_info[0])" 2>$null
-    return ($LASTEXITCODE -eq 0 -and "$majorVersion".Trim() -eq '3')
+    $versionTuple = & $ExecutablePath -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return $false
+    }
+
+    $version = $null
+    if (-not [Version]::TryParse("$versionTuple".Trim(), [ref]$version)) {
+        return $false
+    }
+    return $version -ge [Version]'3.9'
 }
 
 $uv = Get-Command uv -ErrorAction SilentlyContinue
@@ -52,8 +60,8 @@ if (-not $python) {
 }
 
 $pythonPath = Resolve-CommandPath -CommandInfo $python
-if (-not (Test-Python3 -ExecutablePath $pythonPath)) {
-    Write-Error "Python 3.x is required to run strategic-review runtime (found: $pythonPath)."
+if (-not (Test-PythonCompatible -ExecutablePath $pythonPath)) {
+    Write-Error "Python >= 3.9 is required to run strategic-review runtime (found: $pythonPath)."
     exit 1
 }
 

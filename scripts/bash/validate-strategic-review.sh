@@ -43,8 +43,8 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! python3 -c "import sys; raise SystemExit(0 if sys.version_info.major == 3 else 1)" >/dev/null 2>&1; then
-  echo "Error: python3 must be Python 3.x." >&2
+if ! python3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)" >/dev/null 2>&1; then
+  echo "Error: python3 must be Python >= 3.9." >&2
   exit 1
 fi
 
