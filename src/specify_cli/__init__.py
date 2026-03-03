@@ -1842,6 +1842,7 @@ def init(
     steps_lines.append("   [bold cyan]Strategy (Optional Pre-Phase)[/bold cyan]")
     steps_lines.append("   • [cyan]/speckit.brainstorm[/] - Build strategic expansion context in .ideas/")
     steps_lines.append("   • [cyan]/speckit.execution-plan[/] - Convert strategic options into an actionable roadmap")
+    steps_lines.append("   • [cyan]/speckit.strategic-review[/] - Run readiness scoring and blocker extraction before launch")
     steps_lines.append("")
     steps_lines.append("   [bold cyan]Phase 0: AI System Ideation[/bold cyan]")
     steps_lines.append("   • [cyan]/speckit.ideate[/] - Generate ideas using SCAMPER + HMW")

@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **#206: Native strategic-review command (B3)**
+  - Added `/speckit.strategic-review` command template with Bash/PowerShell
+    scaffold and validator scripts for `.ideas/evaluation-results.md`.
+  - Added strategic readiness runtime with configurable weights, thresholds,
+    and blocker emission to `.ideas/launch-blockers.md` when required.
+  - Added discoverability/docs coverage for strategic-review across CLI output,
+    walkthroughs, installation docs, and docs-site mirrors.
+  - Added regression coverage in `tests/test_strategic_review_scripts.py`.
+
+### Changed
+
+- Strategic-review wrappers now align with repository Python execution pattern:
+  prefer `uv run python` when `uv` is available, otherwise fallback to Python 3.
+- Strategic-review PowerShell/Bash script safety checks were hardened for
+  system-directory blocking and deterministic fail-fast behavior.
+
 ## [0.0.82] - 2026-03-03
 
 ### Added

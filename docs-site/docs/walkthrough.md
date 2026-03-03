@@ -127,7 +127,18 @@ Checks cross‑artifact consistency before execution.
 
 Executes tasks according to the plan.
 
-## 10) Amend (Post-Implementation)
+## 10) Strategic Review (Pre-Launch Gate)
+
+```text
+/speckit.strategic-review
+```
+
+Runs strategic readiness scoring and emits:
+
+- `.ideas/evaluation-results.md`
+- `.ideas/launch-blockers.md` (when score bands require blockers)
+
+## 11) Amend (Post-Implementation)
 
 ```text
 /speckit.amend Describe the edge case, new scenario, or behavioral correction.
@@ -137,7 +148,7 @@ Applies a targeted amendment when an edge case or correction is discovered
 after implementation. Updates the spec, adds a failing test, then fixes the
 code without re-running the full pipeline.
 
-## 11) Checklist
+## 12) Checklist
 
 ```text
 /speckit.checklist
@@ -145,7 +156,7 @@ code without re-running the full pipeline.
 
 Generates a quality checklist for the current feature.
 
-## 12) Tasks to Issues
+## 13) Tasks to Issues
 
 ```text
 /speckit.taskstoissues

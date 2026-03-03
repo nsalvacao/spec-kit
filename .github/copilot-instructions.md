@@ -113,6 +113,7 @@ Native parity note:
 
 - `/speckit.brainstorm` is available in this repository as the native strategy pre-phase command.
 - `/speckit.execution-plan` is available as the native strategic roadmap command.
+- `/speckit.strategic-review` is available as the native pre-launch readiness gate.
 - Prefer native `/speckit.*` strategy commands for repository-native workflows and CI/tested behavior.
 
 ### Persistent Memory Protocol

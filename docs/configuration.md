@@ -67,6 +67,26 @@ See full contract and cockpit safety model in:
 
 - `docs/productivity-cockpit-config-contract.md`
 
+## Current Configurable Section: Strategic Review Runtime
+
+The strategic readiness gate (`/speckit.strategic-review`) consumes:
+
+- `strategic_review.weights.output_quality`
+- `strategic_review.weights.readme_docs_quality`
+- `strategic_review.weights.developer_experience`
+- `strategic_review.weights.security_trust`
+- `strategic_review.weights.competitive_positioning`
+- `strategic_review.weights.test_coverage`
+- `strategic_review.thresholds.green_min_score`
+- `strategic_review.thresholds.yellow_min_score`
+- `strategic_review.blockers.emit_on_bands`
+- `strategic_review.blockers.max_items`
+- `strategic_review.validator.min_sections`
+- `strategic_review.validator.min_line_count`
+
+These keys control weighted launch-readiness scoring, score-band mapping, and
+automatic blocker artifact emission.
+
 ## Reuse Guidance for Future Features
 
 When adding new configurable behavior in Spec-Kit:

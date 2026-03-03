@@ -45,6 +45,15 @@ Before Phase 0, you can run strategy artifacts for deeper planning context:
 These outputs are written under `.ideas/` and complement Phase 0; they do not
 replace Phase 0 gates/artifacts.
 
+Before public launch (after implementation), run:
+
+```markdown
+/speckit.strategic-review
+```
+
+This produces `.ideas/evaluation-results.md` and, when thresholds require it,
+`.ideas/launch-blockers.md`.
+
 ### Step 2: Phase 0 AI System Ideation (Recommended Prerequisite)
 
 Run the Phase 0 commands in order:

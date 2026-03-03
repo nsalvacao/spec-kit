@@ -6,6 +6,7 @@ An optional strategic pre-phase can be used before IDEATE:
 
 - `/speckit.brainstorm` -> `.ideas/brainstorm-expansion.md`
 - `/speckit.execution-plan` -> `.ideas/execution-plan.md`
+- `/speckit.strategic-review` -> `.ideas/evaluation-results.md` (+ `.ideas/launch-blockers.md` when needed)
 
 These strategic artifacts feed Phase 0 context but do not replace Phase 0
 artifacts or gates.
@@ -36,6 +37,7 @@ This creates a defensible, documented rationale before the SDD pipeline starts.
 1. **Optional Strategy Pre-Phase**: BRAINSTORM -> EXECUTION-PLAN
 2. **Phase 0**: IDEATE → SELECT → STRUCTURE → VALIDATE  
 3. **SDD Core**: CONSTITUTION → SPECIFY → PLAN → TASKS → IMPLEMENT
+4. **Optional Pre-Launch Gate**: STRATEGIC-REVIEW
 
 ## Core Principles
 
@@ -53,6 +55,8 @@ This creates a defensible, documented rationale before the SDD pipeline starts.
 - `.spec-kit/approvals/g0-validation-report.md`
 - `.ideas/brainstorm-expansion.md`
 - `.ideas/execution-plan.md`
+- `.ideas/evaluation-results.md`
+- `.ideas/launch-blockers.md` (conditional)
 - `.specify/specs/<feature>/spec.md`
 - `.specify/specs/<feature>/plan.md`
 - `.specify/specs/<feature>/tasks.md`

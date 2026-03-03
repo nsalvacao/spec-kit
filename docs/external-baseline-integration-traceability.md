@@ -24,8 +24,8 @@ capabilities into native, first-party functionality.
 | Productivity cockpit UI + bridge advanced follow-up (A3 deferred) | Advanced UX/drift/provider refinements after core parity | [#222](https://github.com/nsalvacao/spec-kit/issues/222) | Planned |
 | Productivity config + safety parity (A4 schema/guards) | `.cockpit.json` contract + path sandboxing + runtime tuning in project config | [#203](https://github.com/nsalvacao/spec-kit/issues/203) | Delivered |
 | Strategic brainstorm parity (B1) | `/speckit.brainstorm` + scaffold/validator scripts + tests | [#204](https://github.com/nsalvacao/spec-kit/issues/204) | Delivered |
-| Strategic execution-plan parity (B2) | `/speckit.execution-plan` + scaffold/validator scripts + tests | [#205](https://github.com/nsalvacao/spec-kit/issues/205) | In progress |
-| Strategic-review parity (B3) | Native readiness scoring + evaluation artifact workflow | [#206](https://github.com/nsalvacao/spec-kit/issues/206) | Planned |
+| Strategic execution-plan parity (B2) | `/speckit.execution-plan` + scaffold/validator scripts + tests | [#205](https://github.com/nsalvacao/spec-kit/issues/205) | Delivered |
+| Strategic-review parity (B3) | Native readiness scoring + evaluation artifact workflow | [#206](https://github.com/nsalvacao/spec-kit/issues/206) | In progress |
 | Integration coherence and closure evidence (C) | End-to-end parity validation package + docs coherence | [#207](https://github.com/nsalvacao/spec-kit/issues/207) | Planned |
 | Cockpit feature binding to active feature tasks | CLI/state + dashboard binding | [#110](https://github.com/nsalvacao/spec-kit/issues/110) | Planned |
 | Guided orchestration across Layers 0-4 | Wizard/orchestrator in native CLI flow | [#111](https://github.com/nsalvacao/spec-kit/issues/111) | Planned |
