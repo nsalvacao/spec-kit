@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.81] - 2026-03-02
+
+### Added
+
+- Merge pull request #226 from nsalvacao/intake/issue-204-b1-native-brainstorm
+- feat(release): hydrate sync changelog entries from release notes
+- fix(changelog): restore v0.0.80 heading for coherence guards
+- Merge branch 'main' into intake/issue-204-b1-native-brainstorm
+- Merge pull request #224 from nsalvacao/automation/release-metadata-0.0.80
+- chore(version): keep #226 metadata aligned with main release lane
+- fix(brainstorm): address PR #226 review findings
+- fix(docs-ci): correct methodology numbering and script execute bits
+- feat(strategy): add native /speckit.brainstorm flow
+- chore(release): sync metadata for v0.0.80
+
 ### Added
 
 - **#204: Native strategic brainstorm command (B1)**
