@@ -25,6 +25,7 @@ DEFAULT_PROJECT_CONFIG: dict[str, Any] = {
     "schema_version": 1,
     "scope_detection": {},
     "productivity_update": {},
+    "strategic_review": {},
 }
 
 

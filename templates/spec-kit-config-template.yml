@@ -44,3 +44,26 @@ productivity_update:
   # common_entity_verbish:
   #   - review
   #   - update
+
+strategic_review:
+  # Runtime tuning for strategic readiness scoring and blocker extraction:
+  #
+  # weights:
+  #   output_quality: 0.25
+  #   readme_docs_quality: 0.20
+  #   developer_experience: 0.20
+  #   security_trust: 0.15
+  #   competitive_positioning: 0.10
+  #   test_coverage: 0.10
+  #
+  # thresholds:
+  #   green_min_score: 4.0
+  #   yellow_min_score: 3.0
+  #
+  # blockers:
+  #   emit_on_bands: [YELLOW, RED]
+  #   max_items: 20
+  #
+  # validator:
+  #   min_sections: 8
+  #   min_line_count: 120

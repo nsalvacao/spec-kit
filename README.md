@@ -86,6 +86,7 @@ that makes every AI decision traceable and auditable:
 - Phase 0 slash-command set:
   - `/speckit.brainstorm` (optional strategic pre-phase that feeds IDEATE)
   - `/speckit.execution-plan` (optional strategic roadmap artifact before readiness review)
+  - `/speckit.strategic-review` (optional strategic readiness gate before public launch)
   - `/speckit.ideate`
   - `/speckit.select`
   - `/speckit.structure`
@@ -117,6 +118,10 @@ that makes every AI decision traceable and auditable:
 Optional strategic pre-step:
 
 `BRAINSTORM -> EXECUTION-PLAN -> IDEATE -> SELECT -> STRUCTURE -> VALIDATE`
+
+Optional pre-launch strategic quality gate:
+
+`... -> IMPLEMENT -> STRATEGIC-REVIEW`
 
 Purpose:
 
